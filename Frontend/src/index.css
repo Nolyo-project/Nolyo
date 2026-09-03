@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", "Georgia", serif;
+  --color-ink: #141711;
+  --color-ink-soft: #3a4034;
+  --color-paper: #f3eee4;
+  --color-paper-2: #e8e1d4;
+  --color-copper: #c45c26;
+  --color-copper-dark: #9c4318;
+  --color-moss: #243026;
+  --color-moss-mid: #3d5340;
+  --color-cream: #faf7f1;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-copper) 28%, transparent);
+}
+
+.dash-sidebar {
+  background:
+    radial-gradient(28rem 18rem at -12% -8%, color-mix(in srgb, var(--color-copper) 28%, transparent), transparent 62%),
+    radial-gradient(18rem 14rem at 120% 110%, color-mix(in srgb, var(--color-cream) 12%, transparent), transparent 55%),
+    var(--color-moss);
+}
+
+.dash-canvas {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-cream) 72%, var(--color-paper)) 0%, var(--color-paper) 18rem);
+}
+
+.dash-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dash-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-moss) 22%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
