@@ -1,43 +1,57 @@
 export const plans = [
   {
     id: 'essentiel',
-    name: 'Nolio Essentiel',
-    price: 4.99,
+    name: 'Nolyo Essentiel',
+    price: 9.99,
     period: 'mois',
-    audience: 'Pour démarrer',
+    audience: 'Pour démarrer, en interne',
     trial: '1er mois offert',
+    commitmentMonths: 6,
+    totalMonths: 7,
+    commitment: 'Engagement 6 mois',
     features: [
-      'Tableau de bord',
-      'Client & Prospect',
+      'Tableau de bord privé',
+      'Clients et prospects',
       'Notes',
-      'Rendez-vous',
-      'Revenus & Dépenses',
-      'Estimations indicatives des cotisations',
-      'Rappel & relance',
-      'Connexion email',
+      'Agenda',
+      'Revenus, un mois à la fois',
+      'Relances',
+      'Connexion e-mail',
     ],
   },
   {
     id: 'pro',
-    name: 'Nolio Pro',
-    price: 9.99,
+    name: 'Nolyo Pro',
+    price: 19.99,
     period: 'mois',
-    audience: 'Pour aller plus loin',
+    audience: 'Tableau de bord + page professionnelle',
     featured: true,
     trial: '1er mois offert',
+    commitmentMonths: 6,
+    totalMonths: 7,
+    commitment: 'Engagement 6 mois',
     features: [
-      'Tout Nolio Essentiel',
-      'Boîte de réception centralisée (Instagram, Facebook, Email)',
-      'Statistiques avancées',
-      'Plusieurs connexions',
+      'Tout Nolyo Essentiel',
+      'Page d’accueil et à propos (votre vitrine)',
+      'Photos, couleurs, présentation de l’équipe',
+      'Réservation et devis en ligne',
+      'QR Code vers votre page',
+      'Boîte de réception (Instagram, Facebook, e-mail)',
+      'Statistiques',
+      'Dépenses et cotisations',
     ],
   },
 ]
 
 export const planLabels = {
-  essentiel: 'Nolio Essentiel',
-  pro: 'Nolio Pro',
+  essentiel: 'Nolyo Essentiel',
+  pro: 'Nolyo Pro',
 }
+
+export const trialNote =
+  'Le premier mois est offert. Ensuite, un engagement de 6 mois. Soit 7 mois au total.'
+
+export const trialShort = '1er mois offert, puis 6 mois d’engagement — 7 mois au total'
 
 export function formatPrice(price) {
   return new Intl.NumberFormat('fr-FR', {
@@ -47,5 +61,5 @@ export function formatPrice(price) {
 }
 
 export function isProPlan(user) {
-  return user?.subscription?.plan === 'pro'
+  return user?.preview === true || user?.subscription?.plan === 'pro'
 }

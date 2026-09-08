@@ -5,6 +5,8 @@
 !**/.env.example
 
 node_modules
+uploads
+Backend/uploads
 dist
 dist-ssr
 .DS_Store

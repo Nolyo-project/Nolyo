@@ -25,9 +25,9 @@ function fillMissingEnv() {
 fillMissingEnv()
 
 const API = process.env.API_URL || `http://localhost:${process.env.PORT || 5050}`
-const DEMO_EMAIL = process.env.DEMO_EMAIL || 'lea@nolio.test'
+const DEMO_EMAIL = process.env.DEMO_EMAIL || 'ines@nolio.test'
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'NolioDemo2026!'
-const MARKER = 'Nolio Test popup'
+const MARKER = 'Nolyo Test popup'
 
 function hoursAgo(hours) {
   return new Date(Date.now() - hours * 60 * 60 * 1000)
@@ -234,7 +234,7 @@ async function main() {
   }
 
   console.log('\nTous les tests API sont passés.')
-  console.log('Rafraîchis le tableau de bord (connecté en lea@nolio.test) : la popup doit s’ouvrir.')
+  console.log('Rafraîchis le tableau de bord (connecté en ines@nolio.test) : la popup doit s’ouvrir.')
   console.log('1) Camille Roux, prospect → Passer en client / Sans suite / Note')
   console.log('2) Nicolas Test, client → Sans suite / Note (pas de Passer en client)')
 }

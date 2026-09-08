@@ -3,11 +3,14 @@ import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { isProPlan } from '../../data/plans'
+import { copyForUser, pluralLabel } from '../../data/trades'
+import { hasModule } from '../../data/workspace'
 import { formatDateTime, formatLongDate, formatMoney, formatTime } from './format'
 import { EmptyState, PageShell, Surface, icons, primaryBtn } from './ui'
 
 function Overview() {
   const { user } = useAuth()
+  const copy = copyForUser(user)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const firstName = user.name.split(' ')[0]
@@ -28,61 +31,71 @@ function Overview() {
   }
 
   const nextItems = [
-    ...data.todayAppointments.slice(0, 3).map((item) => ({
-      id: item._id,
-      title: item.title,
-      meta: `${formatTime(item.startAt)}${item.contact?.name ? ` · ${item.contact.name}` : ''}`,
-      kind: 'Rendez-vous',
-      to: '/dashboard/rdv',
-    })),
-    ...data.reminders.slice(0, 3).map((item) => ({
-      id: item._id,
-      title: item.title,
-      meta: formatDateTime(item.dueAt),
-      kind: 'Relance',
-      to: '/dashboard/relances',
-    })),
+    ...(hasModule(user, 'appointments')
+      ? data.todayAppointments.slice(0, 3).map((item) => ({
+          id: item._id,
+          title: item.title,
+          meta: `${formatTime(item.startAt)}${item.contact?.name ? ` · ${item.contact.name}` : ''}`,
+          kind: copy.appointments,
+          to: '/dashboard/rdv',
+        }))
+      : []),
+    ...(hasModule(user, 'reminders')
+      ? data.reminders.slice(0, 3).map((item) => ({
+          id: item._id,
+          title: item.title,
+          meta: formatDateTime(item.dueAt),
+          kind: 'Relance',
+          to: '/dashboard/relances',
+        }))
+      : []),
   ].slice(0, 5)
 
   const stats = [
-    {
-      to: '/dashboard/finances',
-      label: 'Ce mois',
-      value: formatMoney(data.monthIncome),
-      hint: 'encaissé',
-      tone: 'light',
-    },
-    {
-      to: '/dashboard/rdv',
-      label: 'Aujourd’hui',
-      value: data.todayAppointments.length,
-      hint: data.todayAppointments.length > 1 ? 'rendez-vous' : 'rendez-vous',
-      tone: 'light',
-    },
+    hasModule(user, 'finances')
+      ? {
+          to: '/dashboard/finances',
+          label: 'Ce mois',
+          value: formatMoney(data.monthIncome),
+          hint: 'encaissé',
+          tone: 'light',
+        }
+      : null,
+    hasModule(user, 'appointments')
+      ? {
+          to: '/dashboard/rdv',
+          label: 'Aujourd’hui',
+          value: data.todayAppointments.length,
+          hint: pluralLabel(copy.appointmentHint, data.todayAppointments.length),
+          tone: 'light',
+        }
+      : null,
     {
       to: '/dashboard/clients',
-      label: 'Carnet',
+      label: copy.clients,
       value: data.clients,
-      hint: data.clients > 1 ? 'clients' : 'client',
+      hint: pluralLabel(copy.clientsSingular, data.clients),
       tone: 'light',
     },
-    {
-      to: '/dashboard/relances',
-      label: 'À relancer',
-      value: data.pendingReminders,
-      hint: 'en attente',
-      tone: 'dark',
-    },
-  ]
+    hasModule(user, 'reminders')
+      ? {
+          to: '/dashboard/relances',
+          label: 'À relancer',
+          value: data.pendingReminders,
+          hint: 'en attente',
+          tone: 'dark',
+        }
+      : null,
+  ].filter(Boolean)
 
   const shortcuts = [
-    { to: '/dashboard/taches', label: 'Tâches du jour', icon: 'journal' },
-    { to: '/dashboard/clients', label: 'Nouveau client', icon: 'people' },
-    { to: '/dashboard/prospects', label: 'Nouveau prospect', icon: 'prospect' },
-    { to: '/dashboard/rdv', label: 'Ouvrir l’agenda', icon: 'calendar' },
-    { to: '/dashboard/notes', label: 'Ajouter une note', icon: 'note' },
-    { to: '/dashboard/finances', label: 'Saisir un montant', icon: 'wallet' },
-  ]
+    hasModule(user, 'tasks') ? { to: '/dashboard/taches', label: 'Tâches du jour', icon: 'journal' } : null,
+    { to: '/dashboard/clients', label: copy.newClient, icon: 'people' },
+    hasModule(user, 'prospects') ? { to: '/dashboard/prospects', label: copy.newProspect, icon: 'prospect' } : null,
+    hasModule(user, 'appointments') ? { to: '/dashboard/rdv', label: 'Ouvrir l’agenda', icon: 'calendar' } : null,
+    hasModule(user, 'notes') ? { to: '/dashboard/notes', label: 'Ajouter une note', icon: 'note' } : null,
+    hasModule(user, 'finances') ? { to: '/dashboard/finances', label: 'Saisir un montant', icon: 'wallet' } : null,
+  ].filter(Boolean)
 
   return (
     <PageShell>
@@ -90,7 +103,14 @@ function Overview() {
         <div>
           <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">{formatLongDate()}</p>
           <h1 className="mt-1 font-display text-3xl tracking-tight sm:text-5xl">Bonjour, {firstName}.</h1>
-          <p className="mt-2 text-ink-soft">L’essentiel, sans bruit. Cliquez une carte pour continuer.</p>
+          <p className="mt-2 text-ink-soft">{copy.overviewHint}</p>
+          {user.page?.published && user.page?.slug && hasModule(user, 'page') ? (
+            <p className="mt-3">
+              <Link to={`/p/${user.page.slug}`} className="text-sm font-medium text-copper hover:underline">
+                Voir ma page professionnelle
+              </Link>
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -123,17 +143,21 @@ function Overview() {
               <h2 className="font-display text-2xl">Maintenant</h2>
               <p className="mt-1 text-sm text-ink-soft">Ce qui arrive ensuite.</p>
             </div>
-            <Link to="/dashboard/rdv" className="text-sm font-medium text-copper hover:underline">
-              Agenda
-            </Link>
+            {hasModule(user, 'appointments') ? (
+              <Link to="/dashboard/rdv" className="text-sm font-medium text-copper hover:underline">
+                {copy.agendaKicker}
+              </Link>
+            ) : null}
           </div>
           {nextItems.length === 0 ? (
             <div className="mt-6">
               <EmptyState>
                 Rien de prévu pour l’instant.
-                <Link to="/dashboard/rdv" className={`${primaryBtn} mt-4`}>
-                  Voir l’agenda
-                </Link>
+                {hasModule(user, 'appointments') ? (
+                  <Link to="/dashboard/rdv" className={`${primaryBtn} mt-4`}>
+                    Voir l’agenda
+                  </Link>
+                ) : null}
               </EmptyState>
             </div>
           ) : (
@@ -173,7 +197,7 @@ function Overview() {
                 </Link>
               </li>
             ))}
-            {isPro ? (
+            {hasModule(user, 'inbox') ? (
               <li>
                 <Link
                   to="/dashboard/inbox"
@@ -188,7 +212,7 @@ function Overview() {
                   ) : null}
                 </Link>
               </li>
-            ) : (
+            ) : !isPro ? (
               <li>
                 <Link
                   to="/dashboard/inbox"
@@ -201,7 +225,7 @@ function Overview() {
                   </span>
                 </Link>
               </li>
-            )}
+            ) : null}
           </ul>
         </Surface>
       </section>

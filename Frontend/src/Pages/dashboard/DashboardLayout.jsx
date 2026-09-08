@@ -5,36 +5,42 @@ import { useAuth } from '../../context/AuthContext'
 import { isProPlan, planLabels } from '../../data/plans'
 import Logo from '../../components/Logo'
 import { trialDaysLeft } from './format'
-import { icons, initials } from './ui'
+import { icons, Avatar } from './ui'
 import FollowUpModal from './FollowUpModal'
+import { copyForUser } from '../../data/trades'
+import { hasModule, workspaceLabel } from '../../data/workspace'
 
-const groups = [
-  {
-    label: 'Atelier',
-    links: [
-      { to: '/dashboard', label: 'Vue d’ensemble', icon: 'home', end: true },
-      { to: '/dashboard/taches', label: 'Tâches', icon: 'journal' },
-      { to: '/dashboard/clients', label: 'Clients', icon: 'people' },
-      { to: '/dashboard/prospects', label: 'Prospects', icon: 'prospect' },
-      { to: '/dashboard/rdv', label: 'Rendez-vous', icon: 'calendar', badge: 'rdv' },
-      { to: '/dashboard/notes', label: 'Notes', icon: 'note' },
-    ],
-  },
-  {
-    label: 'Suivi',
-    links: [
-      { to: '/dashboard/finances', label: 'Chiffre d’affaires', icon: 'wallet' },
-      { to: '/dashboard/relances', label: 'Relances', icon: 'bell' },
-    ],
-  },
-  {
-    label: 'Nolio Pro',
-    links: [
-      { to: '/dashboard/inbox', label: 'Boîte de réception', icon: 'inbox', pro: true, badge: 'inbox' },
-      { to: '/dashboard/statistiques', label: 'Statistiques', icon: 'chart', pro: true },
-    ],
-  },
-]
+function navGroups(copy) {
+  return [
+    {
+      label: copy.navGroup,
+      links: [
+        { to: '/dashboard', label: 'Vue d’ensemble', icon: 'home', end: true },
+        { to: '/dashboard/taches', label: 'Tâches', icon: 'journal', module: 'tasks' },
+        { to: '/dashboard/clients', label: copy.clients, icon: 'people' },
+        { to: '/dashboard/prospects', label: copy.prospects, icon: 'prospect', module: 'prospects' },
+        { to: '/dashboard/rdv', label: copy.appointments, icon: 'calendar', badge: 'rdv', module: 'appointments' },
+        { to: '/dashboard/notes', label: 'Notes', icon: 'note', module: 'notes' },
+        { to: '/dashboard/page', label: 'Page', icon: 'page', pro: true, module: 'page' },
+        { to: '/dashboard/qr-code', label: 'QR Code', icon: 'qr', pro: true, module: 'qr' },
+      ],
+    },
+    {
+      label: 'Suivi',
+      links: [
+        { to: '/dashboard/finances', label: 'Chiffre d’affaires', icon: 'wallet', module: 'finances' },
+        { to: '/dashboard/relances', label: 'Relances', icon: 'bell', module: 'reminders' },
+      ],
+    },
+    {
+      label: 'Nolyo Pro',
+      links: [
+        { to: '/dashboard/inbox', label: 'Boîte de réception', icon: 'inbox', pro: true, badge: 'inbox', module: 'inbox' },
+        { to: '/dashboard/statistiques', label: 'Statistiques', icon: 'chart', pro: true, module: 'stats' },
+      ],
+    },
+  ]
+}
 
 const emptyBadges = { rdv: 0, reminders: 0, inbox: 0 }
 
@@ -78,6 +84,33 @@ function navClass({ isActive, locked }) {
   }`
 }
 
+function formatClock(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  const minutes = Math.floor(total / 60)
+  const seconds = total % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function PreviewTag({ expiresAt }) {
+  const [left, setLeft] = useState(() => new Date(expiresAt).getTime() - Date.now())
+
+  useEffect(() => {
+    const tick = () => setLeft(new Date(expiresAt).getTime() - Date.now())
+    tick()
+    const id = window.setInterval(tick, 250)
+    return () => window.clearInterval(id)
+  }, [expiresAt])
+
+  return (
+    <div className="flex items-center gap-2 whitespace-nowrap">
+      <span className="rounded-full bg-moss px-3 py-1.5 text-[11px] font-semibold tracking-wide text-cream uppercase">
+        Nolyo Pro 19,99€
+      </span>
+      <span className="text-sm text-ink-soft">{formatClock(left)}</span>
+    </div>
+  )
+}
+
 function TrialCounter({ activatedAt }) {
   const days = trialDaysLeft(activatedAt)
 
@@ -102,14 +135,24 @@ function TrialCounter({ activatedAt }) {
   )
 }
 
-function NavList({ isPro, badges = {}, onNavigate, className }) {
+function NavList({ user, isPro, badges = {}, onNavigate, className, copy }) {
+  const groups = navGroups(copy)
+    .map((group) => ({
+      ...group,
+      links: group.links.filter((link) => {
+        if (!link.module) return true
+        if (link.pro && !isPro) return true
+        return hasModule(user, link.module)
+      }),
+    }))
+    .filter((group) => group.links.length)
   return (
     <nav className={`flex flex-col ${className || ''}`}>
       {groups.map((group) => (
         <div key={group.label}>
           <p
             className={`px-3 pt-4 pb-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase ${
-              group.label === 'Nolio Pro' && !isPro ? 'text-cream/28' : 'text-cream/40'
+              group.label === 'Nolyo Pro' && !isPro ? 'text-cream/28' : 'text-cream/40'
             }`}
           >
             {group.label}
@@ -126,8 +169,8 @@ function NavList({ isPro, badges = {}, onNavigate, className }) {
                   end={link.end}
                   className={({ isActive }) => navClass({ isActive, locked })}
                   onClick={onNavigate}
-                  title={locked ? 'Réservé à Nolio Pro' : undefined}
-                  aria-label={locked ? `${link.label} — réservé à Nolio Pro` : undefined}
+                  title={locked ? 'Réservé à Nolyo Pro' : undefined}
+                  aria-label={locked ? `${link.label} — réservé à Nolyo Pro` : undefined}
                 >
                   <span className={`relative shrink-0 ${locked ? 'opacity-50' : 'opacity-90'}`}>{icons[link.icon]}</span>
                   <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
@@ -160,7 +203,11 @@ function DashboardLayout() {
   const [badges, setBadges] = useState(emptyBadges)
   const [seen, setSeen] = useState(() => readSeen(user.id))
   const isPro = isProPlan(user)
-  const planName = planLabels[user.subscription?.plan] || 'Nolio'
+  const isPreview = Boolean(user.preview)
+  const copy = copyForUser(user)
+  const spaceName = workspaceLabel(user)
+  const planName = planLabels[user.subscription?.plan] || 'Nolyo'
+  const leaveLabel = isPreview ? 'Quitter l’essai' : 'Déconnexion'
   const activeBadge = badgeRouteKey(pathname)
 
   useEffect(() => {
@@ -205,13 +252,19 @@ function DashboardLayout() {
   return (
     <div className="h-svh overflow-hidden bg-paper text-ink lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)]">
       <aside className="dash-sidebar hidden h-svh flex-col text-cream lg:flex">
-        <div className="px-5 pt-6 pb-4">
-          <Logo to="/dashboard" inverted />
-          <span className="mt-4 inline-flex rounded-full bg-cream/10 px-2.5 py-1 text-[11px] font-medium tracking-wide text-cream/70">
-            {planName}
-          </span>
+        <div className="flex flex-col items-start gap-2.5 px-5 pt-6 pb-4">
+          <Logo to="/dashboard" inverted className="block" />
+          {isPreview ? (
+            <span className="rounded-full bg-cream/14 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-cream uppercase">
+              Nolyo Pro 19,99€
+            </span>
+          ) : (
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-cream/55 uppercase">
+              {planName}
+            </p>
+          )}
         </div>
-        <NavList isPro={isPro} badges={visibleBadges} className="flex-1 overflow-y-auto px-3 pb-4" />
+        <NavList user={user} isPro={isPro} badges={visibleBadges} copy={copy} className="flex-1 overflow-y-auto px-3 pb-4" />
         <div className="border-t border-cream/10 px-4 py-4">
           <NavLink
             to="/dashboard/parametres"
@@ -221,8 +274,8 @@ function DashboardLayout() {
               }`
             }
           >
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cream/12 text-xs font-semibold">
-              {initials(user.name)}
+            <span className="shrink-0">
+              <Avatar user={user} light className="h-10 w-10 text-xs" />
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{user.name}</p>
@@ -235,10 +288,10 @@ function DashboardLayout() {
             </Link>
             <button
               type="button"
-              onClick={logout}
+              onClick={() => logout(isPreview ? 'home' : undefined)}
               className="text-xs text-cream/50 transition hover:text-cream"
             >
-              Déconnexion
+              {leaveLabel}
             </button>
           </div>
         </div>
@@ -252,11 +305,15 @@ function DashboardLayout() {
             </div>
             <div className="hidden min-w-0 sm:block">
               <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Espace</p>
-              <p className="truncate text-sm font-medium">{user.subscription?.company || user.name}</p>
+              <p className="truncate text-sm font-medium">{spaceName}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <TrialCounter activatedAt={user.subscription?.activatedAt} />
+            {isPreview && user.previewExpiresAt ? (
+              <PreviewTag expiresAt={user.previewExpiresAt} />
+            ) : (
+              <TrialCounter activatedAt={user.subscription?.activatedAt} />
+            )}
             <button
               type="button"
               className="rounded-full border border-ink/10 bg-cream px-3 py-2 text-sm lg:hidden"
@@ -269,14 +326,21 @@ function DashboardLayout() {
 
         {menuOpen ? (
           <div className="dash-sidebar shrink-0 px-3 py-4 lg:hidden">
-            <NavList isPro={isPro} badges={visibleBadges} onNavigate={() => setMenuOpen(false)} />
+            {isPreview ? (
+              <p className="mb-3 px-3">
+                <span className="inline-flex rounded-full bg-cream/14 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-cream uppercase">
+                  Nolyo Pro 19,99€
+                </span>
+              </p>
+            ) : null}
+            <NavList user={user} isPro={isPro} badges={visibleBadges} copy={copy} onNavigate={() => setMenuOpen(false)} />
             <NavLink
               to="/dashboard/parametres"
               className="mt-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-cream/72 hover:bg-cream/8 hover:text-cream"
               onClick={() => setMenuOpen(false)}
             >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cream/12 text-xs font-semibold">
-                {initials(user.name)}
+              <span className="shrink-0">
+                <Avatar user={user} light className="h-9 w-9 text-xs" />
               </span>
               <span className="min-w-0">
                 <span className="block truncate font-medium text-cream">{user.name}</span>
@@ -287,8 +351,12 @@ function DashboardLayout() {
               <Link to="/" className="text-sm text-cream/60" onClick={() => setMenuOpen(false)}>
                 Site public
               </Link>
-              <button type="button" className="text-sm text-cream/60" onClick={logout}>
-                Déconnexion
+              <button
+                type="button"
+                className="text-sm text-cream/60"
+                onClick={() => logout(isPreview ? 'home' : undefined)}
+              >
+                {leaveLabel}
               </button>
             </div>
           </div>

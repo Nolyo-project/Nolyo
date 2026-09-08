@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from 'react'
 import { api } from '../../api/client'
 import { fieldClass, formatDateTime, formatTime, toDatetimeLocal } from './format'
-import { EmptyState, PageHeader, PageShell, Surface, initials, primaryBtn, quietBtn } from './ui'
+import { MailMenu } from './MailMenu'
+import { EmptyState, Modal, PageHeader, PageShell, Surface, initials, ghostBtn, primaryBtn, quietBtn } from './ui'
 
 const empty = { title: '', dueAt: toDatetimeLocal(), channel: 'email', contact: '' }
 
@@ -11,24 +12,10 @@ const channelLabel = {
   other: 'Autre',
 }
 
-const channelClass = {
-  email: 'bg-moss/10 text-moss',
-  phone: 'bg-copper/10 text-copper',
-  other: 'bg-paper text-ink-soft',
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden>
-      <path
-        d="M6.5 12.5l3.4 3.4 7.6-8"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
+const channelBorder = {
+  email: 'border-l-moss',
+  phone: 'border-l-copper',
+  other: 'border-l-ink/20',
 }
 
 function startOfDay(value) {
@@ -37,19 +24,15 @@ function startOfDay(value) {
   return date.getTime()
 }
 
-function dueMeta(dueAt) {
-  const due = new Date(dueAt)
-  const diffDays = Math.round((startOfDay(due) - startOfDay(new Date())) / 86400000)
-  const time = formatTime(due)
-  if (diffDays < 0) return { label: `En retard · ${formatDateTime(due)}`, tone: 'late' }
-  if (diffDays === 0) return { label: `Aujourd’hui · ${time}`, tone: 'today' }
-  if (diffDays === 1) return { label: `Demain · ${time}`, tone: 'soon' }
-  return { label: formatDateTime(due), tone: 'later' }
-}
-
-function dueTone(dueAt, done) {
-  if (done) return 'later'
-  return dueMeta(dueAt).tone
+function dayHeading(dueAt) {
+  const diffDays = Math.round((startOfDay(dueAt) - startOfDay(new Date())) / 86400000)
+  const date = new Date(dueAt)
+  const label = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const pretty = label.charAt(0).toUpperCase() + label.slice(1)
+  if (diffDays < 0) return { key: startOfDay(dueAt), title: pretty, hint: 'En retard', late: true }
+  if (diffDays === 0) return { key: startOfDay(dueAt), title: 'Aujourd’hui', hint: pretty, late: false }
+  if (diffDays === 1) return { key: startOfDay(dueAt), title: 'Demain', hint: pretty, late: false }
+  return { key: startOfDay(dueAt), title: pretty, hint: '', late: false }
 }
 
 function Reminders() {
@@ -89,18 +72,20 @@ function Reminders() {
     [reminders],
   )
 
-  const late = openItems.filter((item) => dueTone(item.dueAt, item.done) === 'late')
-  const today = openItems.filter((item) => dueTone(item.dueAt, item.done) === 'today')
-  const later = openItems.filter((item) => dueTone(item.dueAt, item.done) !== 'late' && dueTone(item.dueAt, item.done) !== 'today')
+  const lateCount = openItems.filter((item) => startOfDay(item.dueAt) < startOfDay(new Date())).length
+  const todayCount = openItems.filter((item) => startOfDay(item.dueAt) === startOfDay(new Date())).length
+  const laterCount = openItems.length - lateCount - todayCount
 
-  const groups =
-    tab === 'done'
-      ? [{ key: 'done', title: 'Faites', items: doneItems }]
-      : [
-          { key: 'late', title: 'En retard', items: late },
-          { key: 'today', title: 'Aujourd’hui', items: today },
-          { key: 'later', title: 'À venir', items: later },
-        ].filter((group) => group.items.length)
+  const days = useMemo(() => {
+    const source = tab === 'done' ? doneItems : openItems
+    const map = new Map()
+    for (const item of source) {
+      const heading = dayHeading(item.dueAt)
+      if (!map.has(heading.key)) map.set(heading.key, { ...heading, items: [] })
+      map.get(heading.key).items.push(item)
+    }
+    return [...map.values()]
+  }, [doneItems, openItems, tab])
 
   function update(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -158,7 +143,7 @@ function Reminders() {
       <PageHeader
         kicker="Suivi"
         title="Relances"
-        description="Ce qui attend une action, au bon moment."
+        description="Les relances suivent chaque client. Après un devis, elles se posent toutes seules — et vous pouvez relancer par e-mail ou téléphone."
         actions={
           <button type="button" onClick={openCreate} className={primaryBtn}>
             Nouvelle relance
@@ -167,23 +152,19 @@ function Reminders() {
       />
 
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
-        <Surface className={`p-5 ${late.length ? '!bg-moss text-cream !ring-moss' : ''}`}>
-          <p
-            className={`text-[11px] font-semibold tracking-[0.16em] uppercase ${
-              late.length ? 'text-cream/55' : 'text-ink-soft'
-            }`}
-          >
+        <Surface className={`p-5 ${lateCount ? '!bg-copper text-cream !ring-copper' : ''}`}>
+          <p className={`text-[11px] font-semibold tracking-[0.16em] uppercase ${lateCount ? 'text-cream/70' : 'text-ink-soft'}`}>
             En retard
           </p>
-          <p className="mt-2 font-display text-3xl tracking-tight">{late.length}</p>
+          <p className="mt-2 font-display text-3xl tracking-tight">{lateCount}</p>
         </Surface>
         <Surface className="p-5">
           <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Aujourd’hui</p>
-          <p className="mt-2 font-display text-3xl tracking-tight">{today.length}</p>
+          <p className="mt-2 font-display text-3xl tracking-tight">{todayCount}</p>
         </Surface>
         <Surface className="p-5">
           <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">À venir</p>
-          <p className="mt-2 font-display text-3xl tracking-tight">{later.length}</p>
+          <p className="mt-2 font-display text-3xl tracking-tight">{laterCount}</p>
         </Surface>
       </section>
 
@@ -191,29 +172,25 @@ function Reminders() {
         <button
           type="button"
           onClick={() => setTab('open')}
-          className={`rounded-full px-4 py-2 text-sm ${
-            tab === 'open' ? 'bg-moss font-medium text-cream' : 'text-ink-soft'
-          }`}
+          className={`rounded-full px-4 py-2 text-sm ${tab === 'open' ? 'bg-moss font-medium text-cream' : 'text-ink-soft'}`}
         >
-          À faire ({openItems.length})
+          À relancer ({openItems.length})
         </button>
         <button
           type="button"
           onClick={() => setTab('done')}
-          className={`rounded-full px-4 py-2 text-sm ${
-            tab === 'done' ? 'bg-moss font-medium text-cream' : 'text-ink-soft'
-          }`}
+          className={`rounded-full px-4 py-2 text-sm ${tab === 'done' ? 'bg-moss font-medium text-cream' : 'text-ink-soft'}`}
         >
-          Faites ({doneItems.length})
+          Relancé ({doneItems.length})
         </button>
       </div>
 
-      {groups.length === 0 ? (
+      {days.length === 0 ? (
         <div className="mt-8">
           <EmptyState>
             {tab === 'done'
               ? 'Aucune relance faite pour l’instant.'
-              : 'Aucune relance. Posez la première pour ne rien laisser passer.'}
+              : 'Personne à relancer. Posez un rappel dès qu’un devis ou un appel attend une suite.'}
             {tab === 'open' ? (
               <button type="button" onClick={openCreate} className={`${primaryBtn} mt-4`}>
                 Nouvelle relance
@@ -222,67 +199,76 @@ function Reminders() {
           </EmptyState>
         </div>
       ) : (
-        <div className="mt-8 space-y-8">
-          {groups.map((group) => (
-            <section key={group.key}>
-              {tab === 'open' ? (
-                <p className="mb-3 text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">
-                  {group.title}
-                </p>
-              ) : null}
-              <ul className="space-y-3">
-                {group.items.map((item) => {
-                  const meta = dueMeta(item.dueAt)
+        <div className="mt-8 space-y-10">
+          {days.map((day) => (
+            <section key={day.key}>
+              <div className="mb-4 flex flex-wrap items-baseline gap-2">
+                <h2 className={`font-display text-2xl tracking-tight ${day.late ? 'text-copper' : ''}`}>{day.title}</h2>
+                {day.hint ? <p className="text-sm text-ink-soft">{day.hint}</p> : null}
+              </div>
+              <ul className="relative space-y-3 border-l border-ink/10 pl-6">
+                {day.items.map((item) => {
                   const contactName = item.contact?.name
                   return (
-                    <Surface as="li" key={item._id} className="p-5 transition hover:-translate-y-0.5 hover:shadow-md">
-                      <div className="flex items-start gap-4">
-                        <button
-                          type="button"
-                          onClick={() => toggleDone(item)}
-                          className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border-[1.5px] transition ${
-                            item.done
-                              ? 'border-moss bg-moss text-cream'
-                              : 'border-ink/18 bg-cream text-transparent hover:border-copper hover:text-copper/40'
-                          }`}
-                          aria-label={item.done ? 'Remettre à faire' : 'Marquer faite'}
-                        >
-                          <CheckIcon />
-                        </button>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className={`font-medium ${item.done ? 'text-ink-soft line-through' : ''}`}>
-                              {item.title}
-                            </h3>
-                            <span
-                              className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                                channelClass[item.channel] || channelClass.other
-                              }`}
-                            >
-                              {channelLabel[item.channel] || item.channel}
-                            </span>
+                    <li key={item._id} className="relative">
+                      <span
+                        className={`absolute top-5 -left-[1.85rem] h-3 w-3 rounded-full ${
+                          day.late && !item.done ? 'bg-copper' : 'bg-moss'
+                        }`}
+                        aria-hidden
+                      />
+                      <Surface className={`border-l-4 p-5 ${channelBorder[item.channel] || channelBorder.other}`}>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold tracking-[0.14em] text-ink-soft uppercase">
+                              {formatTime(item.dueAt)} · {channelLabel[item.channel] || item.channel}
+                            </p>
+                            <h3 className={`mt-1 font-medium ${item.done ? 'text-ink-soft' : ''}`}>{item.title}</h3>
+                            {contactName ? (
+                              <div className="mt-3 flex items-center gap-2">
+                                <span className="grid h-7 w-7 place-items-center rounded-full bg-moss text-[10px] font-semibold text-cream">
+                                  {initials(contactName)}
+                                </span>
+                                <span className="truncate text-sm text-ink-soft">{contactName}</span>
+                              </div>
+                            ) : null}
+                            {item.done ? (
+                              <p className="mt-2 text-xs text-ink-soft">Relancé · {formatDateTime(item.dueAt)}</p>
+                            ) : null}
                           </div>
-                          <p
-                            className={`mt-1 text-sm ${
-                              !item.done && meta.tone === 'late' ? 'font-medium text-copper' : 'text-ink-soft'
-                            }`}
-                          >
-                            {item.done ? formatDateTime(item.dueAt) : meta.label}
-                          </p>
-                          {contactName ? (
-                            <div className="mt-3 flex items-center gap-2">
-                              <span className="grid h-7 w-7 place-items-center rounded-full bg-moss text-[10px] font-semibold text-cream">
-                                {initials(contactName)}
-                              </span>
-                              <span className="truncate text-sm text-ink-soft">{contactName}</span>
-                            </div>
-                          ) : null}
+                          <div className="flex shrink-0 flex-wrap items-center gap-2">
+                            {!item.done && item.channel === 'email' && item.contact?.email ? (
+                              <MailMenu
+                                email={item.contact.email}
+                                name={contactName}
+                                subject={item.title}
+                                triggerClassName={ghostBtn}
+                              >
+                                Relancer par e-mail
+                              </MailMenu>
+                            ) : null}
+                            {!item.done && item.channel === 'phone' && item.contact?.phone ? (
+                              <a
+                                href={`tel:${String(item.contact.phone).replace(/\s/g, '')}`}
+                                className={ghostBtn}
+                              >
+                                Appeler
+                              </a>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => toggleDone(item)}
+                              className={item.done ? quietBtn : primaryBtn}
+                            >
+                              {item.done ? 'Remettre à relancer' : 'Marquer relancé'}
+                            </button>
+                            <button type="button" className={quietBtn} onClick={() => handleDelete(item._id)}>
+                              Retirer
+                            </button>
+                          </div>
                         </div>
-                        <button type="button" className={quietBtn} onClick={() => handleDelete(item._id)}>
-                          Retirer
-                        </button>
-                      </div>
-                    </Surface>
+                      </Surface>
+                    </li>
                   )
                 })}
               </ul>
@@ -292,11 +278,8 @@ function Reminders() {
       )}
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 sm:p-8">
-          <form
-            onSubmit={handleSubmit}
-            className="my-auto w-full max-w-lg rounded-[1.6rem] bg-paper p-6 shadow-2xl sm:p-8"
-          >
+        <Modal onClose={closeForm} panelClassName="max-w-lg">
+          <form onSubmit={handleSubmit}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs tracking-[0.18em] text-ink-soft uppercase">Suivi</p>
@@ -319,7 +302,7 @@ function Reminders() {
                 />
               </label>
               <label className="block text-sm font-medium">
-                Échéance
+                Quand
                 <input
                   className={fieldClass}
                   type="datetime-local"
@@ -339,7 +322,7 @@ function Reminders() {
                   </select>
                 </label>
                 <label className="block text-sm font-medium">
-                  Contact
+                  Personne
                   <select className={fieldClass} name="contact" value={form.contact} onChange={update}>
                     <option value="">Sans contact</option>
                     {contacts.map((item) => (
@@ -362,7 +345,7 @@ function Reminders() {
               </button>
             </div>
           </form>
-        </div>
+        </Modal>
       ) : null}
     </PageShell>
   )

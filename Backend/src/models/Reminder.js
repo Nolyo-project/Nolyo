@@ -7,6 +7,7 @@ const reminderSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true, maxlength: 160 },
     dueAt: { type: Date, required: true, index: true },
     channel: { type: String, enum: ['email', 'phone', 'other'], default: 'email' },
+    kind: { type: String, enum: ['manual', 'quote', 'task'], default: 'manual' },
     done: { type: Boolean, default: false },
   },
   { timestamps: true },

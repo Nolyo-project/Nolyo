@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { isProPlan } from '../../data/plans'
 import { formatDateTime } from './format'
 import { UpgradeWall } from './UpgradeWall'
-import { EmptyState, PageHeader, PageShell, Surface, initials, primaryBtn, quietBtn } from './ui'
+import { EmptyState, PageHeader, PageShell, Surface, initials, quietBtn } from './ui'
 
 const INSTAGRAM_GRADIENT = 'linear-gradient(135deg, #f9ce34 0%, #ee2a7b 48%, #6228d7 100%)'
 
@@ -145,6 +145,7 @@ function Inbox() {
   const isPro = isProPlan(user)
   const [items, setItems] = useState([])
   const [tab, setTab] = useState('unread')
+  const [folder, setFolder] = useState('all')
   const [error, setError] = useState('')
   const [pendingId, setPendingId] = useState('')
 
@@ -156,8 +157,31 @@ function Inbox() {
   }, [isPro])
 
   const unread = useMemo(() => items.filter((item) => !item.read), [items])
-  const read = useMemo(() => items.filter((item) => item.read), [items])
-  const visible = tab === 'read' ? read : unread
+
+  function folderOf(item) {
+    if (item.source === 'instagram' || item.source === 'facebook') return item.source
+    return 'email'
+  }
+
+  const folders = useMemo(() => {
+    const emailUnread = items.filter((item) => folderOf(item) === 'email' && !item.read).length
+    const instaUnread = items.filter((item) => folderOf(item) === 'instagram' && !item.read).length
+    const fbUnread = items.filter((item) => folderOf(item) === 'facebook' && !item.read).length
+    return [
+      { key: 'all', label: 'Tous', count: unread.length, total: items.length },
+      { key: 'instagram', label: 'Instagram', count: instaUnread, total: items.filter((item) => folderOf(item) === 'instagram').length },
+      { key: 'facebook', label: 'Facebook', count: fbUnread, total: items.filter((item) => folderOf(item) === 'facebook').length },
+      { key: 'email', label: 'E-mail', count: emailUnread, total: items.filter((item) => folderOf(item) === 'email').length },
+    ]
+  }, [items, unread.length])
+
+  const inFolder = useMemo(
+    () => (folder === 'all' ? items : items.filter((item) => folderOf(item) === folder)),
+    [folder, items],
+  )
+  const folderUnread = inFolder.filter((item) => !item.read)
+  const folderRead = inFolder.filter((item) => item.read)
+  const visible = tab === 'read' ? folderRead : folderUnread
 
   async function setRead(item, nextRead) {
     if (pendingId) return
@@ -199,17 +223,19 @@ function Inbox() {
 
   const emptyMessage =
     tab === 'read'
-      ? 'Aucun message lu pour l’instant. Dès qu’un message est ouvert, il arrive ici.'
-      : unread.length === 0 && items.length > 0
-        ? 'Tout est lu. Les nouveaux messages arriveront ici.'
-        : 'Aucun message pour le moment.'
+      ? 'Aucun message lu dans ce dossier.'
+      : folderUnread.length === 0 && inFolder.length > 0
+        ? 'Tout est lu dans ce dossier.'
+        : folder === 'all'
+          ? 'Aucun message pour le moment.'
+          : 'Ce dossier est vide pour l’instant.'
 
   return (
     <PageShell>
       <PageHeader
         kicker="Pro"
         title="Boîte de réception"
-        description="Instagram, Facebook et e-mail, au même endroit. Un message lu passe dans Lus."
+        description="Instagram, Facebook et e-mail, chacun dans son dossier. Un message lu passe dans Lus."
       />
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -225,7 +251,31 @@ function Inbox() {
         ))}
       </div>
 
-      <div className="mt-6 flex w-fit max-w-full flex-wrap gap-1 rounded-full bg-cream p-1 ring-1 ring-ink/6">
+      <div className="mt-8 grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <nav className="space-y-1">
+          <p className="px-3 pb-2 text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Dossiers</p>
+          {folders.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setFolder(item.key)}
+              className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm transition ${
+                folder === item.key ? 'bg-moss font-medium text-cream' : 'bg-cream text-ink hover:bg-paper'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2">
+                {item.key === 'all' ? null : sourceIcon(item.key)}
+                {item.label}
+              </span>
+              <span className={folder === item.key ? 'text-cream/70' : 'text-ink-soft'}>
+                {item.count ? item.count : item.total || ''}
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        <div>
+      <div className="flex w-fit max-w-full flex-wrap gap-1 rounded-full bg-cream p-1 ring-1 ring-ink/6">
         <button
           type="button"
           onClick={() => setTab('unread')}
@@ -233,7 +283,7 @@ function Inbox() {
             tab === 'unread' ? 'bg-moss font-medium text-cream' : 'text-ink-soft'
           }`}
         >
-          Non lus ({unread.length})
+          Non lus ({folderUnread.length})
         </button>
         <button
           type="button"
@@ -242,7 +292,7 @@ function Inbox() {
             tab === 'read' ? 'bg-moss font-medium text-cream' : 'text-ink-soft'
           }`}
         >
-          Lus ({read.length})
+          Lus ({folderRead.length})
         </button>
       </div>
 
@@ -319,6 +369,8 @@ function Inbox() {
           })}
         </ul>
       )}
+        </div>
+      </div>
     </PageShell>
   )
 }

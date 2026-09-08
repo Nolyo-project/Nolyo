@@ -26,6 +26,8 @@ const subscriptionRequestSchema = new mongoose.Schema(
     inviteCode: { type: String, unique: true, sparse: true },
     inviteCodeCreatedAt: Date,
     registeredAt: Date,
+    issueNote: { type: String, trim: true, default: '', maxlength: 500 },
+    issueAt: Date,
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true },
@@ -47,6 +49,9 @@ subscriptionRequestSchema.methods.toPresidentJSON = function toPresidentJSON() {
     inviteCode: this.inviteCode || null,
     inviteCodeCreatedAt: this.inviteCodeCreatedAt,
     registeredAt: this.registeredAt,
+    issueNote: this.issueNote || '',
+    issueAt: this.issueAt || null,
+    userId: this.user || null,
     createdAt: this.createdAt,
   }
 }

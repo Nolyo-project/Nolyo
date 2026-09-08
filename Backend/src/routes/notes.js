@@ -1,5 +1,6 @@
 const express = require('express')
 const Contact = require('../models/Contact')
+const DayLog = require('../models/DayLog')
 const Note = require('../models/Note')
 const { requireAuth, requireSubscription } = require('../middleware/auth')
 
@@ -68,6 +69,27 @@ router.patch('/:id', async (req, res) => {
   await note.save()
   await note.populate('contact', 'name company')
   res.json({ note })
+})
+
+router.post('/:id/task', async (req, res) => {
+  const note = await Note.findOne({ _id: req.params.id, user: req.user._id }).populate('contact', 'name')
+  if (!note) return res.status(404).json({ error: 'Note introuvable.' })
+
+  const today = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  const dateKey = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+  const title = note.contact?.name ? `${note.title} — ${note.contact.name}` : note.title
+
+  const log = await DayLog.findOneAndUpdate(
+    { user: req.user._id, dateKey },
+    {
+      $push: { tasks: { title, done: false } },
+      $setOnInsert: { user: req.user._id, dateKey },
+    },
+    { new: true, upsert: true },
+  )
+  const task = log.tasks[log.tasks.length - 1]
+  res.status(201).json({ dateKey, task, log })
 })
 
 router.delete('/:id', async (req, res) => {

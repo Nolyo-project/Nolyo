@@ -18,6 +18,7 @@ async function requireAuth(req, res, next) {
     }
 
     req.user = user
+    req.auth = payload
     next()
   } catch {
     return res.status(401).json({ error: 'Session expirée. Reconnectez-vous.' })
@@ -26,7 +27,7 @@ async function requireAuth(req, res, next) {
 
 function requirePresident(req, res, next) {
   if (req.user.role !== 'president') {
-    return res.status(403).json({ error: 'Espace réservé au président.' })
+    return res.status(404).json({ error: 'Route introuvable.' })
   }
   next()
 }

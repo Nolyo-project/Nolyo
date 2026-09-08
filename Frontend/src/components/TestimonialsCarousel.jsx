@@ -5,7 +5,7 @@ const quotes = [
     name: 'Léa Moreau',
     role: 'Graphiste indépendante',
     place: 'Lyon',
-    text: 'Avant, mes relances vivaient dans trois carnets. Nolio me montre qui attendre, qui relancer, et ce qui rentre ce mois-ci — sans me transformer en comptable.',
+    text: 'Avant, mes relances vivaient dans trois carnets. Nolyo me montre qui attendre, qui relancer, et ce qui rentre ce mois-ci — sans me transformer en comptable.',
   },
   {
     name: 'Karim El Amrani',
@@ -23,7 +23,7 @@ const quotes = [
     name: 'Thomas Berger',
     role: 'Artisan',
     place: 'Bordeaux',
-    text: 'Je n’avais pas besoin d’un logiciel de gestion. Juste de voir mes clients, mes chantiers et ce qui reste à encaisser. Nolio fait exactement ça.',
+    text: 'Je n’avais pas besoin d’un logiciel de gestion. Juste de voir mes clients, mes chantiers et ce qui reste à encaisser. Nolyo fait exactement ça.',
   },
   {
     name: 'Sofia Martins',
@@ -50,6 +50,20 @@ const quotes = [
     text: 'L’agenda et le carnet client se parlent enfin. Je vois la semaine d’un coup d’œil, sans empiler les applis. C’est devenu le réflexe du matin.',
   },
 ]
+
+export const reviewStats = {
+  rating: 4.9,
+  count: quotes.length,
+}
+
+export const reviewFaces = quotes.slice(0, 5).map((quote) => ({
+  name: quote.name,
+  initials: quote.name
+    .split(' ')
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join(''),
+}))
 
 function initials(name) {
   return name
@@ -119,7 +133,7 @@ function TestimonialsCarousel() {
               Ils ont retrouvé le fil.
             </h2>
             <p className="mt-3 max-w-lg text-cream/70">
-              Indépendants, studios, cabinets : ceux qui ont ouvert un espace Nolio racontent le
+              Indépendants, studios, cabinets : ceux qui ont ouvert un espace Nolyo racontent le
               quotidien, pas un argumentaire.
             </p>
           </div>

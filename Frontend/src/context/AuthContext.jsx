@@ -1,5 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
+import {
+  hasPreviewSession,
+  markPreviewExit,
+  markPreviewSession,
+} from '../auth/previewSession'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'nolio_token'
@@ -12,16 +17,25 @@ export function AuthProvider({ children }) {
   const persist = useCallback((nextToken, nextUser) => {
     if (nextToken) {
       localStorage.setItem(TOKEN_KEY, nextToken)
+      if (nextUser?.preview) markPreviewSession(true)
+      else markPreviewSession(false)
     } else {
       localStorage.removeItem(TOKEN_KEY)
+      markPreviewSession(false)
     }
     setToken(nextToken)
     setUser(nextUser)
   }, [])
 
-  const logout = useCallback(() => {
-    persist(null, null)
-  }, [persist])
+  const logout = useCallback(
+    (exitTo) => {
+      if (exitTo === 'subscribe' || exitTo === 'home') {
+        markPreviewExit(exitTo)
+      }
+      persist(null, null)
+    },
+    [persist],
+  )
 
   useEffect(() => {
     if (!token) {
@@ -38,7 +52,12 @@ export function AuthProvider({ children }) {
         if (!cancelled) setUser(data.user)
       })
       .catch(() => {
-        if (!cancelled) persist(null, null)
+        if (!cancelled) {
+          if (hasPreviewSession()) {
+            markPreviewExit('subscribe')
+          }
+          persist(null, null)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -73,8 +92,30 @@ export function AuthProvider({ children }) {
     [persist],
   )
 
+  const startPreview = useCallback(async () => {
+    const data = await api('/api/auth/preview', { method: 'POST' })
+    persist(data.token, data.user)
+    return data.user
+  }, [persist])
+
+  const completeOnboarding = useCallback(async (body) => {
+    const data = await api('/api/auth/onboarding', {
+      method: 'POST',
+      body,
+    })
+    setUser(data.user)
+    return data.user
+  }, [])
+
   const updateUser = useCallback((nextUser) => {
-    setUser(nextUser)
+    setUser((current) => {
+      if (!current?.preview) return nextUser
+      return {
+        ...nextUser,
+        preview: true,
+        previewExpiresAt: current.previewExpiresAt,
+      }
+    })
   }, [])
 
   const value = useMemo(
@@ -84,12 +125,15 @@ export function AuthProvider({ children }) {
       loading,
       login,
       register,
+      startPreview,
       logout,
       updateUser,
+      completeOnboarding,
       isPresident: user?.role === 'president',
+      isPreview: Boolean(user?.preview),
       isSubscribed: user?.role === 'member' && user?.subscription?.status === 'active',
     }),
-    [user, token, loading, login, register, logout, updateUser],
+    [user, token, loading, login, register, startPreview, logout, updateUser, completeOnboarding],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

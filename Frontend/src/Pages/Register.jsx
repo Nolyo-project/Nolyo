@@ -70,7 +70,7 @@ function Register() {
             name="code"
             value={form.code}
             onChange={update}
-            placeholder="NOLIO-XXXX-XXXX"
+            placeholder="NOLYO-XXXX-XXXX"
             autoComplete="off"
             required
           />

@@ -3,18 +3,22 @@ import { Link } from 'react-router-dom'
 import { homeForUser } from '../auth/homeForUser'
 import { useAuth } from '../context/AuthContext'
 import Logo from './Logo'
+import TryPreviewButton from './TryPreviewButton'
 
 const marketingLinks = [
-  { to: '/#fonctionnalites', label: 'Produit' },
+  { to: '/#produit', label: 'Produit' },
+  { to: '/#fonctionnement', label: 'Comment ça marche' },
   { to: '/#offres', label: 'Offres' },
+  { to: '/rdv', label: 'Rendez-vous' },
   { to: '/inscription', label: 'J’ai un code' },
 ]
 
 function Header() {
   const [open, setOpen] = useState(false)
   const { user, logout, loading, isPresident } = useAuth()
-  const spaceLabel = isPresident ? 'Dashboard président' : 'Tableau de bord'
+  const spaceLabel = isPresident ? 'Dashboard président' : user?.preview ? 'Continuer l’essai' : 'Tableau de bord'
   const spaceTo = user ? homeForUser(user) : '/login'
+  const leaveLabel = user?.preview ? 'Quitter l’essai' : 'Déconnexion'
 
   return (
     <header className="sticky top-0 z-50 border-b border-ink/8 bg-paper/80 backdrop-blur-xl">
@@ -41,10 +45,10 @@ function Header() {
               </Link>
               <button
                 type="button"
-                onClick={logout}
+                onClick={() => logout(user?.preview ? 'home' : undefined)}
                 className="rounded-full border border-ink/10 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-paper-2"
               >
-                Déconnexion
+                {leaveLabel}
               </button>
             </>
           ) : (
@@ -55,12 +59,9 @@ function Header() {
               >
                 Connexion
               </Link>
-              <Link
-                to="/abonnement"
-                className="rounded-full bg-moss px-4 py-2 text-sm font-semibold text-cream shadow-sm transition hover:bg-ink"
-              >
-                Demander un abonnement
-              </Link>
+              <TryPreviewButton variant="header" onStarted={() => setOpen(false)}>
+                Essayer 5 min
+              </TryPreviewButton>
             </>
           )}
         </div>
@@ -112,10 +113,10 @@ function Header() {
                   className="mt-2 rounded-xl border border-ink/10 px-3 py-2.5 text-left text-sm font-semibold"
                   onClick={() => {
                     setOpen(false)
-                    logout()
+                    logout(user?.preview ? 'home' : undefined)
                   }}
                 >
-                  Déconnexion
+                  {leaveLabel}
                 </button>
               </>
             ) : (
@@ -127,9 +128,12 @@ function Header() {
                 >
                   Connexion
                 </Link>
+                <TryPreviewButton variant="mobile" onStarted={() => setOpen(false)}>
+                  Essayer 5 min
+                </TryPreviewButton>
                 <Link
                   to="/abonnement"
-                  className="mt-2 rounded-xl bg-moss px-3 py-2.5 text-center text-sm font-semibold text-cream"
+                  className="mt-2 rounded-xl border border-ink/10 px-3 py-2.5 text-center text-sm font-semibold"
                   onClick={() => setOpen(false)}
                 >
                   Demander un abonnement

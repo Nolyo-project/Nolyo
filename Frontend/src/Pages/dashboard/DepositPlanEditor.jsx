@@ -100,7 +100,7 @@ export function DepositPlanEditor({ plan, onChange }) {
   )
 }
 
-export function DepositTracker({ plan, price, onTogglePaid, canToggle = false }) {
+export function DepositTracker({ plan, price, onTogglePaid, canToggle = false, lockHint = '' }) {
   const rows = splitDepositAmounts(price, plan)
   const showMoney = price !== undefined && price !== '' && Number(price) > 0
 
@@ -112,6 +112,7 @@ export function DepositTracker({ plan, price, onTogglePaid, canToggle = false })
           Dans Paramètres
         </Link>
       </div>
+      {lockHint ? <p className="mt-1 text-xs text-ink-soft">{lockHint}</p> : null}
       <ul className="mt-3 space-y-2">
         {rows.map((step, index) => (
           <li key={index} className="flex items-center justify-between gap-3 rounded-2xl bg-cream px-4 py-3">

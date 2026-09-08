@@ -12,7 +12,7 @@ const defaultHighlights = [
 
 export function UpgradeWall({
   title,
-  description = 'Cette vue fait partie de Nolio Pro. Passez à 9,99 € par mois pour tout débloquer.',
+  description = 'Cette vue fait partie de Nolyo Pro. Passez à 19,99 € par mois pour tout débloquer.',
   icon = 'lock',
   highlights = defaultHighlights,
 }) {
@@ -22,7 +22,7 @@ export function UpgradeWall({
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-moss text-cream shadow-sm shadow-moss/25 [&_svg]:h-7 [&_svg]:w-7">
           {icons[icon] || icons.lock}
         </span>
-        <p className="mt-6 text-[11px] font-semibold tracking-[0.22em] text-copper uppercase">Nolio Pro</p>
+        <p className="mt-6 text-[11px] font-semibold tracking-[0.22em] text-copper uppercase">Nolyo Pro</p>
         <h1 className="mt-2 font-display text-4xl tracking-tight sm:text-5xl">{title}</h1>
         <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-ink-soft">{description}</p>
 
@@ -42,7 +42,7 @@ export function UpgradeWall({
           Passer à Pro
         </Link>
         <p className="mt-3 text-sm text-ink-soft">
-          {pro ? `${formatPrice(pro.price)} / ${pro.period}` : '9,99 € / mois'}
+          {pro ? `${formatPrice(pro.price)} / ${pro.period}` : '19,99 € / mois'}
           <span className="text-ink/30"> · </span>
           1er mois offert
         </p>

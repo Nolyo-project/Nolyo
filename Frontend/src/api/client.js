@@ -27,3 +27,24 @@ export async function api(path, options = {}) {
 
   return data
 }
+
+export async function apiUpload(path, formData, options = {}) {
+  const token = options.token ?? localStorage.getItem('nolio_token')
+  const headers = { ...(options.headers || {}) }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const res = await fetch(path, {
+    method: options.method || 'POST',
+    headers,
+    body: formData,
+  })
+
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const error = new Error(data.error || 'Une erreur est survenue.')
+    error.status = res.status
+    error.code = data.code
+    throw error
+  }
+  return data
+}

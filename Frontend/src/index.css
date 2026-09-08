@@ -51,3 +51,61 @@ body {
   border: 2px solid transparent;
   background-clip: padding-box;
 }
+
+.public-page {
+  background-color: var(--page-bg, var(--color-paper));
+  color: var(--page-ink, var(--color-ink));
+  --page-muted: color-mix(in srgb, var(--page-ink) 64%, var(--page-bg));
+}
+
+.public-page .page-muted {
+  color: var(--page-muted);
+}
+
+.public-page .page-card .page-muted {
+  color: color-mix(in srgb, var(--page-surface-ink) 62%, var(--page-surface));
+}
+
+.public-page .page-accent {
+  color: var(--page-accent, var(--color-copper));
+}
+
+.public-page .page-accent-bar {
+  background: var(--page-accent, var(--color-copper));
+}
+
+.public-page .page-card {
+  background: var(--page-surface, var(--color-cream));
+  color: var(--page-surface-ink, var(--color-ink));
+}
+
+.public-page .page-chip {
+  background: var(--page-bg, var(--color-paper));
+}
+
+.public-page .page-field {
+  background: var(--page-bg, var(--color-paper));
+  color: inherit;
+}
+
+.public-page .page-cta {
+  background: var(--page-accent, var(--color-moss));
+  color: var(--page-accent-ink, var(--color-cream));
+}
+
+.public-page .page-cta:hover {
+  filter: brightness(0.93);
+}
+
+.public-page .page-chip-active {
+  background: var(--page-accent, var(--color-moss));
+  color: var(--page-accent-ink, var(--color-cream));
+}
+
+.public-page .page-nav-link {
+  color: color-mix(in srgb, var(--page-ink) 58%, var(--page-bg));
+}
+
+.public-page .page-nav-link-active {
+  color: var(--page-ink, var(--color-ink));
+}

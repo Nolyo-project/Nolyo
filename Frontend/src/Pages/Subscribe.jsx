@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
+import { consumePreviewExit } from '../auth/previewSession'
 import { formatPrice, plans as catalog } from '../data/plans'
 
 const fieldClass =
@@ -20,13 +21,24 @@ function Subscribe() {
   const [sent, setSent] = useState(false)
 
   const planFromUrl = params.get('plan')
+  const trialEnded = params.get('essai') === 'termine'
   const plan = planFromUrl === 'pro' || planFromUrl === 'essentiel' ? planFromUrl : 'essentiel'
 
   useEffect(() => {
-    if (planFromUrl !== 'pro' && planFromUrl !== 'essentiel') {
-      setParams({ plan: 'essentiel' }, { replace: true })
-    }
-  }, [planFromUrl, setParams])
+    consumePreviewExit()
+  }, [])
+
+  useEffect(() => {
+    if (planFromUrl === 'pro' || planFromUrl === 'essentiel') return
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('plan', trialEnded ? 'pro' : 'essentiel')
+        return next
+      },
+      { replace: true },
+    )
+  }, [planFromUrl, setParams, trialEnded])
 
   useEffect(() => {
     api('/api/requests/plans')
@@ -42,7 +54,14 @@ function Subscribe() {
   )
 
   function choosePlan(id) {
-    setParams({ plan: id }, { replace: true })
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('plan', id)
+        return next
+      },
+      { replace: true },
+    )
   }
 
   function update(event) {
@@ -79,8 +98,7 @@ function Subscribe() {
           Merci, {form.name.split(' ')[0]}.
         </h1>
         <p className="mt-2 text-sm text-ink-soft">
-          Votre demande pour l’offre {selected.name} a été transmise au président. Après devis
-          signé et paiement, vous recevrez votre code unique.
+          Votre demande {selected.name} est transmise. On vous recontacte. Le premier mois est offert.
         </p>
         <Link
           to="/login"
@@ -104,6 +122,11 @@ function Subscribe() {
         Demande d’abonnement
       </p>
       <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight">Envoyez votre demande.</h1>
+      {trialEnded ? (
+        <p className="mt-4 rounded-2xl bg-moss px-4 py-3 text-sm text-cream">
+          L’essai est terminé. Demandez Nolyo Pro — le premier mois est offert.
+        </p>
+      ) : null}
       <p className="mt-2 text-sm text-ink-soft">
         Déjà un code ?{' '}
         <Link to="/inscription" className="font-semibold text-ink underline decoration-copper/50">
@@ -139,7 +162,9 @@ function Subscribe() {
                     {formatPrice(item.price)}
                     <span className="ml-0.5 text-sm text-ink-soft"> / {item.period}</span>
                   </p>
-                  {item.trial ? <p className="mt-1 text-[11px] text-moss">{item.trial}</p> : null}
+                  <p className="mt-2 inline-flex rounded-full bg-copper px-2.5 py-0.5 text-[11px] font-semibold text-cream">
+                    1er mois offert
+                  </p>
                 </button>
               )
             })}

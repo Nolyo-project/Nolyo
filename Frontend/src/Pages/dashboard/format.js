@@ -58,6 +58,34 @@ export function toDateInput(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+export function monthKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`
+}
+
+export function shiftMonthKey(key, delta) {
+  const [year, month] = String(key).split('-').map(Number)
+  return monthKey(new Date(year, month - 1 + delta, 1))
+}
+
+export function formatMonthLabel(key) {
+  const [year, month] = String(key).split('-').map(Number)
+  const raw = new Date(year, month - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
+}
+
+export function dateInMonth(key) {
+  return monthKey() === key ? toDateInput() : `${key}-01`
+}
+
+export function monthInputBounds(key) {
+  const [year, month] = String(key).split('-').map(Number)
+  const last = new Date(year, month, 0).getDate()
+  const pad = (n) => String(n).padStart(2, '0')
+  return { min: `${key}-01`, max: `${key}-${pad(last)}` }
+}
+
 export const WEEKDAY_LABELS = [
   { key: 1, short: 'Lun', long: 'Lundi' },
   { key: 2, short: 'Mar', long: 'Mardi' },
@@ -132,6 +160,13 @@ export function appointmentOverlaps(appointment, slotStart, durationMinutes) {
   const end = start + (appointment.durationMinutes || durationMinutes || 60) * 60000
   const slotEnd = slotStart.getTime() + durationMinutes * 60000
   return start < slotEnd && end > slotStart.getTime()
+}
+
+export function appointmentSlotSpan(appointment, slotDurationMinutes, remainingSlots = 1) {
+  const slot = Number(slotDurationMinutes) || 60
+  const duration = Number(appointment?.durationMinutes) || slot
+  const span = Math.max(1, Math.ceil(duration / slot))
+  return Math.min(span, Math.max(1, remainingSlots))
 }
 
 export function localDateTimeIso(dateValue, timeValue) {
@@ -247,4 +282,26 @@ export function depositProgress(price, steps) {
     paid: due.filter((step) => step.paid).length,
     total: due.length,
   }
+}
+
+export function resolveQuoteStatus(contact) {
+  if (contact?.quoteStatus === 'sent' || contact?.quoteStatus === 'signed') return contact.quoteStatus
+  if ((contact?.depositPlan || []).some((step) => step.paid)) return 'signed'
+  return 'none'
+}
+
+export function dealStage(contact, userPlan) {
+  if (contact?.jobStatus === 'done') return { key: 'done', label: 'Terminé' }
+  if (contact?.jobStatus === 'archived') return { key: 'archived', label: 'Sans suite' }
+  const quote = resolveQuoteStatus(contact)
+  if (quote === 'none') return { key: 'quote', label: 'Devis à envoyer' }
+  if (quote === 'sent') return { key: 'sent', label: 'Devis envoyé' }
+  const due = splitDepositAmounts(contact.price, contact.depositPlan?.length ? contact.depositPlan : userPlan).filter(
+    (step) => step.amount > 0,
+  )
+  const unpaid = due.filter((step) => !step.paid)
+  if (unpaid.length) {
+    return { key: 'payment', label: `${unpaid[0].label} à encaisser` }
+  }
+  return { key: 'ready', label: 'Prêt à terminer' }
 }

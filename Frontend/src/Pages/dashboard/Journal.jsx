@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/client'
-import { addDays, parseLocalDate, toDateInput } from './format'
+import { addDays, fieldClass, parseLocalDate, toDateInput } from './format'
+import { ghostBtn, primaryBtn } from './ui'
 
 function formatDayTitle(dateKey) {
   const date = parseLocalDate(dateKey)
@@ -150,7 +151,7 @@ function TaskList({ tasks, empty, onToggle, onRename, onRemove }) {
   return (
     <div>
       {open.length ? (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col lg:grid lg:grid-cols-2 lg:gap-x-2">
           {open.map((task) => (
             <TaskRow key={task._id} task={task} onToggle={onToggle} onRename={onRename} onRemove={onRemove} />
           ))}
@@ -194,6 +195,11 @@ function Journal() {
   const [title, setTitle] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  const [contacts, setContacts] = useState([])
+  const [offer, setOffer] = useState(null)
+  const [offerContact, setOfferContact] = useState('')
+  const [offerChannel, setOfferChannel] = useState('email')
+  const [offerPending, setOfferPending] = useState(false)
 
   const isToday = dateKey === todayKey
   const openCount = tasks.filter((item) => !item.done).length
@@ -241,6 +247,12 @@ function Journal() {
     loadMonth(monthCursor).catch((err) => setError(err.message))
   }, [monthCursor])
 
+  useEffect(() => {
+    api('/api/workspace/contacts')
+      .then((data) => setContacts(data.contacts || []))
+      .catch(() => {})
+  }, [])
+
   function shiftMonth(delta) {
     const next = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + delta, 1)
     setMonthCursor(next)
@@ -276,12 +288,51 @@ function Journal() {
         body: { title: label },
       })
       applyDay(dateKey, data.log?.tasks || [])
+      setOffer({ title: label, dateKey })
+      setOfferContact('')
+      setOfferChannel('email')
       inputRef.current?.focus()
     } catch (err) {
       setTitle(label)
       setError(err.message)
     } finally {
       setPending(false)
+    }
+  }
+
+  function reminderDueFromDateKey(key) {
+    const day = parseLocalDate(key)
+    if (!day) return new Date().toISOString()
+    if (key === todayKey) {
+      const due = new Date()
+      due.setHours(due.getHours() + 1, 0, 0, 0)
+      return due.toISOString()
+    }
+    day.setHours(9, 0, 0, 0)
+    return day.toISOString()
+  }
+
+  async function acceptOffer() {
+    if (!offer) return
+    setOfferPending(true)
+    setError('')
+    try {
+      await api('/api/workspace/reminders', {
+        method: 'POST',
+        body: {
+          title: offer.title,
+          dueAt: reminderDueFromDateKey(offer.dateKey),
+          channel: offerChannel,
+          contact: offerContact || undefined,
+          kind: 'task',
+        },
+      })
+      setOffer(null)
+      window.dispatchEvent(new Event('nolio-workspace-changed'))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setOfferPending(false)
     }
   }
 
@@ -335,7 +386,7 @@ function Journal() {
 
   return (
     <main className="w-full px-5 py-8 lg:px-10 lg:py-10">
-      <div className="mx-auto w-full max-w-2xl">
+      <div className="w-full">
         <div className="flex items-center justify-between gap-3">
           <div className="flex gap-1 rounded-full bg-cream p-1 ring-1 ring-ink/6">
             {[
@@ -436,6 +487,52 @@ function Journal() {
             autoFocus
           />
         </form>
+
+        {offer ? (
+          <div className="mt-4 rounded-[1.5rem] bg-cream px-4 py-4 shadow-sm shadow-ink/5 ring-1 ring-ink/8 sm:px-5">
+            <p className="text-sm font-medium">Mettre aussi dans Relances ?</p>
+            <p className="mt-1 text-sm text-ink-soft">
+              « {offer.title} » arrivera au jour choisi, avec le canal que vous préférez.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm font-medium">
+                Personne
+                <select
+                  className={fieldClass}
+                  value={offerContact}
+                  onChange={(event) => setOfferContact(event.target.value)}
+                >
+                  <option value="">Sans contact</option>
+                  {contacts.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.name}
+                      {item.kind === 'prospect' ? ' · prospect' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-medium">
+                Canal
+                <select
+                  className={fieldClass}
+                  value={offerChannel}
+                  onChange={(event) => setOfferChannel(event.target.value)}
+                >
+                  <option value="email">E-mail</option>
+                  <option value="phone">Téléphone</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button type="button" disabled={offerPending} onClick={acceptOffer} className={primaryBtn}>
+                {offerPending ? 'Ajout…' : 'Oui, relancer'}
+              </button>
+              <button type="button" onClick={() => setOffer(null)} className={ghostBtn}>
+                Non merci
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {error ? <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
 

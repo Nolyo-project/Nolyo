@@ -1,12 +1,16 @@
 const express = require('express')
+const mongoose = require('mongoose')
 const Appointment = require('../models/Appointment')
 const Contact = require('../models/Contact')
 const DayLog = require('../models/DayLog')
 const InboxItem = require('../models/InboxItem')
 const Note = require('../models/Note')
 const Reminder = require('../models/Reminder')
+const Service = require('../models/Service')
 const Transaction = require('../models/Transaction')
 const { requireAuth, requireSubscription } = require('../middleware/auth')
+const { hasOverlap, isDuplicateKey } = require('../utils/overlap')
+const { userHasModule, asksSessionPayment, sessionAmount, parsePaymentMethod, paymentMethodLabel } = require('../data/workspace')
 
 const router = express.Router()
 router.use(requireAuth, requireSubscription)
@@ -31,7 +35,7 @@ function startOfMonth(date = new Date()) {
 
 function requirePro(req, res, next) {
   if (req.user.subscription?.plan !== 'pro') {
-    return res.status(403).json({ error: 'Réservé à Nolio Pro.', code: 'PRO_REQUIRED' })
+    return res.status(403).json({ error: 'Réservé à Nolyo Pro.', code: 'PRO_REQUIRED' })
   }
   next()
 }
@@ -81,21 +85,6 @@ function parseSchedule(body, current = {}) {
   }
 
   return { schedule: { workStart, workEnd, durationMinutes, workDays } }
-}
-
-async function hasOverlap(userId, startAt, durationMinutes, excludeId) {
-  const endAt = new Date(startAt.getTime() + durationMinutes * 60000)
-  const windowStart = new Date(startAt.getTime() - 4 * 60 * 60000)
-  const candidates = await Appointment.find({
-    user: userId,
-    status: 'planned',
-    startAt: { $gte: windowStart, $lt: endAt },
-    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
-  })
-  return candidates.some((item) => {
-    const itemEnd = new Date(item.startAt.getTime() + (item.durationMinutes || 60) * 60000)
-    return item.startAt < endAt && itemEnd > startAt
-  })
 }
 
 router.get('/overview', async (req, res) => {
@@ -170,18 +159,50 @@ router.get('/stats', requirePro, async (req, res) => {
   const userId = req.user._id
   const now = new Date()
   const monthStart = startOfMonth(now)
-  const from = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  const rawShift = Number(req.query.monthsOffset)
+  const monthsOffset = Number.isFinite(rawShift) ? Math.max(-60, Math.min(60, Math.round(rawShift))) : 0
+  const windowStart = new Date(now.getFullYear(), now.getMonth() + monthsOffset - 5, 1)
+  const baselineFrom = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  const from = windowStart < baselineFrom ? windowStart : baselineFrom
 
-  const [txs, doneClients, prospects] = await Promise.all([
+  const [txs, contacts, bookingAppointments] = await Promise.all([
     Transaction.find({ user: userId, date: { $gte: from } }),
-    Contact.countDocuments({ user: userId, kind: 'client', jobStatus: 'done' }),
-    Contact.countDocuments({ user: userId, kind: 'prospect', jobStatus: { $ne: 'archived' } }),
+    Contact.find({ user: userId }),
+    Appointment.find({ user: userId, source: 'booking', status: { $ne: 'cancelled' } }).select(
+      'servicePrice contact startAt',
+    ),
   ])
 
+  const clients = contacts.filter((item) => item.kind === 'client' && item.jobStatus !== 'archived')
+  const prospects = contacts.filter((item) => item.kind === 'prospect' && item.jobStatus !== 'archived')
+  const doneClients = clients.filter((item) => item.jobStatus === 'done').length
+  const openClients = clients.filter((item) => item.jobStatus === 'open')
+  const quotesSent = clients.filter((item) => resolvedQuoteStatus(item) === 'sent').length
+  const quotesSigned = clients.filter((item) => resolvedQuoteStatus(item) === 'signed' || item.jobStatus === 'done').length
+  const quotesWaiting = openClients.filter((item) => resolvedQuoteStatus(item) === 'none').length
+
+  let unpaidAmount = 0
+  const waitingMoney = []
+  for (const contact of openClients) {
+    const unpaid = unpaidDeposits(contact.price, contact.depositPlan)
+    const due = unpaid.reduce((sum, step) => sum + step.amount, 0)
+    if (due > 0) {
+      unpaidAmount += due
+      waitingMoney.push({
+        id: contact._id,
+        name: contact.name,
+        label: unpaid[0]?.label || 'Acompte',
+        amount: due,
+        quoteStatus: resolvedQuoteStatus(contact),
+      })
+    }
+  }
+  waitingMoney.sort((a, b) => b.amount - a.amount)
+
   const months = []
-  for (let offset = 5; offset >= 0; offset -= 1) {
-    const start = new Date(now.getFullYear(), now.getMonth() - offset, 1)
-    const end = new Date(now.getFullYear(), now.getMonth() - offset + 1, 1)
+  for (let i = 5; i >= 0; i -= 1) {
+    const start = new Date(now.getFullYear(), now.getMonth() + monthsOffset - i, 1)
+    const end = new Date(now.getFullYear(), now.getMonth() + monthsOffset - i + 1, 1)
     const monthTx = txs.filter((item) => item.date >= start && item.date < end)
     const income = monthTx.filter((item) => item.kind === 'income').reduce((sum, item) => sum + item.amount, 0)
     months.push({
@@ -194,15 +215,51 @@ router.get('/stats', requirePro, async (req, res) => {
   const monthTx = txs.filter((item) => item.date >= monthStart)
   const monthIncome = monthTx.filter((item) => item.kind === 'income').reduce((sum, item) => sum + item.amount, 0)
   const monthExpense = monthTx.filter((item) => item.kind === 'expense').reduce((sum, item) => sum + item.amount, 0)
+  const prevMonth = months.length >= 2 ? months[months.length - 2].income : 0
+  const avgDeal =
+    clients.filter((item) => item.price > 0).reduce((sum, item) => sum + item.price, 0) /
+    Math.max(1, clients.filter((item) => item.price > 0).length)
+
+  const bookingContacts = contacts.filter((item) => item.source === 'booking')
+  const collectedIds = []
+  for (const contact of bookingContacts) {
+    for (const step of contact.depositPlan || []) {
+      if (step.transaction) collectedIds.push(step.transaction)
+    }
+    if (contact.completionTransaction) collectedIds.push(contact.completionTransaction)
+  }
+  const collectedTx = collectedIds.length
+    ? await Transaction.find({ _id: { $in: collectedIds }, user: userId, kind: 'income' }).select('amount')
+    : []
 
   res.json({
     stats: {
       monthIncome,
       monthExpense,
       monthBalance: monthIncome - monthExpense,
+      lastMonthIncome: prevMonth,
+      incomeChange: prevMonth ? Math.round(((monthIncome - prevMonth) / prevMonth) * 100) : null,
       doneClients,
-      prospects,
+      openClients: openClients.length,
+      prospects: prospects.length,
+      conversion:
+        prospects.length + clients.length
+          ? Math.round((clients.length / (clients.length + prospects.length)) * 100)
+          : 0,
+      quotesWaiting,
+      quotesSent,
+      quotesSigned,
+      unpaidAmount,
+      avgDeal: Math.round(avgDeal * 100) / 100,
+      waitingMoney: waitingMoney.slice(0, 6),
       months,
+      monthsOffset,
+      nolio: {
+        bookings: bookingAppointments.length,
+        newContacts: bookingContacts.length,
+        bookedAmount: Math.round(bookingAppointments.reduce((sum, item) => sum + (item.servicePrice || 0), 0) * 100) / 100,
+        collectedAmount: Math.round(collectedTx.reduce((sum, item) => sum + (item.amount || 0), 0) * 100) / 100,
+      },
     },
   })
 })
@@ -234,6 +291,54 @@ router.patch('/settings', async (req, res) => {
   res.json({ user: req.user.toSafeJSON() })
 })
 
+function parseServiceBody(body, previous = {}) {
+  const name = String(body?.name ?? previous.name ?? '').trim()
+  const kind = body?.kind === 'quote' || (body?.kind === undefined && previous.kind === 'quote') ? 'quote' : 'session'
+  const price = Number(body?.price ?? previous.price ?? 0)
+  const durationMinutes = Number(body?.durationMinutes ?? previous.durationMinutes ?? 60)
+  const active = body?.active === undefined ? previous.active !== false : Boolean(body.active)
+  if (name.length < 2) return { error: 'Donnez un nom à la prestation.' }
+  if (!Number.isFinite(price) || price < 0) return { error: 'Prix invalide.' }
+  if (!Number.isFinite(durationMinutes) || durationMinutes < 15 || durationMinutes > 240) {
+    return { error: 'La durée doit être entre 15 et 240 minutes.' }
+  }
+  return { service: { name: name.slice(0, 80), kind, price: kind === 'quote' && !price ? 0 : price, durationMinutes, active } }
+}
+
+router.get('/services', async (req, res) => {
+  const services = await Service.find({ user: req.user._id }).sort({ sort: 1, createdAt: 1 }).limit(40)
+  res.json({ services })
+})
+
+router.post('/services', async (req, res) => {
+  const parsed = parseServiceBody(req.body)
+  if (parsed.error) return res.status(400).json({ error: parsed.error })
+  const count = await Service.countDocuments({ user: req.user._id })
+  if (count >= 20) return res.status(400).json({ error: 'Vous avez atteint la limite de 20 prestations.' })
+  const service = await Service.create({
+    user: req.user._id,
+    ...parsed.service,
+    sort: count,
+  })
+  res.status(201).json({ service })
+})
+
+router.patch('/services/:id', async (req, res) => {
+  const service = await Service.findOne({ _id: req.params.id, user: req.user._id })
+  if (!service) return res.status(404).json({ error: 'Prestation introuvable.' })
+  const parsed = parseServiceBody(req.body, service.toObject())
+  if (parsed.error) return res.status(400).json({ error: parsed.error })
+  Object.assign(service, parsed.service)
+  await service.save()
+  res.json({ service })
+})
+
+router.delete('/services/:id', async (req, res) => {
+  const service = await Service.findOneAndDelete({ _id: req.params.id, user: req.user._id })
+  if (!service) return res.status(404).json({ error: 'Prestation introuvable.' })
+  res.json({ ok: true })
+})
+
 router.get('/contacts', async (req, res) => {
   const kind = req.query.kind === 'client' || req.query.kind === 'prospect' ? req.query.kind : null
   const filter = { user: req.user._id }
@@ -259,6 +364,36 @@ function parsePrice(value) {
   if (value === undefined || value === null || value === '') return 0
   const amount = Number(value)
   return Number.isFinite(amount) && amount >= 0 ? amount : null
+}
+
+function parseServiceLines(value) {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) return null
+  const lines = []
+  for (const item of value.slice(0, 20)) {
+    const name = String(item?.name || '').trim().slice(0, 80)
+    const price = Number(item?.price)
+    const quantity = Math.min(20, Math.max(1, Math.round(Number(item?.quantity) || 1)))
+    if (name.length < 2 || !Number.isFinite(price) || price < 0) continue
+    const line = { name, price, quantity }
+    if (item?.service && mongoose.Types.ObjectId.isValid(String(item.service))) {
+      line.service = item.service
+    }
+    lines.push(line)
+  }
+  return lines
+}
+
+function serviceLinesTotal(lines) {
+  return Math.round((lines || []).reduce((sum, line) => sum + Number(line.price || 0) * (line.quantity || 1), 0) * 100) / 100
+}
+
+function serviceLinesActivity(lines) {
+  return (lines || [])
+    .map((line) => (line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name))
+    .filter(Boolean)
+    .join(', ')
+    .slice(0, 160)
 }
 
 function parseDepositPlan(value, previous = []) {
@@ -314,6 +449,61 @@ function unpaidDeposits(price, steps) {
   return splitDepositAmounts(price, steps).filter((step) => step.amount > 0 && !step.paid)
 }
 
+function addDealEvent(contact, title, meta = '') {
+  if (!Array.isArray(contact.dealLog)) contact.dealLog = []
+  contact.dealLog.push({ title, meta, at: new Date() })
+  contact.markModified('dealLog')
+}
+
+function followUpDueAt(days, schedule) {
+  const n = Number(days)
+  if (!Number.isFinite(n) || n < 0) return null
+  const due = new Date()
+  if (n === 0) {
+    due.setHours(due.getHours() + 2, 0, 0, 0)
+    return due
+  }
+  due.setDate(due.getDate() + n)
+  const [hours, minutes] = String(schedule?.workStart || '09:00').split(':').map(Number)
+  due.setHours(hours || 9, minutes || 0, 0, 0)
+  return due
+}
+
+async function scheduleQuoteReminder(user, contact) {
+  const days = user.quoteFollowUpDays === undefined || user.quoteFollowUpDays === null ? 3 : user.quoteFollowUpDays
+  const dueAt = followUpDueAt(days, user.schedule)
+  if (!dueAt) return null
+  const channel = user.quoteFollowUpChannel === 'phone' ? 'phone' : 'email'
+  const title = `Relancer le devis — ${contact.name}`
+  const existing = await Reminder.findOne({
+    user: user._id,
+    contact: contact._id,
+    kind: 'quote',
+    done: false,
+  })
+  if (existing) {
+    existing.title = title
+    existing.dueAt = dueAt
+    existing.channel = channel
+    await existing.save()
+    return existing
+  }
+  return Reminder.create({
+    user: user._id,
+    contact: contact._id,
+    title,
+    dueAt,
+    channel,
+    kind: 'quote',
+  })
+}
+
+function resolvedQuoteStatus(contact) {
+  if (contact.quoteStatus === 'sent' || contact.quoteStatus === 'signed') return contact.quoteStatus
+  if ((contact.depositPlan || []).some((step) => step.paid)) return 'signed'
+  return contact.quoteStatus || 'none'
+}
+
 function resolveContactName(body) {
   const firstName = body?.firstName !== undefined ? String(body.firstName).trim() : ''
   const lastName = body?.lastName !== undefined ? String(body.lastName).trim() : ''
@@ -335,6 +525,11 @@ router.post('/contacts', async (req, res) => {
   if (depositPlan === null) {
     return res.status(400).json({ error: 'Acomptes invalides.' })
   }
+  const serviceLines = parseServiceLines(req.body?.serviceLines)
+  if (serviceLines === null) {
+    return res.status(400).json({ error: 'Prestations invalides.' })
+  }
+  const resolvedLines = serviceLines || []
   const contact = await Contact.create({
     user: req.user._id,
     firstName,
@@ -343,9 +538,10 @@ router.post('/contacts', async (req, res) => {
     email: String(req.body?.email || '').trim().toLowerCase(),
     phone: String(req.body?.phone || '').trim(),
     company: String(req.body?.company || '').trim(),
-    activity: String(req.body?.activity || '').trim(),
+    activity: String(req.body?.activity || serviceLinesActivity(resolvedLines) || '').trim(),
     kind: req.body?.kind === 'prospect' ? 'prospect' : 'client',
-    price,
+    price: price || (resolvedLines.length ? serviceLinesTotal(resolvedLines) : 0),
+    serviceLines: resolvedLines,
     depositPlan: depositPlan || [],
     nextAction: String(req.body?.nextAction || '').trim(),
     notes: String(req.body?.notes || '').trim(),
@@ -393,10 +589,58 @@ router.patch('/contacts/:id', async (req, res) => {
     if (price === null) return res.status(400).json({ error: 'Prix invalide.' })
     contact.price = price
   }
+  if (req.body?.serviceLines !== undefined) {
+    const serviceLines = parseServiceLines(req.body.serviceLines)
+    if (serviceLines === null) return res.status(400).json({ error: 'Prestations invalides.' })
+    contact.serviceLines = serviceLines
+    if (req.body?.price === undefined) contact.price = serviceLinesTotal(serviceLines)
+    if (req.body?.activity === undefined) contact.activity = serviceLinesActivity(serviceLines)
+  }
   if (req.body?.depositPlan !== undefined) {
     const depositPlan = parseDepositPlan(req.body.depositPlan, contact.depositPlan)
     if (depositPlan === null) return res.status(400).json({ error: 'Acomptes invalides.' })
     contact.depositPlan = depositPlan
+  }
+  if (req.body?.quoteStatus === 'none' || req.body?.quoteStatus === 'sent' || req.body?.quoteStatus === 'signed') {
+    contact.quoteStatus = req.body.quoteStatus
+  }
+  await contact.save()
+  res.json({ contact })
+})
+
+router.patch('/contacts/:id/quote', async (req, res) => {
+  const contact = await Contact.findOne({ _id: req.params.id, user: req.user._id })
+  if (!contact) return res.status(404).json({ error: 'Contact introuvable.' })
+  if (contact.kind === 'prospect') {
+    return res.status(400).json({ error: 'Passez d’abord ce prospect en client.' })
+  }
+  const status = req.body?.status
+  if (status !== 'none' && status !== 'sent' && status !== 'signed') {
+    return res.status(400).json({ error: 'Statut de devis invalide.' })
+  }
+  contact.quoteStatus = status
+  if (status === 'sent') {
+    contact.quoteSentAt = new Date()
+    contact.quoteSignedAt = undefined
+    addDealEvent(contact, 'Devis envoyé')
+    try {
+      await scheduleQuoteReminder(req.user, contact)
+    } catch {
+      /* la relance ne doit pas bloquer l’envoi du devis */
+    }
+  } else if (status === 'signed') {
+    if (!contact.quoteSentAt) contact.quoteSentAt = new Date()
+    contact.quoteSignedAt = new Date()
+    addDealEvent(contact, 'Devis signé')
+    await Reminder.updateMany(
+      { user: req.user._id, contact: contact._id, kind: 'quote', done: false },
+      { $set: { done: true } },
+    )
+  } else {
+    contact.quoteSentAt = undefined
+    contact.quoteSignedAt = undefined
+    addDealEvent(contact, 'Devis réinitialisé')
+    await Reminder.deleteMany({ user: req.user._id, contact: contact._id, kind: 'quote', done: false })
   }
   await contact.save()
   res.json({ contact })
@@ -407,6 +651,9 @@ router.patch('/contacts/:id/deposits/:index', async (req, res) => {
   if (!contact) return res.status(404).json({ error: 'Contact introuvable.' })
   if (contact.kind === 'prospect') {
     return res.status(400).json({ error: 'Passez d’abord ce prospect en client.' })
+  }
+  if (Boolean(req.body?.paid) && resolvedQuoteStatus(contact) !== 'signed') {
+    return res.status(400).json({ error: 'Faites d’abord signer le devis, puis encaissez.' })
   }
   if (req.body?.depositPlan !== undefined) {
     const parsed = parseDepositPlan(req.body.depositPlan, contact.depositPlan)
@@ -447,6 +694,7 @@ router.patch('/contacts/:id/deposits/:index', async (req, res) => {
     }
     step.paid = true
     step.paidAt = new Date()
+    addDealEvent(contact, `${step.label} payé`, amount ? `${amount.toFixed(2)} €` : '')
   }
 
   if (!paid && step.paid) {
@@ -456,6 +704,7 @@ router.patch('/contacts/:id/deposits/:index', async (req, res) => {
     step.paid = false
     step.paidAt = undefined
     step.transaction = undefined
+    addDealEvent(contact, `${step.label} annulé`)
   }
 
   contact.markModified('depositPlan')
@@ -475,13 +724,18 @@ router.post('/contacts/:id/complete', async (req, res) => {
   if (contact.jobStatus === 'done') {
     return res.json({ contact, alreadyDone: true })
   }
+  if (userHasModule(req.user, 'quotes') && resolvedQuoteStatus(contact) !== 'signed' && contact.price > 0) {
+    return res.status(400).json({ error: 'Le devis doit être signé avant de terminer la mission.' })
+  }
 
-  const unpaid = unpaidDeposits(contact.price, contact.depositPlan)
-  if (unpaid.length) {
-    const names = unpaid.map((step) => step.label).join(', ')
-    return res.status(400).json({
-      error: `Encore à encaisser : ${names}. Marquez chaque échéance comme payée, puis terminez.`,
-    })
+  if (userHasModule(req.user, 'deposits')) {
+    const unpaid = unpaidDeposits(contact.price, contact.depositPlan)
+    if (unpaid.length) {
+      const names = unpaid.map((step) => step.label).join(', ')
+      return res.status(400).json({
+        error: `Encore à encaisser : ${names}. Marquez chaque échéance comme payée, puis terminez.`,
+      })
+    }
   }
 
   const month = new Date().toLocaleDateString('fr-FR', { month: 'long' })
@@ -501,6 +755,7 @@ router.post('/contacts/:id/complete', async (req, res) => {
   }
   contact.jobStatus = 'done'
   contact.completedAt = new Date()
+  addDealEvent(contact, 'Mission terminée')
   await contact.save()
   res.json({ contact, transaction })
 })
@@ -537,21 +792,28 @@ router.get('/appointments', async (req, res) => {
 })
 
 router.get('/follow-ups', async (req, res) => {
-  const appointments = await Appointment.find({
+  const found = await Appointment.find({
     user: req.user._id,
     status: 'planned',
     contact: { $ne: null },
     startAt: { $lte: new Date() },
   })
     .sort({ startAt: -1 })
-    .populate('contact', 'name firstName lastName kind company phone')
+    .populate('contact', 'name firstName lastName kind company phone price')
     .limit(30)
 
-  const due = appointments.filter((item) => {
-    const end = new Date(item.startAt.getTime() + (item.durationMinutes || 60) * 60000)
-    return end.getTime() <= Date.now()
+  const appointments = found.map((item) => {
+    const json = item.toObject()
+    const contact = json.contact || {}
+    const askPayment = asksSessionPayment(req.user, item)
+    return {
+      ...json,
+      askPayment,
+      amount: sessionAmount(item, contact),
+    }
   })
-  res.json({ appointments: due })
+
+  res.json({ appointments })
 })
 
 router.post('/appointments', async (req, res) => {
@@ -571,15 +833,23 @@ router.post('/appointments', async (req, res) => {
     return res.status(409).json({ error: 'Ce créneau n’est plus disponible.' })
   }
 
-  const appointment = await Appointment.create({
-    user: req.user._id,
-    title,
-    startAt,
-    durationMinutes,
-    location: String(req.body?.location || '').trim(),
-    notes: String(req.body?.notes || '').trim(),
-    contact: req.body?.contact || undefined,
-  })
+  let appointment
+  try {
+    appointment = await Appointment.create({
+      user: req.user._id,
+      title,
+      startAt,
+      durationMinutes,
+      location: String(req.body?.location || '').trim(),
+      notes: String(req.body?.notes || '').trim(),
+      contact: req.body?.contact || undefined,
+    })
+  } catch (err) {
+    if (isDuplicateKey(err) || (await hasOverlap(req.user._id, startAt, durationMinutes))) {
+      return res.status(409).json({ error: 'Ce créneau n’est plus disponible.' })
+    }
+    throw err
+  }
   await appointment.populate('contact', 'name phone')
   res.status(201).json({ appointment })
 })
@@ -616,6 +886,64 @@ router.patch('/appointments/:id', async (req, res) => {
   res.json({ appointment })
 })
 
+async function saveAppointmentSessionNote(userId, contact, appointment, raw) {
+  const body = String(raw || '').trim()
+  if (body.length < 2) return false
+  const when = appointment.startAt.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  await Note.create({
+    user: userId,
+    title: `RDV du ${when}`.slice(0, 120),
+    body: body.slice(0, 4000),
+    contact: contact._id,
+  })
+  appointment.notes = body.slice(0, 1000)
+  return true
+}
+
+async function markSimpleDepositPaid(contact, transactionId, amount, methodLabel = '') {
+  const steps = contact.depositPlan || []
+  const unpaid = steps.filter((step) => !step.paid)
+  if (unpaid.length !== 1) return false
+  unpaid[0].paid = true
+  unpaid[0].paidAt = new Date()
+  if (transactionId) unpaid[0].transaction = transactionId
+  contact.markModified('depositPlan')
+  addDealEvent(
+    contact,
+    `${unpaid[0].label || 'Séance'} payé`,
+    [amount ? `${Number(amount).toFixed(2)} €` : '', methodLabel].filter(Boolean).join(' · '),
+  )
+  return true
+}
+
+async function recordUnpaidReminder(user, contact, appointment) {
+  if (!userHasModule(user, 'reminders')) return
+  const title = `Encaisser ${contact.name}`.slice(0, 160)
+  const existing = await Reminder.findOne({
+    user: user._id,
+    contact: contact._id,
+    done: false,
+    title,
+  })
+  if (existing) return
+  const dueAt = new Date()
+  dueAt.setDate(dueAt.getDate() + 1)
+  const [hours, minutes] = String(user.schedule?.workStart || '09:00').split(':').map(Number)
+  dueAt.setHours(hours || 9, minutes || 0, 0, 0)
+  await Reminder.create({
+    user: user._id,
+    contact: contact._id,
+    title,
+    dueAt,
+    channel: 'other',
+    kind: 'manual',
+  })
+}
+
 router.post('/appointments/:id/follow-up', async (req, res) => {
   const appointment = await Appointment.findOne({ _id: req.params.id, user: req.user._id }).populate('contact')
   if (!appointment) return res.status(404).json({ error: 'Rendez-vous introuvable.' })
@@ -627,30 +955,85 @@ router.post('/appointments/:id/follow-up', async (req, res) => {
   if (!contact) return res.status(404).json({ error: 'Contact introuvable.' })
 
   const action = String(req.body?.action || '')
-  if (action === 'client') {
+  const noteBody = String(req.body?.note || '').trim()
+  const allowed = ['note', 'client', 'archive', 'paid', 'unpaid', 'absent']
+  if (!allowed.includes(action)) {
+    return res.status(400).json({ error: 'Choisissez une suite : payé, absent, notes, client, ou sans suite.' })
+  }
+  if (action === 'note' && noteBody.length < 2) {
+    return res.status(400).json({ error: 'Écrivez les notes de ce rendez-vous.' })
+  }
+  if (noteBody.length >= 2) {
+    await saveAppointmentSessionNote(req.user._id, contact, appointment, noteBody)
+  }
+
+  if (action === 'paid') {
+    const fallback = sessionAmount(appointment, contact)
+    const parsed = req.body?.amount === undefined || req.body?.amount === '' ? fallback : parsePrice(req.body.amount)
+    if (parsed === null) return res.status(400).json({ error: 'Montant invalide.' })
+    const method = parsePaymentMethod(req.body?.method)
+    if (!method) return res.status(400).json({ error: 'Indiquez le moyen de paiement.' })
+    const amount = parsed
+    const methodLabel = paymentMethodLabel(method)
+    if (contact.kind === 'prospect') contact.kind = 'client'
+    appointment.paymentStatus = 'paid'
+    appointment.paymentMethod = method
+    const when = appointment.startAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+    const serviceLabel = appointment.serviceName || appointment.title || 'Séance'
+    if (amount > 0) {
+      const label = [contact.name, serviceLabel].filter(Boolean).join(' — ').slice(0, 120)
+      const transaction = await Transaction.create({
+        user: req.user._id,
+        kind: 'income',
+        label,
+        amount,
+        date: appointment.startAt || new Date(),
+        category: serviceLabel,
+        method,
+      })
+      appointment.paymentTransaction = transaction._id
+      const marked = await markSimpleDepositPaid(contact, transaction._id, amount, methodLabel)
+      if (!marked) {
+        addDealEvent(
+          contact,
+          'Séance payée',
+          [serviceLabel, `${amount.toFixed(2)} €`, methodLabel, when].filter(Boolean).join(' · '),
+        )
+      }
+    } else {
+      addDealEvent(contact, 'Séance payée', [serviceLabel, methodLabel, when].filter(Boolean).join(' · '))
+    }
+  } else if (action === 'unpaid') {
+    const fallback = sessionAmount(appointment, contact)
+    const parsed = req.body?.amount === undefined || req.body?.amount === '' ? fallback : parsePrice(req.body.amount)
+    if (parsed === null) return res.status(400).json({ error: 'Montant invalide.' })
+    if (contact.kind === 'prospect') contact.kind = 'client'
+    appointment.paymentStatus = 'unpaid'
+    addDealEvent(
+      contact,
+      'Séance non payée',
+      [appointment.serviceName, parsed > 0 ? `${parsed.toFixed(2)} €` : ''].filter(Boolean).join(' · '),
+    )
+    await recordUnpaidReminder(req.user, contact, appointment)
+  } else if (action === 'absent') {
+    if (contact.kind === 'prospect') contact.kind = 'client'
+    appointment.paymentStatus = 'absent'
+    const when = appointment.startAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+    addDealEvent(
+      contact,
+      'Absent',
+      [appointment.serviceName || appointment.title, when].filter(Boolean).join(' · '),
+    )
+  } else if (action === 'client') {
     contact.kind = 'client'
     contact.jobStatus = 'open'
     contact.completedAt = undefined
-    await contact.save()
   } else if (action === 'archive') {
     contact.jobStatus = 'archived'
     contact.completedAt = new Date()
-    await contact.save()
-  } else if (action === 'note') {
-    const body = String(req.body?.note || '').trim()
-    if (body.length < 2) {
-      return res.status(400).json({ error: 'Écrivez une note après ce rendez-vous.' })
-    }
-    await Note.create({
-      user: req.user._id,
-      title: `Après RDV — ${contact.name}`,
-      body,
-      contact: contact._id,
-    })
-  } else {
-    return res.status(400).json({ error: 'Choisissez une suite : client, sans suite, ou note.' })
   }
 
+  await contact.save()
   appointment.status = 'done'
   await appointment.save()
   await appointment.populate('contact', 'name firstName lastName kind company phone jobStatus')
@@ -663,8 +1046,23 @@ router.delete('/appointments/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
+function monthBounds(ym) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(ym || ''))
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return null
+  return {
+    start: new Date(year, month - 1, 1),
+    end: new Date(year, month, 1),
+  }
+}
+
 router.get('/transactions', async (req, res) => {
-  const transactions = await Transaction.find({ user: req.user._id }).sort({ date: -1 }).limit(80)
+  const bounds = monthBounds(req.query.month)
+  const filter = { user: req.user._id }
+  if (bounds) filter.date = { $gte: bounds.start, $lt: bounds.end }
+  const transactions = await Transaction.find(filter).sort({ date: -1 }).limit(bounds ? 400 : 80)
   const income = transactions.filter((t) => t.kind === 'income').reduce((sum, t) => sum + t.amount, 0)
   const expense = transactions.filter((t) => t.kind === 'expense').reduce((sum, t) => sum + t.amount, 0)
   const cotisationEstimate = Math.round(income * COTISATION_RATE * 100) / 100
@@ -689,7 +1087,7 @@ router.post('/transactions', async (req, res) => {
   const date = parseDate(req.body?.date)
   const kind = req.body?.kind === 'expense' ? 'expense' : 'income'
   if (kind === 'expense' && req.user.subscription?.plan !== 'pro') {
-    return res.status(403).json({ error: 'Les dépenses sont réservées à Nolio Pro.', code: 'PRO_REQUIRED' })
+    return res.status(403).json({ error: 'Les dépenses sont réservées à Nolyo Pro.', code: 'PRO_REQUIRED' })
   }
   if (!label) return res.status(400).json({ error: 'Indiquez un libellé.' })
   if (!Number.isFinite(amount) || amount < 0) {
@@ -731,7 +1129,7 @@ router.patch('/transactions/:id', async (req, res) => {
   }
   if (req.body?.kind === 'expense' || req.body?.kind === 'income') {
     if (req.body.kind === 'expense' && req.user.subscription?.plan !== 'pro') {
-      return res.status(403).json({ error: 'Les dépenses sont réservées à Nolio Pro.', code: 'PRO_REQUIRED' })
+      return res.status(403).json({ error: 'Les dépenses sont réservées à Nolyo Pro.', code: 'PRO_REQUIRED' })
     }
     transaction.kind = req.body.kind
   }
@@ -750,7 +1148,7 @@ router.delete('/transactions/:id', async (req, res) => {
 router.get('/reminders', async (req, res) => {
   const reminders = await Reminder.find({ user: req.user._id })
     .sort({ done: 1, dueAt: 1 })
-    .populate('contact', 'name phone')
+    .populate('contact', 'name phone email')
     .limit(80)
   res.json({ reminders })
 })
@@ -767,8 +1165,9 @@ router.post('/reminders', async (req, res) => {
     dueAt,
     channel: ['email', 'phone', 'other'].includes(req.body?.channel) ? req.body.channel : 'email',
     contact: req.body?.contact || undefined,
+    kind: req.body?.kind === 'task' || req.body?.kind === 'quote' ? req.body.kind : 'manual',
   })
-  await reminder.populate('contact', 'name phone')
+  await reminder.populate('contact', 'name phone email')
   res.status(201).json({ reminder })
 })
 
@@ -783,7 +1182,7 @@ router.patch('/reminders/:id', async (req, res) => {
     reminder.dueAt = dueAt
   }
   await reminder.save()
-  await reminder.populate('contact', 'name phone')
+  await reminder.populate('contact', 'name phone email')
   res.json({ reminder })
 })
 

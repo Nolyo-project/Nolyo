@@ -1,5 +1,38 @@
+import { useEffect } from 'react'
+
 export function PageShell({ children, className = '' }) {
   return <main className={`w-full px-5 py-8 lg:px-10 lg:py-10 ${className}`.trim()}>{children}</main>
+}
+
+export function Modal({ onClose, children, panelClassName = '', overlayClassName = '' }) {
+  useEffect(() => {
+    function onKey(event) {
+      if (event.key === 'Escape') onClose?.()
+    }
+    document.addEventListener('keydown', onKey)
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previous
+    }
+  }, [onClose])
+
+  return (
+    <div
+      className={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 sm:p-8 ${overlayClassName || 'z-50'}`.trim()}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose?.()
+      }}
+    >
+      <div
+        className={`my-auto w-full rounded-[1.6rem] bg-paper p-6 shadow-2xl sm:p-8 ${panelClassName}`.trim()}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  )
 }
 
 export function PageHeader({ kicker, title, description, actions }) {
@@ -30,6 +63,28 @@ export function EmptyState({ children }) {
     <div className="flex flex-col items-center rounded-[1.5rem] border border-dashed border-ink/12 bg-cream/40 px-5 py-14 text-center text-sm text-ink-soft">
       {children}
     </div>
+  )
+}
+
+export function Accordion({ title, hint, open, onToggle, children }) {
+  return (
+    <Surface className="overflow-hidden p-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
+        aria-expanded={open}
+      >
+        <span className="min-w-0">
+          <span className="block font-display text-2xl">{title}</span>
+          {hint ? <span className="mt-0.5 block text-sm text-ink-soft">{hint}</span> : null}
+        </span>
+        <span className={`shrink-0 text-lg text-ink-soft transition ${open ? 'rotate-180' : ''}`} aria-hidden>
+          ⌄
+        </span>
+      </button>
+      {open ? <div className="border-t border-ink/6 px-6 pt-5 pb-6">{children}</div> : null}
+    </Surface>
   )
 }
 
@@ -121,6 +176,18 @@ export const icons = {
       <path d="M9 11V8.5a3 3 0 016 0V11" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </Icon>
   ),
+  qr: (
+    <Icon>
+      <path d="M5 5h5.5v5.5H5V5zM13.5 5H19v5.5h-5.5V5zM5 13.5H10.5V19H5v-5.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M13.5 13.5h2.2V16M16 19h3v-3M19 13.5h-2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Icon>
+  ),
+  page: (
+    <Icon>
+      <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8 9h8M8 12.5h5.5M8 16h3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Icon>
+  ),
 }
 
 export function initials(name) {
@@ -131,4 +198,19 @@ export function initials(name) {
     .map((part) => part[0])
     .join('')
     .toUpperCase()
+}
+
+export function Avatar({ user, className = 'h-10 w-10', light = false }) {
+  if (user?.avatar) {
+    return <img src={user.avatar} alt="" className={`shrink-0 rounded-full object-cover ${className}`} />
+  }
+  return (
+    <span
+      className={`grid shrink-0 place-items-center rounded-full text-xs font-semibold ${
+        light ? 'bg-cream/12 text-cream' : 'bg-moss text-cream'
+      } ${className}`}
+    >
+      {initials(user?.name)}
+    </span>
+  )
 }

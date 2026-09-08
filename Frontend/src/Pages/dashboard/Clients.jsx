@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
+import { copyForUser } from '../../data/trades'
+import { hasModule } from '../../data/workspace'
+import { paymentMethodLabel } from '../../data/payments'
 import {
   appointmentOverlaps,
   buildDaySlots,
@@ -13,13 +17,17 @@ import {
   unpaidDeposits,
   normalizeDepositPlan,
   parseLocalDate,
+  resolveQuoteStatus,
+  dealStage,
   slotDateTime,
   splitDepositAmounts,
   toDateInput,
   useNow,
 } from './format'
 import { DepositTracker } from './DepositPlanEditor'
-import { EmptyState, PageHeader, PageShell, Surface, ghostBtn, icons, primaryBtn, quietBtn } from './ui'
+import { DealFollow, stageTone } from './DealFollow'
+import { MailMenu } from './MailMenu'
+import { EmptyState, Modal, PageHeader, PageShell, Surface, ghostBtn, icons, primaryBtn, quietBtn } from './ui'
 
 const PAGE_SIZE = 9
 
@@ -34,6 +42,27 @@ const empty = {
   price: '',
   depositPlan: [],
   notes: '',
+  serviceLines: [],
+}
+
+function linesTotal(lines) {
+  return Math.round((lines || []).reduce((sum, line) => sum + Number(line.price || 0) * (line.quantity || 1), 0) * 100) / 100
+}
+
+function linesActivity(lines) {
+  return (lines || [])
+    .map((line) => (line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name))
+    .filter(Boolean)
+    .join(', ')
+}
+
+function applyLines(form, serviceLines) {
+  return {
+    ...form,
+    serviceLines,
+    price: serviceLines.length ? String(linesTotal(serviceLines)) : form.price,
+    activity: linesActivity(serviceLines),
+  }
 }
 
 const rdvStatus = {
@@ -53,10 +82,21 @@ function personParts(item) {
   return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') }
 }
 
+function upperLastName(value) {
+  return String(value || '').trim().toLocaleUpperCase('fr-FR')
+}
+
+function formattedPersonName(item) {
+  const { firstName, lastName } = personParts(item)
+  return [String(firstName || '').trim(), upperLastName(lastName)].filter(Boolean).join(' ')
+}
+
 function displayName(form, useParts = false) {
-  const fromParts = [form.firstName, form.lastName].filter(Boolean).join(' ').trim()
-  if (useParts) return fromParts || String(form.name || '').trim()
-  return String(form.name || '').trim() || fromParts
+  if (useParts) {
+    const fromParts = [form.firstName, upperLastName(form.lastName)].filter(Boolean).join(' ').trim()
+    return fromParts || formattedPersonName({ name: form.name })
+  }
+  return formattedPersonName({ name: form.name }) || formattedPersonName(form)
 }
 
 function initials(name) {
@@ -79,8 +119,11 @@ function depositSummary(item, userPlan) {
 }
 
 function Clients({ mode = 'clients' }) {
-  const isProspects = mode === 'prospects'
   const { user } = useAuth()
+  const copy = copyForUser(user)
+  const quotesOn = hasModule(user, 'quotes')
+  const depositsOn = hasModule(user, 'deposits')
+  const isProspects = mode === 'prospects'
   const now = useNow()
   const schedule = user?.schedule || defaultSchedule()
   const [contacts, setContacts] = useState([])
@@ -103,6 +146,11 @@ function Clients({ mode = 'clients' }) {
   const [rdvPending, setRdvPending] = useState(false)
   const [dayBusy, setDayBusy] = useState([])
   const [saved, setSaved] = useState('')
+  const [dealLog, setDealLog] = useState([])
+  const [quoteStatus, setQuoteStatus] = useState('none')
+  const [quoteSentAt, setQuoteSentAt] = useState('')
+  const [quoteSignedAt, setQuoteSignedAt] = useState('')
+  const [catalog, setCatalog] = useState([])
 
   const clients = useMemo(
     () =>
@@ -122,12 +170,22 @@ function Clients({ mode = 'clients' }) {
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    if (!needle) return clients
-    return clients.filter((item) =>
-      [item.name, item.firstName, item.lastName, item.company, item.activity, item.email, item.phone]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(needle)),
-    )
+    const list = needle
+      ? clients.filter((item) =>
+          [item.name, item.firstName, item.lastName, item.company, item.activity, item.email, item.phone]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(needle)),
+        )
+      : clients
+    return [...list].sort((a, b) => {
+      const nameOf = (item) => {
+        const last = String(item.lastName || '').trim()
+        const first = String(item.firstName || '').trim()
+        if (last || first) return `${last} ${first}`
+        return String(item.name || '').trim()
+      }
+      return nameOf(a).localeCompare(nameOf(b), 'fr', { sensitivity: 'base' })
+    })
   }, [clients, query])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -155,9 +213,20 @@ function Clients({ mode = 'clients' }) {
     const items = [
       ...appointments.map((item) => ({
         id: `rdv-${item._id}`,
-        kind: 'Rendez-vous',
-        title: item.title,
-        meta: `${formatDateTime(item.startAt)} · ${rdvStatus[item.status] || item.status}`,
+        kind: item.source === 'booking' ? 'Réservation Nolyo' : 'Rendez-vous',
+        title: item.serviceName || item.title,
+        meta: [
+          formatDateTime(item.startAt),
+          item.paymentStatus === 'paid'
+            ? ['Payé', paymentMethodLabel(item.paymentMethod), item.servicePrice ? formatMoney(item.servicePrice) : '']
+                .filter(Boolean)
+                .join(' · ')
+            : item.paymentStatus === 'absent'
+              ? 'Absent'
+              : rdvStatus[item.status] || item.status,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         at: item.startAt,
       })),
       ...clientNotes.map((item) => ({
@@ -174,9 +243,16 @@ function Clients({ mode = 'clients' }) {
         meta: `${formatDateTime(item.dueAt)}${item.done ? ' · Faite' : ''}`,
         at: item.dueAt,
       })),
+      ...dealLog.map((item, index) => ({
+        id: `deal-${item.at || index}-${index}`,
+        kind: 'Suivi',
+        title: item.title,
+        meta: [item.meta, item.at ? formatDateTime(item.at) : ''].filter(Boolean).join(' · '),
+        at: item.at || 0,
+      })),
     ]
     return items.sort((a, b) => new Date(b.at) - new Date(a.at))
-  }, [appointments, clientNotes, reminders])
+  }, [appointments, clientNotes, dealLog, reminders])
 
   async function load() {
     const data = await api(`/api/workspace/contacts?kind=${isProspects ? 'prospect' : 'client'}`)
@@ -185,6 +261,9 @@ function Clients({ mode = 'clients' }) {
 
   useEffect(() => {
     load().catch((err) => setError(err.message))
+    api('/api/workspace/services')
+      .then((data) => setCatalog((data.services || []).filter((item) => item.active !== false)))
+      .catch(() => {})
     function refresh() {
       load().catch((err) => setError(err.message))
     }
@@ -226,6 +305,28 @@ function Clients({ mode = 'clients' }) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }))
   }
 
+  function addServiceLine(service) {
+    setForm((current) => {
+      const lines = [...(current.serviceLines || [])]
+      const index = lines.findIndex((line) => String(line.service || '') === String(service._id))
+      if (index >= 0) {
+        lines[index] = { ...lines[index], quantity: (lines[index].quantity || 1) + 1 }
+      } else {
+        lines.push({
+          service: service._id,
+          name: service.name,
+          price: service.price,
+          quantity: 1,
+        })
+      }
+      return applyLines(current, lines)
+    })
+  }
+
+  function removeServiceLine(index) {
+    setForm((current) => applyLines(current, (current.serviceLines || []).filter((_, i) => i !== index)))
+  }
+
   function fillForm(item) {
     const parts = personParts(item)
     const fullName = String(item.name || '').trim() || [parts.firstName, parts.lastName].filter(Boolean).join(' ')
@@ -240,9 +341,14 @@ function Clients({ mode = 'clients' }) {
       price: item.price === 0 || item.price ? String(item.price) : '',
       depositPlan: normalizeDepositPlan(item.depositPlan?.length ? item.depositPlan : user?.depositPlan),
       notes: item.notes || '',
+      serviceLines: Array.isArray(item.serviceLines) ? item.serviceLines : [],
     })
     setJobStatus(item.jobStatus || 'open')
     setSheetKind(item.kind || 'client')
+    setQuoteStatus(resolveQuoteStatus(item))
+    setQuoteSentAt(item.quoteSentAt || '')
+    setQuoteSignedAt(item.quoteSignedAt || '')
+    setDealLog(item.dealLog || [])
   }
 
   async function loadSheet(contactId) {
@@ -259,12 +365,25 @@ function Clients({ mode = 'clients' }) {
     return data.contact
   }
 
+  useEffect(() => {
+    function refreshSheet() {
+      if (!editingId) return
+      loadSheet(editingId).catch(() => {})
+    }
+    window.addEventListener('nolio-workspace-changed', refreshSheet)
+    return () => window.removeEventListener('nolio-workspace-changed', refreshSheet)
+  }, [editingId])
+
   function openCreate() {
     setEditingId(null)
     setForm({ ...empty, depositPlan: normalizeDepositPlan(user?.depositPlan) })
     setAppointments([])
     setClientNotes([])
     setReminders([])
+    setDealLog([])
+    setQuoteStatus('none')
+    setQuoteSentAt('')
+    setQuoteSignedAt('')
     setRdvDate('')
     setRdvTime('')
     setTab('fiche')
@@ -299,6 +418,10 @@ function Clients({ mode = 'clients' }) {
     setAppointments([])
     setClientNotes([])
     setReminders([])
+    setDealLog([])
+    setQuoteStatus('none')
+    setQuoteSentAt('')
+    setQuoteSignedAt('')
     setRdvDate('')
     setRdvTime('')
     setTab('fiche')
@@ -336,11 +459,13 @@ function Clients({ mode = 'clients' }) {
     }
     if (isProspectForm) {
       body.firstName = form.firstName
-      body.lastName = form.lastName
+      body.lastName = upperLastName(form.lastName)
       body.activity = form.activity
     } else {
       body.price = price
       body.depositPlan = normalizeDepositPlan(form.depositPlan)
+      body.serviceLines = form.serviceLines || []
+      body.activity = form.activity || ''
     }
     try {
       if (editingId) {
@@ -379,6 +504,47 @@ function Clients({ mode = 'clients' }) {
       setError(err.message)
     } finally {
       setPending(false)
+    }
+  }
+
+  async function setQuote(status) {
+    if (!editingId) return
+    setError('')
+    setSaved('')
+    setPending(true)
+    try {
+      const data = await api(`/api/workspace/contacts/${editingId}/quote`, {
+        method: 'PATCH',
+        body: { status },
+      })
+      setContacts((current) =>
+        current.map((item) => (item._id === editingId ? data.contact : item)),
+      )
+      fillForm(data.contact)
+      setSaved(
+        status === 'sent' ? 'Devis marqué comme envoyé.' : status === 'signed' ? 'Devis signé.' : 'Devis réinitialisé.',
+      )
+      window.dispatchEvent(new Event('nolio-workspace-changed'))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setPending(false)
+    }
+  }
+
+  async function markQuoteFromList(item) {
+    if (item.kind === 'prospect' || item.jobStatus === 'done' || item.jobStatus === 'archived') return
+    if (resolveQuoteStatus(item) !== 'none') return
+    try {
+      const data = await api(`/api/workspace/contacts/${item._id}/quote`, {
+        method: 'PATCH',
+        body: { status: 'sent' },
+      })
+      setContacts((current) => current.map((row) => (row._id === item._id ? data.contact : row)))
+      if (editingId === item._id) fillForm(data.contact)
+      window.dispatchEvent(new Event('nolio-workspace-changed'))
+    } catch (err) {
+      setError(err.message)
     }
   }
 
@@ -455,7 +621,13 @@ function Clients({ mode = 'clients' }) {
   async function markDone() {
     if (!editingId) return
     const remaining = unpaidDeposits(form.price, form.depositPlan)
-    if (remaining.length) {
+    const quote = resolveQuoteStatus({ quoteStatus, depositPlan: form.depositPlan })
+    if (quotesOn && Number(form.price) > 0 && quote !== 'signed') {
+      setError('Le devis doit être signé avant de terminer la mission.')
+      setTab('fiche')
+      return
+    }
+    if (depositsOn && remaining.length) {
       setError(
         `Encore à encaisser : ${remaining.map((step) => step.label).join(', ')}. Marquez chaque échéance comme payée, puis terminez.`,
       )
@@ -552,41 +724,41 @@ function Clients({ mode = 'clients' }) {
   const doneCount = contacts.filter((item) => item.jobStatus === 'done').length
   const archivedCount = contacts.filter((item) => item.jobStatus === 'archived').length
   const isProspectSheet = isProspects || sheetKind === 'prospect'
-  const remainingDeposits = isProspectSheet ? [] : unpaidDeposits(form.price, form.depositPlan)
-  const canFinish = remainingDeposits.length === 0
+  const remainingDeposits = !depositsOn || isProspectSheet ? [] : unpaidDeposits(form.price, form.depositPlan)
+  const quoteReady =
+    !quotesOn ||
+    isProspectSheet ||
+    Number(form.price) <= 0 ||
+    resolveQuoteStatus({ quoteStatus, depositPlan: form.depositPlan }) === 'signed'
+  const depositsUnlocked = !isProspectSheet && quoteReady && jobStatus === 'open'
+  const canFinish = remainingDeposits.length === 0 && quoteReady
   const emptyMessage = query
-    ? isProspects
-      ? 'Aucun prospect ne correspond à cette recherche.'
-      : 'Aucun client ne correspond à cette recherche.'
+    ? 'Aucun résultat pour cette recherche.'
     : listTab === 'archived'
       ? isProspects
-        ? 'Aucun prospect sans suite pour l’instant.'
+        ? 'Aucune archive pour l’instant.'
         : 'Aucune archive. Les rendez-vous sans suite arriveront ici.'
       : listTab === 'done' && !isProspects
         ? 'Aucune mission terminée pour l’instant.'
         : isProspects
-          ? 'Aucun prospect pour l’instant. Ajoutez les personnes à démarcher.'
-          : 'Aucun client en cours pour l’instant.'
+          ? `Pas encore de ${copy.prospects.toLowerCase()}. Ajoutez les personnes à démarcher.`
+          : `Aucun ${copy.clientsSingular} en cours pour l’instant.`
 
   return (
     <PageShell>
       <PageHeader
-        kicker="Carnet"
-        title={isProspects ? 'Prospects' : 'Clients'}
-        description={
-          isProspects
-            ? 'Les personnes à démarcher. Quand c’est bon, passez-les en client — elles arriveront dans Clients.'
-            : 'Cliquez une carte pour ouvrir la fiche. Marquez l’acompte et le solde comme payés, puis terminez la mission.'
-        }
+        kicker={isProspects ? copy.prospects : copy.clients}
+        title={isProspects ? copy.prospects : copy.clients}
+        description={isProspects ? copy.prospectsHint : copy.clientsHint}
         actions={
           <>
             <label className="relative min-w-0 flex-1 lg:w-72">
-              <span className="sr-only">{isProspects ? 'Rechercher un prospect' : 'Rechercher un client'}</span>
+              <span className="sr-only">{isProspects ? copy.searchProspect : copy.searchClient}</span>
               <input
                 className="w-full rounded-full border border-ink/10 bg-cream py-2.5 pr-4 pl-10 text-sm outline-none ring-1 ring-ink/5 transition focus:border-copper focus:ring-copper/20"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={isProspects ? 'Rechercher un prospect' : 'Rechercher un client'}
+                placeholder={isProspects ? copy.searchProspect : copy.searchClient}
               />
               <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-soft">
                 {icons.search}
@@ -600,7 +772,7 @@ function Clients({ mode = 'clients' }) {
               Archives ({archivedCount})
             </button>
             <button type="button" onClick={openCreate} className={primaryBtn}>
-              {isProspects ? 'Nouveau prospect' : 'Nouveau client'}
+              {isProspects ? copy.newProspect : copy.newClient}
             </button>
           </>
         }
@@ -637,7 +809,8 @@ function Clients({ mode = 'clients' }) {
         <>
           <ul className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {visible.map((item) => {
-              const summary = isProspects ? null : depositSummary(item, user?.depositPlan)
+              const summary = isProspects || !depositsOn ? null : depositSummary(item, user?.depositPlan)
+              const stage = isProspects || !quotesOn ? null : dealStage(item, user?.depositPlan)
               return (
               <Surface
                 as="li"
@@ -648,12 +821,14 @@ function Clients({ mode = 'clients' }) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
                     <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-moss text-sm font-semibold text-cream">
-                      {initials(item.name)}
+                      {initials(formattedPersonName(item))}
                     </span>
                     <div className="min-w-0">
-                      <h2 className="truncate font-medium">{item.name}</h2>
-                      <p className="truncate text-sm text-ink-soft">{item.company || 'Sans société'}</p>
-                      {isProspects && item.activity ? (
+                      <h2 className="truncate font-medium">{formattedPersonName(item)}</h2>
+                      <p className="truncate text-sm text-ink-soft">
+                        {item.company || item.email || (isProspects ? 'Sans société' : 'Sans coordonnées')}
+                      </p>
+                      {item.activity ? (
                         <p className="truncate text-sm text-ink-soft">{item.activity}</p>
                       ) : null}
                     </div>
@@ -673,17 +848,25 @@ function Clients({ mode = 'clients' }) {
                     </span>
                   )}
                   </div>
-                  <p className="mt-3 truncate text-sm text-ink-soft">
-                    {[item.email, item.phone].filter(Boolean).join(' · ') || 'Pas de coordonnées'}
-                  </p>
-                  {item.jobStatus === 'archived' ? (
+                  {stage ? (
+                    <span className={`mt-3 w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${stageTone(stage.key)}`}>
+                      {stage.label}
+                    </span>
+                  ) : item.jobStatus === 'archived' ? (
                     <p className="mt-2 text-[11px] font-semibold tracking-wide text-copper uppercase">Sans suite</p>
                   ) : item.kind === 'prospect' ? (
                     <p className="mt-2 text-[11px] font-semibold tracking-wide text-copper uppercase">Prospect</p>
-                  ) : item.jobStatus === 'done' ? (
-                    <p className="mt-2 text-[11px] font-semibold tracking-wide text-copper uppercase">Terminé</p>
                   ) : null}
                 </button>
+                <p className="mt-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-soft">
+                  {item.email ? (
+                    <MailMenu email={item.email} name={formattedPersonName(item)} onPicked={quotesOn ? () => markQuoteFromList(item) : undefined}>
+                      {item.email}
+                    </MailMenu>
+                  ) : null}
+                  {item.phone ? <span>{item.phone}</span> : null}
+                  {!item.email && !item.phone ? <span>Pas de coordonnées</span> : null}
+                </p>
                 <div className="mt-auto flex gap-4 pt-4 text-xs font-medium">
                   <button type="button" className="text-ink-soft hover:text-ink" onClick={() => openSheet(item)}>
                     Ouvrir
@@ -740,12 +923,8 @@ function Clients({ mode = 'clients' }) {
       )}
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-5 sm:p-10">
-          <form
-            noValidate
-            onSubmit={handleSubmit}
-            className="my-auto w-full max-w-5xl rounded-[1.8rem] bg-paper p-7 shadow-2xl sm:p-10 lg:p-12"
-          >
+        <Modal onClose={closeForm} panelClassName="max-w-5xl p-7 sm:p-10 lg:p-12">
+          <form noValidate onSubmit={handleSubmit}>
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-start gap-3">
                 {editingId ? (
@@ -834,7 +1013,7 @@ function Clients({ mode = 'clients' }) {
                       <label className="block text-sm font-medium">
                         Nom
                         <input
-                          className={fieldClass}
+                          className={`${fieldClass} uppercase`}
                           name="lastName"
                           value={form.lastName}
                           onChange={update}
@@ -866,6 +1045,63 @@ function Clients({ mode = 'clients' }) {
                   ) : null}
                   {isProspectSheet ? null : (
                     <>
+                      <div>
+                        <p className="text-sm font-medium">Prestations</p>
+                        <p className="mt-1 text-xs text-ink-soft">
+                          Cliquez pour les ajouter au dossier. Le total sert de base au devis, à faire ensuite sur votre
+                          plateforme de facturation.
+                        </p>
+                        {catalog.length ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {catalog.map((item) => (
+                              <button
+                                key={item._id}
+                                type="button"
+                                onClick={() => addServiceLine(item)}
+                                className="rounded-full bg-paper px-3 py-1.5 text-sm ring-1 ring-ink/8 transition hover:bg-moss hover:text-cream hover:ring-moss"
+                              >
+                                {item.name}
+                                <span className="ml-1.5 text-xs opacity-70">{formatMoney(item.price)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-sm text-ink-soft">
+                            Aucune prestation pour l’instant.{' '}
+                            <Link to="/dashboard/parametres" className="font-medium text-ink underline">
+                              Les renseigner
+                            </Link>
+                          </p>
+                        )}
+                        {(form.serviceLines || []).length ? (
+                          <ul className="mt-3 divide-y divide-ink/8 rounded-2xl bg-paper px-4">
+                            {form.serviceLines.map((line, index) => (
+                              <li key={`${line.service || line.name}-${index}`} className="flex items-center justify-between gap-3 py-2.5">
+                                <span className="min-w-0 text-sm">
+                                  {line.name}
+                                  {line.quantity > 1 ? ` ×${line.quantity}` : ''}
+                                </span>
+                                <span className="flex shrink-0 items-center gap-3">
+                                  <span className="text-sm font-medium">
+                                    {formatMoney(Number(line.price) * (line.quantity || 1))}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="text-xs text-ink-soft underline hover:text-copper"
+                                    onClick={() => removeServiceLine(index)}
+                                  >
+                                    Retirer
+                                  </button>
+                                </span>
+                              </li>
+                            ))}
+                            <li className="flex items-center justify-between py-2.5 font-medium">
+                              <span>Total</span>
+                              <span className="font-display text-lg">{formatMoney(Number(form.price) || 0)}</span>
+                            </li>
+                          </ul>
+                        ) : null}
+                      </div>
                       <label className="block text-sm font-medium">
                         Prix de la mission (€)
                         <input
@@ -879,12 +1115,34 @@ function Clients({ mode = 'clients' }) {
                           placeholder="0"
                         />
                       </label>
+                      {editingId && quotesOn ? (
+                        <DealFollow
+                          contact={{
+                            quoteStatus,
+                            quoteSentAt,
+                            quoteSignedAt,
+                            depositPlan: form.depositPlan,
+                          }}
+                          email={form.email}
+                          name={displayName(form)}
+                          canEdit={jobStatus === 'open' && !pending}
+                          pending={pending}
+                          onQuote={setQuote}
+                        />
+                      ) : null}
+                      {depositsOn ? (
                       <DepositTracker
                         plan={normalizeDepositPlan(form.depositPlan)}
                         price={form.price}
-                        canToggle={Boolean(editingId) && jobStatus === 'open' && !pending}
+                        canToggle={Boolean(editingId) && depositsUnlocked && !pending}
+                        lockHint={
+                          editingId && jobStatus === 'open' && !depositsUnlocked && quotesOn
+                            ? 'Faites d’abord signer le devis, puis encaissez.'
+                            : ''
+                        }
                         onTogglePaid={toggleDepositPaid}
                       />
+                      ) : null}
                     </>
                   )}
                   <label className="block text-sm font-medium">
@@ -917,7 +1175,12 @@ function Clients({ mode = 'clients' }) {
                         <li key={item._id} className="flex items-start justify-between gap-3 rounded-xl bg-paper px-3 py-2 text-sm">
                           <span>
                             {formatDateTime(item.startAt)}
-                            <span className="mt-0.5 block text-xs text-ink-soft">{rdvStatus[item.status] || item.status}</span>
+                            <span className="mt-0.5 block text-xs text-ink-soft">
+                              {item.serviceName || item.title}
+                              {item.source === 'booking' ? ' · via Nolyo' : ''}
+                              {' · '}
+                              {rdvStatus[item.status] || item.status}
+                            </span>
                           </span>
                           {item.status !== 'cancelled' ? (
                             <button
@@ -1000,7 +1263,7 @@ function Clients({ mode = 'clients' }) {
                   <EmptyState>
                     {isProspectSheet
                       ? 'Rien pour l’instant. Les rendez-vous, notes et relances liés à ce prospect apparaîtront ici.'
-                      : 'Rien pour l’instant. Les rendez-vous, notes et relances liés à ce client apparaîtront ici.'}
+                      : 'Rien pour l’instant. Les devis, paiements, rendez-vous, notes et relances apparaîtront ici.'}
                   </EmptyState>
                 ) : (
                   <ul className="space-y-3">
@@ -1047,13 +1310,19 @@ function Clients({ mode = 'clients' }) {
                     title={
                       canFinish
                         ? undefined
-                        : `Encore à encaisser : ${remainingDeposits.map((step) => step.label).join(', ')}`
+                        : !quoteReady
+                          ? 'Le devis doit être signé avant de terminer.'
+                          : `Encore à encaisser : ${remainingDeposits.map((step) => step.label).join(', ')}`
                     }
                     className="inline-flex items-center justify-center rounded-full bg-copper px-5 py-2.5 text-sm font-semibold text-cream transition hover:bg-copper-dark disabled:opacity-60"
                   >
                     Terminer
                   </button>
-                  {remainingDeposits.length ? (
+                  {!quoteReady ? (
+                    <p className="basis-full text-sm text-ink-soft">
+                      Envoyez le devis, faites-le signer, puis encaissez.
+                    </p>
+                  ) : remainingDeposits.length ? (
                     <p className="basis-full text-sm text-ink-soft">
                       Encore à encaisser : {remainingDeposits.map((step) => step.label).join(', ')}.
                     </p>
@@ -1079,7 +1348,7 @@ function Clients({ mode = 'clients' }) {
               ) : null}
             </div>
           </form>
-        </div>
+        </Modal>
       ) : null}
     </PageShell>
   )

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { isProPlan } from '../../data/plans'
-import { fieldClass, formatDay, formatMoney, toDateInput } from './format'
+import { fieldClass, formatDay, formatMoney, formatMonthLabel, monthKey, shiftMonthKey, dateInMonth, monthInputBounds, toDateInput } from './format'
 import { ProLock } from './UpgradeWall'
-import { EmptyState, PageHeader, PageShell, Surface, primaryBtn, quietBtn } from './ui'
+import { EmptyState, Modal, PageHeader, PageShell, Surface, primaryBtn, quietBtn } from './ui'
 
 const empty = { kind: 'income', label: '', amount: '', date: toDateInput(), category: '' }
 
@@ -74,6 +74,7 @@ function MoneyTable({ title, items, emptyText, addLabel, onAdd, onEdit, onDelete
 function Finances() {
   const { user } = useAuth()
   const isPro = isProPlan(user)
+  const [month, setMonth] = useState(() => monthKey())
   const [transactions, setTransactions] = useState([])
   const [totals, setTotals] = useState(null)
   const [form, setForm] = useState(empty)
@@ -92,14 +93,14 @@ function Finances() {
   )
 
   async function load() {
-    const data = await api('/api/workspace/transactions')
+    const data = await api(`/api/workspace/transactions?month=${encodeURIComponent(month)}`)
     setTransactions(data.transactions)
     setTotals(data.totals)
   }
 
   useEffect(() => {
     load().catch((err) => setError(err.message))
-  }, [])
+  }, [month])
 
   function update(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -107,7 +108,7 @@ function Finances() {
 
   function openCreate(kind = 'income') {
     setEditingId(null)
-    setForm({ ...empty, kind: !isPro && kind === 'expense' ? 'income' : kind, date: toDateInput() })
+    setForm({ ...empty, kind: !isPro && kind === 'expense' ? 'income' : kind, date: dateInMonth(month) })
     setError('')
     setOpen(true)
   }
@@ -169,13 +170,42 @@ function Finances() {
         title="Chiffre d’affaires"
         description={
           isPro
-            ? 'Les gains d’un côté, les dépenses de l’autre. Les cotisations sont indicatives.'
-            : 'Saisissez vos gains. Cotisations, dépenses et total net sont inclus dans Nolio Pro.'
+            ? 'Les gains et les dépenses, un mois à la fois. Les cotisations sont indicatives.'
+            : 'Saisissez vos gains, un mois à la fois. Cotisations et dépenses sont inclus dans Nolyo Pro.'
         }
         actions={
-          <button type="button" onClick={() => openCreate('income')} className={primaryBtn}>
-            Nouvelle ligne
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-full bg-cream p-1 ring-1 ring-ink/8">
+              <button
+                type="button"
+                className={`${quietBtn} px-3`}
+                aria-label="Mois précédent"
+                onClick={() => setMonth((current) => shiftMonthKey(current, -1))}
+              >
+                ‹
+              </button>
+              <p className="min-w-40 px-2 text-center text-sm font-medium">{formatMonthLabel(month)}</p>
+              <button
+                type="button"
+                className={`${quietBtn} px-3`}
+                aria-label="Mois suivant"
+                onClick={() => setMonth((current) => shiftMonthKey(current, 1))}
+              >
+                ›
+              </button>
+            </div>
+            <button
+              type="button"
+              className={`${quietBtn} disabled:opacity-40`}
+              disabled={month === monthKey()}
+              onClick={() => setMonth(monthKey())}
+            >
+              Aujourd’hui
+            </button>
+            <button type="button" onClick={() => openCreate('income')} className={primaryBtn}>
+              Nouvelle ligne
+            </button>
+          </div>
         }
       />
 
@@ -217,17 +247,17 @@ function Finances() {
         <MoneyTable
           title="Gains"
           items={gains}
-          emptyText="Aucun gain pour l’instant. Ajoutez un encaissement."
+          emptyText="Aucun gain ce mois-ci."
           addLabel="Ajouter un gain"
           onAdd={() => openCreate('income')}
           onEdit={startEdit}
           onDelete={handleDelete}
         />
-        <ProLock isPro={isPro} title="Les dépenses sont dans Nolio Pro" className="min-h-[18rem]">
+        <ProLock isPro={isPro} title="Les dépenses sont dans Nolyo Pro" className="min-h-[18rem]">
           <MoneyTable
             title="Dépenses"
             items={expenses}
-            emptyText="Aucune dépense pour l’instant."
+            emptyText="Aucune dépense ce mois-ci."
             addLabel="Ajouter une dépense"
             onAdd={() => openCreate('expense')}
             onEdit={startEdit}
@@ -237,11 +267,8 @@ function Finances() {
       </section>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 sm:p-8">
-          <form
-            onSubmit={handleSubmit}
-            className="my-auto w-full max-w-lg rounded-[1.6rem] bg-paper p-6 shadow-2xl sm:p-8"
-          >
+        <Modal onClose={closeForm} panelClassName="max-w-lg">
+          <form onSubmit={handleSubmit}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs tracking-[0.18em] text-ink-soft uppercase">Trésorerie</p>
@@ -284,7 +311,16 @@ function Finances() {
               </label>
               <label className="block text-sm font-medium">
                 Date
-                <input className={fieldClass} type="date" name="date" value={form.date} onChange={update} required />
+                <input
+                  className={fieldClass}
+                  type="date"
+                  name="date"
+                  value={form.date}
+                  min={monthInputBounds(month).min}
+                  max={monthInputBounds(month).max}
+                  onChange={update}
+                  required
+                />
               </label>
               <label className="block text-sm font-medium">
                 Catégorie
@@ -310,7 +346,7 @@ function Finances() {
               ) : null}
             </div>
           </form>
-        </div>
+        </Modal>
       ) : null}
     </PageShell>
   )

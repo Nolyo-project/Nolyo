@@ -8,6 +8,7 @@ const transactionSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     date: { type: Date, required: true, index: true },
     category: { type: String, trim: true, default: '', maxlength: 60 },
+    method: { type: String, trim: true, default: '', maxlength: 20 },
   },
   { timestamps: true },
 )

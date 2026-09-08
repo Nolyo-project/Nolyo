@@ -1,9 +1,45 @@
 const express = require('express')
 const User = require('../models/User')
 const SubscriptionRequest = require('../models/SubscriptionRequest')
+const AccountDeletionRequest = require('../models/AccountDeletionRequest')
 const { requireAuth } = require('../middleware/auth')
-const { signToken } = require('../utils/token')
-const { normalizeInviteCode } = require('../utils/inviteCode')
+const { signToken, tokenExpiresAt } = require('../utils/token')
+const { normalizeInviteCode, inviteCodeCandidates } = require('../utils/inviteCode')
+const { handleMulter, saveImage, removeFile } = require('../utils/uploads')
+const { RESERVED } = require('./public')
+const { TRADE_IDS, WORK_MODES, publicTrades } = require('../data/trades')
+const { pickWorkspace } = require('../data/workspace')
+const { applyOnboarding } = require('../utils/applyOnboarding')
+
+async function sendUser(res, user, status = 200, extras = {}) {
+  const json = await AccountDeletionRequest.decorateUser(user)
+  const preview = previewExtras(res.req || {})
+  return res.status(status).json({ user: { ...json, ...preview, ...extras } })
+}
+
+function previewExtras(req) {
+  if (!req.auth?.preview || !req.auth.exp) return {}
+  return {
+    preview: true,
+    previewExpiresAt: new Date(req.auth.exp * 1000).toISOString(),
+  }
+}
+
+const PREVIEW_EMAIL = String(process.env.PREVIEW_EMAIL || 'ines@nolio.test').toLowerCase()
+const previewAttempts = new Map()
+
+function tooManyPreviews(ip) {
+  const now = Date.now()
+  const windowMs = 60 * 60 * 1000
+  const current = (previewAttempts.get(ip) || []).filter((at) => now - at < windowMs)
+  if (current.length >= 8) {
+    previewAttempts.set(ip, current)
+    return true
+  }
+  current.push(now)
+  previewAttempts.set(ip, current)
+  return false
+}
 
 const router = express.Router()
 
@@ -35,7 +71,7 @@ router.post('/register', async (req, res) => {
     })
   }
 
-  const request = await SubscriptionRequest.findOne({ inviteCode: code })
+  const request = await SubscriptionRequest.findOne({ inviteCode: { $in: inviteCodeCandidates(code) } })
   if (!request || request.status !== 'code_issued') {
     return res.status(400).json({ error: 'Ce code est invalide ou déjà utilisé.' })
   }
@@ -75,7 +111,7 @@ router.post('/register', async (req, res) => {
 
     return res.status(201).json({
       token: signToken(user),
-      user: user.toSafeJSON(),
+      user: await AccountDeletionRequest.decorateUser(user),
     })
   } catch (err) {
     if (err.code === 11000) {
@@ -96,12 +132,93 @@ router.post('/login', async (req, res) => {
 
   res.json({
     token: signToken(user),
-    user: user.toSafeJSON(),
+    user: await AccountDeletionRequest.decorateUser(user),
   })
 })
 
-router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: req.user.toSafeJSON() })
+router.get('/me', requireAuth, async (req, res) => {
+  await sendUser(res, req.user)
+})
+
+router.post('/preview', async (req, res) => {
+  const ip = String(req.ip || req.headers['x-forwarded-for'] || 'unknown').split(',')[0].trim()
+  if (tooManyPreviews(ip)) {
+    return res.status(429).json({ error: 'Trop d’essais. Réessayez dans un moment.' })
+  }
+
+  const user = await User.findOne({ email: PREVIEW_EMAIL, role: 'member' })
+  if (!user || user.subscription?.status !== 'active') {
+    return res.status(503).json({ error: 'La prévisualisation n’est pas disponible pour le moment.' })
+  }
+
+  const token = signToken(user, { expiresIn: '5m', preview: true })
+  const extras = {
+    preview: true,
+    previewExpiresAt: tokenExpiresAt(token),
+  }
+  const json = await AccountDeletionRequest.decorateUser(user)
+  res.json({ token, user: { ...json, ...extras }, expiresAt: extras.previewExpiresAt })
+})
+
+router.get('/onboarding', requireAuth, (req, res) => {
+  res.json({
+    trades: publicTrades(),
+    preparePage: req.user.subscription?.plan === 'pro',
+  })
+})
+
+router.post('/onboarding', requireAuth, async (req, res) => {
+  if (req.user.role === 'president') {
+    return res.status(403).json({ error: 'Espace réservé au président.' })
+  }
+  if (req.user.subscription?.status !== 'active') {
+    return res.status(403).json({ error: 'Un abonnement actif est requis.' })
+  }
+  if (req.user.onboarding?.completedAt) {
+    return res.status(409).json({ error: 'Votre espace est déjà prêt.' })
+  }
+
+  const trade = String(req.body?.trade || '').trim()
+  const workMode = String(req.body?.workMode || '').trim()
+  const company = String(req.body?.company || '').trim().slice(0, 80)
+  const city = String(req.body?.city || '').trim().slice(0, 80)
+  const tradeLabel = String(req.body?.tradeLabel || '').trim().slice(0, 60)
+  const title = String(req.body?.title || '').trim().slice(0, 80)
+  const description = String(req.body?.description || '').trim().slice(0, 800)
+  const displayAs = req.body?.displayAs === 'person' ? 'person' : 'company'
+  const services = Array.isArray(req.body?.services)
+    ? req.body.services.map((name) => String(name || '').trim()).filter(Boolean).slice(0, 8)
+    : []
+
+  if (!TRADE_IDS.includes(trade)) {
+    return res.status(400).json({ error: 'Choisissez votre métier.' })
+  }
+  if (trade === 'other' && tradeLabel.length < 2) {
+    return res.status(400).json({ error: 'Précisez votre métier.' })
+  }
+  if (company.length < 2) {
+    return res.status(400).json({ error: 'Indiquez le nom de votre activité.' })
+  }
+  if (!WORK_MODES.includes(workMode)) {
+    return res.status(400).json({ error: 'Indiquez comment vous travaillez.' })
+  }
+  const preparePage = req.user.subscription?.plan === 'pro'
+  if (preparePage && title.length < 2) {
+    return res.status(400).json({ error: 'Indiquez le titre de votre page.' })
+  }
+
+  const user = await applyOnboarding(req.user, {
+    trade,
+    tradeLabel,
+    workMode,
+    company,
+    city,
+    title,
+    description,
+    displayAs,
+    services,
+  })
+  await sendUser(res, user)
 })
 
 router.patch('/me', requireAuth, async (req, res) => {
@@ -158,8 +275,184 @@ router.patch('/me', requireAuth, async (req, res) => {
   if (req.body?.depositPlan !== undefined) {
     req.user.depositPlan = User.pickDepositPlan(req.body.depositPlan)
   }
+  if (req.body?.quoteFollowUpDays !== undefined) {
+    const days = Number(req.body.quoteFollowUpDays)
+    if (!Number.isFinite(days) || days < -1 || days > 90) {
+      return res.status(400).json({ error: 'Délai de relance invalide.' })
+    }
+    req.user.quoteFollowUpDays = Math.round(days)
+  }
+  if (req.body?.quoteFollowUpChannel === 'email' || req.body?.quoteFollowUpChannel === 'phone') {
+    req.user.quoteFollowUpChannel = req.body.quoteFollowUpChannel
+  }
+  if (req.body?.workspace && typeof req.body.workspace === 'object') {
+    const current = req.user.workspace?.toObject?.() || req.user.workspace || {}
+    const currentModules = current.modules || {}
+    req.user.workspace = pickWorkspace(
+      {
+        displayAs: req.body.workspace.displayAs ?? current.displayAs,
+        modules: { ...currentModules, ...(req.body.workspace.modules || {}) },
+      },
+      {
+        plan: req.user.subscription?.plan,
+        tradeId: req.user.onboarding?.trade,
+        workMode: req.user.onboarding?.workMode,
+      },
+    )
+  }
+  if (req.body?.page && typeof req.body.page === 'object') {
+    const current = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
+    const incoming = req.body.page
+    const next = User.pickPage({
+      ...current,
+      ...incoming,
+      photos: incoming.photos || current.photos,
+      theme: incoming.theme || current.theme,
+      about: incoming.about
+        ? {
+            body: incoming.about.body !== undefined ? incoming.about.body : current.about.body,
+            people: Array.isArray(incoming.about.people)
+              ? incoming.about.people.map((person, index) => ({
+                  ...person,
+                  photo: person.photo || current.about.people[index]?.photo || '',
+                }))
+              : current.about.people,
+          }
+        : current.about,
+    })
+    const kept = new Set((next.about.people || []).map((person) => person.photo).filter(Boolean))
+    for (const person of current.about.people || []) {
+      if (person.photo && !kept.has(person.photo)) removeFile(person.photo)
+    }
+    if (next.published) {
+      if (!next.slug) {
+        next.slug = User.slugify(next.title || req.user.name)
+      }
+      if (!next.slug) {
+        return res.status(400).json({ error: 'Indiquez une adresse de page (ex. atelier-nord).' })
+      }
+      if (RESERVED.has(next.slug)) {
+        return res.status(400).json({ error: 'Cette adresse est réservée.' })
+      }
+      const taken = await User.findOne({
+        'page.slug': next.slug,
+        _id: { $ne: req.user._id },
+      })
+      if (taken) {
+        return res.status(409).json({ error: 'Cette adresse de page est déjà prise.' })
+      }
+    }
+    req.user.page = next
+  }
   await req.user.save()
-  res.json({ user: req.user.toSafeJSON() })
+  await sendUser(res, req.user)
+})
+
+router.post('/me/avatar', requireAuth, handleMulter, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
+  removeFile(req.user.avatar)
+  req.user.avatar = saveImage(req.file, 'avatars', String(req.user._id))
+  await req.user.save()
+  await sendUser(res, req.user)
+})
+
+router.delete('/me/avatar', requireAuth, async (req, res) => {
+  removeFile(req.user.avatar)
+  req.user.avatar = ''
+  await req.user.save()
+  await sendUser(res, req.user)
+})
+
+router.post('/me/page/photos', requireAuth, handleMulter, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
+  const index = Math.min(2, Math.max(0, Number(req.body?.index) || 0))
+  const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
+  removeFile(page.photos[index])
+  page.photos[index] = saveImage(req.file, 'pages', `${req.user._id}-${index}`)
+  req.user.page = page
+  await req.user.save()
+  await sendUser(res, req.user)
+})
+
+router.post('/me/page/banner', requireAuth, handleMulter, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
+  const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
+  removeFile(page.banner)
+  page.banner = saveImage(req.file, 'pages', `${req.user._id}-banner`)
+  req.user.page = page
+  await req.user.save()
+  await sendUser(res, req.user)
+})
+
+router.delete('/me/page/banner', requireAuth, async (req, res) => {
+  const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
+  removeFile(page.banner)
+  page.banner = ''
+  req.user.page = page
+  await req.user.save()
+  await sendUser(res, req.user)
+})
+
+router.post('/me/page/people/:index/photo', requireAuth, handleMulter, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
+  const index = Math.min(5, Math.max(0, Number(req.params.index) || 0))
+  const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
+  const people = [...(page.about.people || [])]
+  while (people.length <= index) people.push({ name: '', role: '', bio: '', photo: '' })
+  removeFile(people[index].photo)
+  people[index] = { ...people[index], photo: saveImage(req.file, 'pages', `${req.user._id}-person-${index}`) }
+  page.about = { ...page.about, people }
+  req.user.page = page
+  await req.user.save()
+  await sendUser(res, req.user)
+})
+
+router.delete('/me/page/people/:index/photo', requireAuth, async (req, res) => {
+  const index = Math.min(5, Math.max(0, Number(req.params.index) || 0))
+  const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
+  const people = [...(page.about.people || [])]
+  if (!people[index]) return res.status(404).json({ error: 'Personne introuvable.' })
+  removeFile(people[index].photo)
+  people[index] = { ...people[index], photo: '' }
+  page.about = { ...page.about, people }
+  req.user.page = page
+  await req.user.save()
+  await sendUser(res, req.user)
+})
+
+router.delete('/me/page/photos/:index', requireAuth, async (req, res) => {
+  const index = Math.min(2, Math.max(0, Number(req.params.index) || 0))
+  const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
+  removeFile(page.photos[index])
+  page.photos[index] = ''
+  req.user.page = page
+  await req.user.save()
+  await sendUser(res, req.user)
+})
+
+router.post('/me/deletion-request', requireAuth, async (req, res) => {
+  const message = String(req.body?.message || '').trim()
+  if (message.length < 12) {
+    return res.status(400).json({ error: 'Expliquez en quelques lignes pourquoi vous partez.' })
+  }
+
+  const pending = await AccountDeletionRequest.findOne({ user: req.user._id, status: 'pending' })
+  if (pending) {
+    return res.status(409).json({ error: 'Une demande est déjà en attente chez le fondateur.' })
+  }
+
+  const created = await AccountDeletionRequest.create({
+    user: req.user._id,
+    name: req.user.name,
+    email: req.user.email,
+    company: req.user.subscription?.company || req.user.business?.tradeName || '',
+    plan: req.user.subscription?.plan || '',
+    message,
+    status: 'pending',
+  })
+
+  const user = await AccountDeletionRequest.decorateUser(req.user)
+  res.status(201).json({ user, deletionRequest: created.toMemberJSON() })
 })
 
 module.exports = router
