@@ -80,6 +80,7 @@ function FinancesView() {
   const [month, setMonth] = useState(() => monthKey())
   const [transactions, setTransactions] = useState([])
   const [totals, setTotals] = useState(null)
+  const [urssaf, setUrssaf] = useState(null)
   const [form, setForm] = useState(empty)
   const [editingId, setEditingId] = useState(null)
   const [open, setOpen] = useState(false)
@@ -93,6 +94,7 @@ function FinancesView() {
     const data = await api(`/api/president/transactions?month=${encodeURIComponent(month)}`)
     setTransactions(data.transactions || [])
     setTotals(data.totals || null)
+    setUrssaf(data.urssaf || null)
   }
 
   useEffect(() => {
@@ -177,20 +179,53 @@ function FinancesView() {
       </div>
 
       {totals ? (
-        <section className="mt-8 grid gap-4 sm:grid-cols-3">
+        <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Surface className="p-5">
             <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Gains</p>
             <p className="mt-2 font-display text-3xl">{formatMoney(totals.income)}</p>
+          </Surface>
+          <Surface className="p-5">
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Cotisations URSSAF</p>
+            <p className="mt-2 font-display text-3xl">{formatMoney(totals.cotisationEstimate)}</p>
+            <p className="mt-2 text-sm text-ink-soft">
+              {(totals.cotisationRate * 100).toFixed(1).replace('.', ',')} % du CA
+              <span className="mt-1 block text-xs">
+                Services · VL {(totals.versementLiberatoireRate * 100).toFixed(1).replace('.', ',')} % · hors ACRE
+              </span>
+            </p>
           </Surface>
           <Surface className="p-5">
             <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Dépenses</p>
             <p className="mt-2 font-display text-3xl">{formatMoney(totals.expense)}</p>
           </Surface>
           <Surface className="bg-moss p-5 text-cream ring-moss">
-            <p className="text-[11px] font-semibold tracking-[0.16em] text-cream/55 uppercase">Résultat</p>
-            <p className="mt-2 font-display text-3xl">{formatMoney(totals.balance)}</p>
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-cream/55 uppercase">Après cotisations</p>
+            <p className="mt-2 font-display text-3xl">{formatMoney(totals.netAfterCotisation ?? totals.balance)}</p>
           </Surface>
         </section>
+      ) : null}
+
+      {urssaf ? (
+        <button
+          type="button"
+          onClick={() => window.open(urssaf.payUrl, '_blank', 'noopener,noreferrer')}
+          className={`mt-4 w-full rounded-[1.4rem] p-5 text-left ring-1 transition hover:-translate-y-0.5 ${
+            urssaf.reminderActive
+              ? 'bg-copper text-cream ring-copper'
+              : 'bg-cream text-ink ring-ink/8 hover:ring-copper/30'
+          }`}
+        >
+          <p className={`text-[11px] font-semibold tracking-[0.16em] uppercase ${urssaf.reminderActive ? 'text-cream/70' : 'text-ink-soft'}`}>
+            Rappel du 5 · URSSAF
+          </p>
+          <p className="mt-2 font-display text-2xl tracking-tight">
+            {urssaf.reminderActive ? 'Payer mes cotisations' : 'Espace autoentrepreneur URSSAF'}
+          </p>
+          <p className={`mt-1 text-sm ${urssaf.reminderActive ? 'text-cream/80' : 'text-ink-soft'}`}>
+            {urssaf.reminderLabel}
+            {totals?.cotisationEstimate != null ? ` · ${formatMoney(totals.cotisationEstimate)} ce mois` : ''}
+          </p>
+        </button>
       ) : null}
 
       {error && !open ? <p className="mt-6 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}

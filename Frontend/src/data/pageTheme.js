@@ -5,8 +5,8 @@ export const DEFAULT_THEME = {
 }
 
 export const ACCENT_PRESETS = ['#c45c26', '#243026', '#8b3a2d', '#1d4e4e', '#3d4a7c', '#6b3d5b']
-export const BACKGROUND_PRESETS = ['#f3eee4', '#faf7f1', '#ffffff', '#efe6d6', '#243026', '#1c1e1a']
-export const SURFACE_PRESETS = ['#ffffff', '#faf7f1', '#f3eee4', '#efe6d6', '#2a332c', '#1c1e1a']
+export const BACKGROUND_PRESETS = ['#faf7f1', '#f3eee4', '#ffffff', '#efe6d6', '#f0ebe3', '#e8f0ec']
+export const SURFACE_PRESETS = ['#ffffff', '#faf7f1', '#f3eee4', '#efe6d6']
 
 export function parseHex(value, fallback = DEFAULT_THEME.accent) {
   const raw = String(value || '').trim()
@@ -62,7 +62,58 @@ export function isQuoteService(item) {
   return item?.kind === 'quote'
 }
 
+export function isHeadingService(item) {
+  return item?.kind === 'heading'
+}
+
+export function groupServicesByHeading(list = []) {
+  const services = list || []
+  const headings = services.filter(isHeadingService)
+  const hasLinked = services.some((item) => !isHeadingService(item) && item.headingId)
+
+  if (!hasLinked) {
+    const blocks = []
+    let current = { title: '', headingId: null, items: [] }
+    for (const item of services) {
+      if (isHeadingService(item)) {
+        if (current.items.length || current.title) blocks.push(current)
+        current = { title: item.name, headingId: item._id, items: [] }
+      } else {
+        current.items.push(item)
+      }
+    }
+    if (current.items.length || current.title) blocks.push(current)
+    return blocks
+  }
+
+  const byHeading = new Map()
+  const ungrouped = []
+  for (const item of services) {
+    if (isHeadingService(item)) continue
+    const key = item.headingId ? String(item.headingId) : ''
+    if (key) {
+      if (!byHeading.has(key)) byHeading.set(key, [])
+      byHeading.get(key).push(item)
+    } else {
+      ungrouped.push(item)
+    }
+  }
+
+  const blocks = headings.map((heading) => ({
+    title: heading.name,
+    headingId: heading._id,
+    items: byHeading.get(String(heading._id)) || [],
+  }))
+  if (ungrouped.length) blocks.push({ title: '', headingId: null, items: ungrouped })
+  return blocks
+}
+
+export function bookableServices(list = []) {
+  return (list || []).filter((item) => !isHeadingService(item))
+}
+
 export function servicePriceLabel(item, formatMoney) {
+  if (isHeadingService(item)) return ''
   if (isQuoteService(item) && !(Number(item?.price) > 0)) return 'Sur rendez-vous'
   return formatMoney(item?.price || 0)
 }

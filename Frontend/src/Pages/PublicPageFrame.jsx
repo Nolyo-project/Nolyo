@@ -63,6 +63,29 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
         <div className="absolute inset-0 bg-linear-to-t from-[color:var(--page-bg)] via-transparent to-ink/50" />
       </div>
 
+      {page.away ? (
+        <div
+          className="sticky top-0 z-30 border-b border-ink/10 bg-[var(--page-accent)] px-5 py-3 text-center text-[var(--page-accent-ink)] shadow-sm sm:px-8"
+          role="status"
+        >
+          <p className="text-sm font-semibold tracking-wide">
+            Actuellement en congés
+            {page.awayLabel ? <span className="font-normal opacity-90"> · {page.awayLabel}</span> : null}
+          </p>
+          <p className="mt-0.5 text-xs opacity-80">La réservation en ligne reprend bientôt</p>
+        </div>
+      ) : page.nextAwayLabel ? (
+        <div
+          className="relative z-10 border-b border-ink/8 bg-[color-mix(in_srgb,var(--page-accent)_14%,var(--page-bg))] px-5 py-2.5 text-center sm:px-8"
+          role="status"
+        >
+          <p className="text-sm font-medium text-[var(--page-ink)]">
+            Prochains congés
+            <span className="page-muted font-normal"> · {page.nextAwayLabel}</span>
+          </p>
+        </div>
+      ) : null}
+
       <div className="relative mx-auto min-w-0 max-w-[92rem] px-5 sm:px-8 lg:px-12">
         <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
           <div className="relative z-10 -mt-16 sm:-mt-20 lg:-mt-24">

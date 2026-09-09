@@ -66,9 +66,9 @@ export function EmptyState({ children }) {
   )
 }
 
-export function Accordion({ title, hint, open, onToggle, children }) {
+export function Accordion({ id, title, hint, open, onToggle, children }) {
   return (
-    <Surface className="overflow-hidden p-0">
+    <Surface id={id} className="overflow-hidden p-0">
       <button
         type="button"
         onClick={onToggle}
@@ -122,6 +122,13 @@ export const icons = {
       <path d="M8 3.5V7M16 3.5V7M3.5 10h17" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </Icon>
   ),
+  absence: (
+    <Icon>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8 3.5V7M16 3.5V7M3.5 10h17" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M9 14.5h6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Icon>
+  ),
   note: (
     <Icon>
       <path d="M7 4.5h7.5L20 10v9.5a1 1 0 01-1 1H7a1 1 0 01-1-1v-14a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
@@ -132,6 +139,12 @@ export const icons = {
     <Icon>
       <rect x="3.5" y="6" width="17" height="13" rx="2" stroke="currentColor" strokeWidth="1.7" />
       <path d="M3.5 10h17M16.5 14.5h.01" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Icon>
+  ),
+  card: (
+    <Icon>
+      <rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M3 10h18M7 15h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </Icon>
   ),
   bell: (
@@ -210,7 +223,7 @@ export function Avatar({ user, className = 'h-10 w-10', light = false }) {
         light ? 'bg-cream/12 text-cream' : 'bg-moss text-cream'
       } ${className}`}
     >
-      {initials(user?.name)}
+      {initials(user?.company || user?.name)}
     </span>
   )
 }

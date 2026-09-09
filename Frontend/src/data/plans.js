@@ -4,7 +4,7 @@ export const plans = [
     name: 'Nolyo Essentiel',
     price: 9.99,
     period: 'mois',
-    audience: 'Pour démarrer, en interne',
+    audience: 'Tout pour gérer votre activité, en privé.',
     trial: '1er mois offert',
     commitmentMonths: 6,
     totalMonths: 7,
@@ -12,11 +12,11 @@ export const plans = [
     features: [
       'Tableau de bord privé',
       'Clients et prospects',
-      'Notes',
-      'Agenda',
-      'Revenus, un mois à la fois',
-      'Relances',
-      'Connexion e-mail',
+      'Agenda et congés',
+      'Notes et tâches',
+      'Revenus, mois par mois',
+      'Relances clients',
+      'Paiement Stripe sécurisé',
     ],
   },
   {
@@ -24,7 +24,7 @@ export const plans = [
     name: 'Nolyo Pro',
     price: 19.99,
     period: 'mois',
-    audience: 'Tableau de bord + page professionnelle',
+    audience: 'Le tableau de bord + votre page pour être trouvé et réserver.',
     featured: true,
     trial: '1er mois offert',
     commitmentMonths: 6,
@@ -32,13 +32,14 @@ export const plans = [
     commitment: 'Engagement 6 mois',
     features: [
       'Tout Nolyo Essentiel',
-      'Page d’accueil et à propos (votre vitrine)',
-      'Photos, couleurs, présentation de l’équipe',
+      'Page professionnelle (accueil & à propos)',
       'Réservation et devis en ligne',
+      'Photos, couleurs, équipe',
       'QR Code vers votre page',
-      'Boîte de réception (Instagram, Facebook, e-mail)',
+      'Avis clients modérés',
       'Statistiques',
       'Dépenses et cotisations',
+      'Paiement Stripe sécurisé',
     ],
   },
 ]
@@ -53,6 +54,9 @@ export const trialNote =
 
 export const trialShort = '1er mois offert, puis 6 mois d’engagement — 7 mois au total'
 
+export const paymentNote =
+  'Paiements sécurisés via Stripe : prélèvement automatique, ou règlement manuel chaque mois.'
+
 export function formatPrice(price) {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
@@ -60,6 +64,10 @@ export function formatPrice(price) {
   }).format(price)
 }
 
+/** Pro réel, ou essai 5 min lancé en mode Pro. */
 export function isProPlan(user) {
-  return user?.preview === true || user?.subscription?.plan === 'pro'
+  if (user?.preview) {
+    return (user.previewPlan || user.subscription?.plan || 'pro') === 'pro'
+  }
+  return user?.subscription?.plan === 'pro'
 }

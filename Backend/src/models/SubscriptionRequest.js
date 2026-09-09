@@ -29,6 +29,8 @@ const subscriptionRequestSchema = new mongoose.Schema(
     issueNote: { type: String, trim: true, default: '', maxlength: 500 },
     issueAt: Date,
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    stripeCustomerId: { type: String, trim: true, default: '' },
+    stripeSubscriptionId: { type: String, trim: true, default: '' },
   },
   { timestamps: true },
 )
@@ -52,6 +54,8 @@ subscriptionRequestSchema.methods.toPresidentJSON = function toPresidentJSON() {
     issueNote: this.issueNote || '',
     issueAt: this.issueAt || null,
     userId: this.user || null,
+    stripeCustomerId: this.stripeCustomerId || '',
+    stripeSubscriptionId: this.stripeSubscriptionId || '',
     createdAt: this.createdAt,
   }
 }

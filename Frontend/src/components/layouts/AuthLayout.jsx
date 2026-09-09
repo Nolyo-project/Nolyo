@@ -8,6 +8,11 @@ const panels = {
     title: 'Vous demandez. On vous ouvre l’espace.',
     text: 'Choisissez Essentiel ou Pro, envoyez votre demande. On vous recontacte, puis un code unique donne accès à Nolyo.',
   },
+  '/facture': {
+    kicker: 'Paiement sécurisé',
+    title: 'Payer pour déverrouiller.',
+    text: 'Sans règlement, l’accès reste bloqué. Un clic sur Payer, Stripe gère le reste — et votre tableau de bord se rouvre.',
+  },
   default: {
     kicker: 'Espace Nolyo',
     title: 'Vos clients, rendez-vous et comptes, au même endroit.',

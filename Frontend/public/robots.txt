@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Allow: /p/
+Disallow: /dashboard
+Disallow: /president
+Disallow: /login
+Disallow: /inscription
+Disallow: /onboarding
+
+Sitemap: /sitemap.xml

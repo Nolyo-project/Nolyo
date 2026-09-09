@@ -17,8 +17,8 @@ export function DealFollow({ contact, email, name, canEdit, pending, onQuote }) 
     <div className="rounded-[1.6rem] bg-cream p-5 sm:p-6">
       <p className="text-sm font-medium">Suivi du dossier</p>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-        Composez le montant avec vos prestations, faites le devis sur votre plateforme de facturation, envoyez-le, puis
-        marquez-le ici.
+        Composez le montant avec vos prestations, faites le devis sur votre plateforme de facturation, puis cliquez
+        « Envoyer le devis » ici.
       </p>
       <ol className="mt-4 flex flex-wrap gap-2">
         {steps.map((step, index) => (
@@ -62,7 +62,7 @@ export function DealFollow({ contact, email, name, canEdit, pending, onQuote }) 
 
       {canEdit && quote === 'none' ? (
         <button type="button" disabled={pending} onClick={() => onQuote?.('sent')} className={`${ghostBtn} mt-4`}>
-          J’ai envoyé le devis
+          Envoyer le devis
         </button>
       ) : null}
       {canEdit && quote === 'sent' ? (

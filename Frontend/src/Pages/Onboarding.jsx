@@ -55,8 +55,8 @@ function Onboarding() {
   })
 
   const stepIds = preparePage
-    ? ['trade', 'identity', 'rhythm', 'page', 'services']
-    : ['trade', 'identity', 'rhythm', 'services']
+    ? ['trade', 'identity', 'rhythm', 'page', 'services', 'billing']
+    : ['trade', 'identity', 'rhythm', 'services', 'billing']
   const current = stepIds[step] || 'trade'
   const lastIndex = stepIds.length - 1
 
@@ -384,6 +384,41 @@ function Onboarding() {
                   Pas de catalogue pour ce métier. Vous ajouterez vos prestations dans Paramètres.
                 </p>
               )}
+            </section>
+          ) : null}
+
+          {current === 'billing' ? (
+            <section className="mt-4">
+              <h1 className="font-display text-4xl tracking-tight sm:text-5xl">Votre mois offert, puis la suite</h1>
+              <p className="mt-3 text-ink-soft">
+                Pendant 30 jours, Nolyo est gratuit. Deux jours avant la fin, une fenêtre s’ouvre pour choisir comment
+                continuer — ainsi vous n’êtes pas surpris le jour de la facture.
+              </p>
+              <ul className="mt-8 space-y-4">
+                <li className="rounded-[1.4rem] border border-ink/10 bg-cream/70 px-5 py-4">
+                  <p className="font-medium">Prélèvement automatique</p>
+                  <p className="mt-1 text-sm text-ink-soft">
+                    Vous enregistrez votre carte. Stripe prélève chaque mois. Rien à faire le jour J — l’espace reste
+                    ouvert.
+                  </p>
+                </li>
+                <li className="rounded-[1.4rem] border border-ink/10 bg-cream/70 px-5 py-4">
+                  <p className="font-medium">Payer chaque mois vous-même</p>
+                  <p className="mt-1 text-sm text-ink-soft">
+                    Vous préférez valider à la main : un lien Stripe vous est envoyé à chaque échéance.
+                  </p>
+                </li>
+                <li className="rounded-[1.4rem] border border-ink/10 bg-cream/70 px-5 py-4">
+                  <p className="font-medium">Arrêter Nolyo</p>
+                  <p className="mt-1 text-sm text-ink-soft">
+                    Vous pouvez aussi demander à partir. Le fondateur reçoit la demande ; s’il accepte, le compte est
+                    supprimé automatiquement.
+                  </p>
+                </li>
+              </ul>
+              <p className="mt-6 text-sm text-ink-soft">
+                Vous pourrez aussi enregistrer une carte plus tôt dans Paramètres → Abonnement.
+              </p>
             </section>
           ) : null}
 

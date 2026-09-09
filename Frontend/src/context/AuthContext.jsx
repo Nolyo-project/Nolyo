@@ -3,11 +3,16 @@ import { api } from '../api/client'
 import {
   hasPreviewSession,
   markPreviewExit,
+  markPreviewPlan,
   markPreviewSession,
+  peekPreviewPlan,
 } from '../auth/previewSession'
+import { hasWorkspaceAccess } from '../data/billing'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'nolio_token'
+
+export { AuthContext }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -17,8 +22,10 @@ export function AuthProvider({ children }) {
   const persist = useCallback((nextToken, nextUser) => {
     if (nextToken) {
       localStorage.setItem(TOKEN_KEY, nextToken)
-      if (nextUser?.preview) markPreviewSession(true)
-      else markPreviewSession(false)
+      if (nextUser?.preview) {
+        markPreviewSession(true)
+        markPreviewPlan(nextUser.previewPlan || nextUser.subscription?.plan || 'pro')
+      } else markPreviewSession(false)
     } else {
       localStorage.removeItem(TOKEN_KEY)
       markPreviewSession(false)
@@ -30,11 +37,13 @@ export function AuthProvider({ children }) {
   const logout = useCallback(
     (exitTo) => {
       if (exitTo === 'subscribe' || exitTo === 'home') {
+        const plan = user?.previewPlan || user?.subscription?.plan || peekPreviewPlan()
+        markPreviewPlan(plan)
         markPreviewExit(exitTo)
       }
       persist(null, null)
     },
-    [persist],
+    [persist, user],
   )
 
   useEffect(() => {
@@ -92,8 +101,14 @@ export function AuthProvider({ children }) {
     [persist],
   )
 
-  const startPreview = useCallback(async () => {
-    const data = await api('/api/auth/preview', { method: 'POST' })
+  const startPreview = useCallback(async (plan = 'pro') => {
+    const { getAnalyticsSessionId, gaEvent } = await import('../utils/analytics')
+    const previewPlan = plan === 'essentiel' ? 'essentiel' : 'pro'
+    const data = await api('/api/auth/preview', {
+      method: 'POST',
+      body: { plan: previewPlan, sessionId: getAnalyticsSessionId() },
+    })
+    gaEvent('preview_start', { plan: previewPlan })
     persist(data.token, data.user)
     return data.user
   }, [persist])
@@ -113,10 +128,22 @@ export function AuthProvider({ children }) {
       return {
         ...nextUser,
         preview: true,
+        previewPlan: current.previewPlan || nextUser.previewPlan || 'pro',
         previewExpiresAt: current.previewExpiresAt,
+        subscription: {
+          ...(nextUser.subscription || {}),
+          plan: current.previewPlan || nextUser.previewPlan || nextUser.subscription?.plan || 'pro',
+        },
       }
     })
   }, [])
+
+  const refreshUser = useCallback(async () => {
+    if (!token) return null
+    const data = await api('/api/auth/me', { token })
+    setUser(data.user)
+    return data.user
+  }, [token])
 
   const value = useMemo(
     () => ({
@@ -128,12 +155,13 @@ export function AuthProvider({ children }) {
       startPreview,
       logout,
       updateUser,
+      refreshUser,
       completeOnboarding,
       isPresident: user?.role === 'president',
       isPreview: Boolean(user?.preview),
-      isSubscribed: user?.role === 'member' && user?.subscription?.status === 'active',
+      isSubscribed: hasWorkspaceAccess(user) && user?.role === 'member',
     }),
-    [user, token, loading, login, register, startPreview, logout, updateUser, completeOnboarding],
+    [user, token, loading, login, register, startPreview, logout, updateUser, refreshUser, completeOnboarding],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

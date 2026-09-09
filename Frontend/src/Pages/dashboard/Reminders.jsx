@@ -9,12 +9,14 @@ const empty = { title: '', dueAt: toDatetimeLocal(), channel: 'email', contact: 
 const channelLabel = {
   email: 'E-mail',
   phone: 'Téléphone',
+  both: 'E-mail et téléphone',
   other: 'Autre',
 }
 
 const channelBorder = {
   email: 'border-l-moss',
   phone: 'border-l-copper',
+  both: 'border-l-copper',
   other: 'border-l-ink/20',
 }
 
@@ -237,7 +239,9 @@ function Reminders() {
                             ) : null}
                           </div>
                           <div className="flex shrink-0 flex-wrap items-center gap-2">
-                            {!item.done && item.channel === 'email' && item.contact?.email ? (
+                            {!item.done &&
+                            (item.channel === 'email' || item.channel === 'both') &&
+                            item.contact?.email ? (
                               <MailMenu
                                 email={item.contact.email}
                                 name={contactName}
@@ -247,7 +251,9 @@ function Reminders() {
                                 Relancer par e-mail
                               </MailMenu>
                             ) : null}
-                            {!item.done && item.channel === 'phone' && item.contact?.phone ? (
+                            {!item.done &&
+                            (item.channel === 'phone' || item.channel === 'both') &&
+                            item.contact?.phone ? (
                               <a
                                 href={`tel:${String(item.contact.phone).replace(/\s/g, '')}`}
                                 className={ghostBtn}
@@ -318,6 +324,7 @@ function Reminders() {
                   <select className={fieldClass} name="channel" value={form.channel} onChange={update}>
                     <option value="email">E-mail</option>
                     <option value="phone">Téléphone</option>
+                    <option value="both">E-mail et téléphone</option>
                     <option value="other">Autre</option>
                   </select>
                 </label>

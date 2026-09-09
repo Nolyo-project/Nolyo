@@ -9,6 +9,7 @@ const transactionSchema = new mongoose.Schema(
     date: { type: Date, required: true, index: true },
     category: { type: String, trim: true, default: '', maxlength: 60 },
     method: { type: String, trim: true, default: '', maxlength: 20 },
+    stripeInvoiceId: { type: String, trim: true, unique: true, sparse: true },
   },
   { timestamps: true },
 )

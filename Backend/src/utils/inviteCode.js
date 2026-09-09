@@ -1,4 +1,5 @@
 const crypto = require('crypto')
+const SubscriptionRequest = require('../models/SubscriptionRequest')
 
 function createInviteCode() {
   const raw = crypto.randomBytes(4).toString('hex').toUpperCase()
@@ -20,4 +21,17 @@ function inviteCodeCandidates(code) {
   return [...new Set([`NOLYO-${rest}`, `NOLIO-${rest}`])]
 }
 
-module.exports = { createInviteCode, normalizeInviteCode, inviteCodeCandidates }
+async function ensureInviteCode(request) {
+  if (request.inviteCode) return request.inviteCode
+  let code = createInviteCode()
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const clash = await SubscriptionRequest.findOne({ inviteCode: code })
+    if (!clash) break
+    code = createInviteCode()
+  }
+  request.inviteCode = code
+  request.inviteCodeCreatedAt = new Date()
+  return code
+}
+
+module.exports = { createInviteCode, normalizeInviteCode, inviteCodeCandidates, ensureInviteCode }

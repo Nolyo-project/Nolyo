@@ -1,10 +1,22 @@
 const express = require('express')
 const Appointment = require('../models/Appointment')
 const Contact = require('../models/Contact')
+const Review = require('../models/Review')
 const Service = require('../models/Service')
+const SiteReview = require('../models/SiteReview')
 const User = require('../models/User')
-const { listAvailability, resolveSchedule, isValidPublicSlot } = require('../utils/bookingSlots')
+const { DEMO_EMAILS } = require('../seed/demoMember')
+const { listAvailability, resolveSchedule, isValidPublicSlot, isAbsentOn } = require('../utils/bookingSlots')
+const { publicAwayInfo } = require('../utils/publicAway')
 const { hasOverlap, isDuplicateKey } = require('../utils/overlap')
+const { buildPublicSeoPayload, injectSeoIntoHtml } = require('../utils/publicSeo')
+const {
+  ensureSeedSiteReviews,
+  publicSiteReview,
+  siteReviewStats,
+} = require('../utils/siteReviews')
+const { sendBookingEmails } = require('../utils/emails')
+const { sendPushToUser } = require('../utils/push')
 
 const router = express.Router()
 
@@ -46,18 +58,31 @@ function websiteUrl(value) {
 }
 
 function publicService(item) {
+  const kind = item.kind === 'quote' ? 'quote' : item.kind === 'heading' ? 'heading' : 'session'
   return {
     _id: String(item._id),
     name: item.name,
-    price: item.price,
-    durationMinutes: item.durationMinutes,
-    kind: item.kind === 'quote' ? 'quote' : 'session',
+    price: kind === 'heading' ? 0 : item.price,
+    durationMinutes: kind === 'heading' ? 0 : item.durationMinutes,
+    kind,
+    headingId: item.headingId ? String(item.headingId) : null,
+  }
+}
+
+function publicReview(item) {
+  return {
+    id: String(item._id),
+    authorName: item.authorName,
+    rating: item.rating,
+    body: item.body,
+    createdAt: item.createdAt,
   }
 }
 
 function publicPage(user, extras = {}) {
   const page = User.pickPage(user.page?.toObject?.() || user.page || {})
   const photos = (page.photos || []).filter(Boolean).slice(0, 3)
+  const hasGeo = page.lat != null && page.lng != null
   return {
     title: page.title || user.subscription?.company || user.name,
     description: page.description,
@@ -68,6 +93,11 @@ function publicPage(user, extras = {}) {
     linkedin: socialUrl('linkedin', page.linkedin),
     website: websiteUrl(page.website),
     address: page.address,
+    city: page.city,
+    postalCode: page.postalCode,
+    lat: hasGeo ? page.lat : null,
+    lng: hasGeo ? page.lng : null,
+    hours: page.hours,
     phone: page.phone,
     email: page.email,
     theme: page.theme,
@@ -85,7 +115,10 @@ async function findPublishedOwner(slugParam, { requireActive = false } = {}) {
   if (!slug || RESERVED.has(slug)) return null
   const user = await User.findOne({ 'page.slug': slug, 'page.published': true })
   if (!user) return null
-  if (requireActive && user.subscription?.status !== 'active') return null
+  if (requireActive) {
+    const { hasWorkspaceAccess } = require('../utils/billing')
+    if (!hasWorkspaceAccess(user)) return null
+  }
   return user
 }
 
@@ -103,23 +136,197 @@ function tooManyBooks(ip) {
 }
 
 router.get('/stats', async (_req, res) => {
-  const members = await User.countDocuments({
+  const memberFilter = {
     role: 'member',
-    'subscription.status': 'active',
+    email: { $nin: DEMO_EMAILS },
+    'subscription.status': { $in: ['active', 'trialing'] },
+  }
+  const [members, faces] = await Promise.all([
+    User.countDocuments(memberFilter),
+    User.find(memberFilter)
+      .sort({ 'subscription.activatedAt': -1, createdAt: -1 })
+      .limit(5)
+      .select('name avatar subscription.company onboarding.company business.tradeName'),
+  ])
+
+  res.json({
+    members,
+    faces: faces.map((user) => {
+      const company =
+        user.subscription?.company ||
+        user.onboarding?.company ||
+        user.business?.tradeName ||
+        user.name ||
+        'Nolyo'
+      const parts = String(company).trim().split(/\s+/).filter(Boolean)
+      const initials = parts
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join('')
+        .toUpperCase()
+      return {
+        name: company,
+        avatar: user.avatar || '',
+        initials: initials || 'N',
+      }
+    }),
   })
-  res.json({ members })
+})
+
+const trackAttempts = new Map()
+
+function tooManyTracks(ip) {
+  const now = Date.now()
+  const windowMs = 60 * 1000
+  const current = (trackAttempts.get(ip) || []).filter((at) => now - at < windowMs)
+  if (current.length >= 60) {
+    trackAttempts.set(ip, current)
+    return true
+  }
+  current.push(now)
+  trackAttempts.set(ip, current)
+  return false
+}
+
+router.post('/track', async (req, res) => {
+  const ip = String(req.ip || req.headers['x-forwarded-for'] || 'unknown').split(',')[0].trim()
+  if (tooManyTracks(ip)) return res.status(204).end()
+
+  const { trackEvent } = require('../utils/analytics')
+  const type = String(req.body?.type || '').trim()
+  if (type !== 'page_view') return res.status(204).end()
+
+  await trackEvent({
+    type: 'page_view',
+    path: req.body?.path,
+    referrer: req.body?.referrer,
+    source: req.body?.source || req.body?.utm_source,
+    medium: req.body?.medium || req.body?.utm_medium,
+    campaign: req.body?.campaign || req.body?.utm_campaign,
+    sessionId: req.body?.sessionId,
+  })
+  res.status(204).end()
+})
+
+const testimonialAttempts = new Map()
+
+function tooManyTestimonials(ip) {
+  const now = Date.now()
+  const windowMs = 60 * 60 * 1000
+  const current = (testimonialAttempts.get(ip) || []).filter((at) => now - at < windowMs)
+  if (current.length >= 5) {
+    testimonialAttempts.set(ip, current)
+    return true
+  }
+  current.push(now)
+  testimonialAttempts.set(ip, current)
+  return false
+}
+
+router.get('/testimonials', async (_req, res) => {
+  await ensureSeedSiteReviews()
+  const [reviews, stats] = await Promise.all([
+    SiteReview.find({ status: 'approved' }).sort({ createdAt: -1 }).limit(40),
+    siteReviewStats(),
+  ])
+  res.json({
+    reviews: reviews.map(publicSiteReview),
+    stats,
+  })
+})
+
+router.post('/testimonials', async (req, res) => {
+  const ip = String(req.ip || req.headers['x-forwarded-for'] || 'unknown').split(',')[0].trim()
+  if (tooManyTestimonials(ip)) {
+    return res.status(429).json({ error: 'Trop d’envois. Réessayez plus tard.' })
+  }
+
+  const authorName = String(req.body?.authorName || req.body?.name || '').trim().slice(0, 80)
+  const role = String(req.body?.role || '').trim().slice(0, 80)
+  const place = String(req.body?.place || '').trim().slice(0, 80)
+  const authorEmail = String(req.body?.authorEmail || req.body?.email || '')
+    .trim()
+    .toLowerCase()
+    .slice(0, 120)
+  const body = String(req.body?.body || req.body?.text || '').trim().slice(0, 800)
+  const rating = Number(req.body?.rating)
+
+  if (authorName.length < 2) return res.status(400).json({ error: 'Indiquez votre nom.' })
+  if (body.length < 20) return res.status(400).json({ error: 'Écrivez un avis un peu plus long.' })
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'Choisissez une note de 1 à 5.' })
+  }
+  if (authorEmail && !EMAIL_RE.test(authorEmail)) {
+    return res.status(400).json({ error: 'E-mail invalide.' })
+  }
+
+  await SiteReview.create({
+    authorName,
+    role,
+    place,
+    authorEmail,
+    rating,
+    body,
+    status: 'pending',
+  })
+
+  res.status(201).json({
+    ok: true,
+    message: 'Merci — votre avis sera publié après validation.',
+  })
 })
 
 router.get('/pages/:slug', async (req, res) => {
   const user = await findPublishedOwner(req.params.slug)
   if (!user) return res.status(404).json({ error: 'Page introuvable.' })
 
-  const services = await Service.find({ user: user._id, active: true }).sort({ sort: 1, createdAt: 1 }).limit(20)
+  const [services, reviews, awayInfo] = await Promise.all([
+    Service.find({ user: user._id, active: true }).sort({ sort: 1, createdAt: 1 }).limit(40),
+    Review.find({ user: user._id, status: 'approved' }).sort({ createdAt: -1 }).limit(40),
+    publicAwayInfo(user._id),
+  ])
+  const bookable = services.filter((item) => item.kind !== 'heading')
   res.json({
     page: publicPage(user, {
-      bookingAvailable: services.length > 0,
+      bookingAvailable: bookable.length > 0 && !awayInfo.away,
+      ...awayInfo,
       services: services.map(publicService),
+      reviews: reviews.map(publicReview),
     }),
+  })
+})
+
+router.post('/pages/:slug/reviews', async (req, res) => {
+  const user = await findPublishedOwner(req.params.slug)
+  if (!user) return res.status(404).json({ error: 'Page introuvable.' })
+
+  const authorName = String(req.body?.authorName || '').trim()
+  const authorEmail = String(req.body?.authorEmail || '').trim().toLowerCase()
+  const body = String(req.body?.body || '').trim()
+  const rating = Number(req.body?.rating)
+
+  if (authorName.length < 2) return res.status(400).json({ error: 'Indiquez votre prénom.' })
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'Choisissez une note de 1 à 5.' })
+  }
+  if (body.length < 12) return res.status(400).json({ error: 'Écrivez un avis un peu plus long.' })
+  if (authorEmail && !EMAIL_RE.test(authorEmail)) {
+    return res.status(400).json({ error: 'E-mail invalide.' })
+  }
+
+  const review = await Review.create({
+    user: user._id,
+    authorName: authorName.slice(0, 80),
+    authorEmail: authorEmail.slice(0, 120),
+    rating,
+    body: body.slice(0, 800),
+    status: 'pending',
+  })
+
+  res.status(201).json({
+    ok: true,
+    message: 'Merci — votre avis sera visible après validation.',
+    id: String(review._id),
   })
 })
 
@@ -127,10 +334,13 @@ router.get('/pages/:slug/booking', async (req, res) => {
   const user = await findPublishedOwner(req.params.slug, { requireActive: true })
   if (!user) return res.status(404).json({ error: 'Page introuvable.' })
 
-  const services = await Service.find({ user: user._id, active: true }).sort({ sort: 1, createdAt: 1 }).limit(20)
+  const [services, awayInfo] = await Promise.all([
+    Service.find({ user: user._id, active: true }).sort({ sort: 1, createdAt: 1 }).limit(40),
+    publicAwayInfo(user._id),
+  ])
   const schedule = resolveSchedule(user)
   res.json({
-    page: publicPage(user),
+    page: publicPage(user, { ...awayInfo, bookingAvailable: !awayInfo.away }),
     services: services.map(publicService),
     schedule: {
       workStart: schedule.workStart,
@@ -145,9 +355,9 @@ router.get('/pages/:slug/availability', async (req, res) => {
   if (!user) return res.status(404).json({ error: 'Page introuvable.' })
 
   const service = await Service.findOne({ _id: req.query.service, user: user._id, active: true })
-  if (!service) return res.status(400).json({ error: 'Choisissez une prestation.' })
+  if (!service || service.kind === 'heading') return res.status(400).json({ error: 'Choisissez une prestation.' })
 
-  const days = await listAvailability(user, service.durationMinutes, 21)
+  const days = await listAvailability(user, service.durationMinutes, 56)
   res.json({ days, durationMinutes: service.durationMinutes })
 })
 
@@ -161,7 +371,7 @@ router.post('/pages/:slug/book', async (req, res) => {
   if (!user) return res.status(404).json({ error: 'Page introuvable.' })
 
   const service = await Service.findOne({ _id: req.body?.service, user: user._id, active: true })
-  if (!service) return res.status(400).json({ error: 'Choisissez une prestation.' })
+  if (!service || service.kind === 'heading') return res.status(400).json({ error: 'Choisissez une prestation.' })
 
   const startAt = new Date(req.body?.startAt)
   if (Number.isNaN(startAt.getTime()) || startAt.getTime() <= Date.now()) {
@@ -171,6 +381,9 @@ router.post('/pages/:slug/book', async (req, res) => {
   const schedule = resolveSchedule(user)
   if (!isValidPublicSlot(startAt, service.durationMinutes, schedule)) {
     return res.status(400).json({ error: 'Ce créneau n’est pas proposé.' })
+  }
+  if (await isAbsentOn(user._id, startAt)) {
+    return res.status(400).json({ error: 'Ce jour n’est pas disponible (absence).' })
   }
 
   const firstName = String(req.body?.firstName || '').trim().slice(0, 40)
@@ -287,6 +500,22 @@ router.post('/pages/:slug/book', async (req, res) => {
     throw err
   }
 
+  const page = publicPage(user)
+  sendBookingEmails({
+    owner: user,
+    contact,
+    appointment,
+    pageTitle: page.title,
+  }).catch((err) => console.error('Booking mail', err.message))
+
+  if (user.notifications?.pushBooking !== false) {
+    sendPushToUser(user, {
+      title: 'Nouveau rendez-vous',
+      body: `${contact.name || 'Un client'} · ${appointment.serviceName} · ${new Date(appointment.startAt).toLocaleString('fr-FR')}`,
+      url: '/dashboard/rdv',
+    }).catch((err) => console.error('Booking push', err.message))
+  }
+
   res.status(201).json({
     appointment: {
       startAt: appointment.startAt,
@@ -296,7 +525,7 @@ router.post('/pages/:slug/book', async (req, res) => {
       kind: appointment.kind,
     },
     guest: { firstName, lastName, name },
-    page: { title: publicPage(user).title },
+    page: { title: page.title },
   })
 })
 
@@ -328,7 +557,7 @@ router.get('/founder/availability', async (req, res) => {
     ? await Service.findOne({ _id: req.query.service, user: user._id, active: true })
     : await Service.findOne({ user: user._id, active: true }).sort({ createdAt: 1 })
   if (!service) return res.status(400).json({ error: 'Les rendez-vous ne sont pas encore ouverts.' })
-  const days = await listAvailability(user, service.durationMinutes, 21)
+  const days = await listAvailability(user, service.durationMinutes, 56)
   res.json({ days, durationMinutes: service.durationMinutes, service: publicService(service) })
 })
 
@@ -354,6 +583,9 @@ router.post('/founder/book', async (req, res) => {
   const schedule = resolveSchedule(user)
   if (!isValidPublicSlot(startAt, service.durationMinutes, schedule)) {
     return res.status(400).json({ error: 'Ce créneau n’est pas proposé.' })
+  }
+  if (await isAbsentOn(user._id, startAt)) {
+    return res.status(400).json({ error: 'Ce jour n’est pas disponible (absence).' })
   }
 
   const firstName = String(req.body?.firstName || '').trim().slice(0, 40)
@@ -432,6 +664,21 @@ router.post('/founder/book', async (req, res) => {
     throw err
   }
 
+  sendBookingEmails({
+    owner: user,
+    contact,
+    appointment,
+    pageTitle: 'Nolyo',
+  }).catch((err) => console.error('Founder booking mail', err.message))
+
+  if (user.notifications?.pushBooking !== false) {
+    sendPushToUser(user, {
+      title: 'Nouveau rendez-vous découverte',
+      body: `${contact.name || 'Un prospect'} · ${appointment.serviceName} · ${new Date(appointment.startAt).toLocaleString('fr-FR')}`,
+      url: '/president',
+    }).catch((err) => console.error('Founder booking push', err.message))
+  }
+
   res.status(201).json({
     appointment: {
       startAt: appointment.startAt,
@@ -444,5 +691,75 @@ router.post('/founder/book', async (req, res) => {
   })
 })
 
+router.get('/sitemap.xml', async (_req, res) => {
+  const origin = String(process.env.SITE_ORIGIN || process.env.CLIENT_ORIGIN || 'https://nolyo.fr').replace(/\/$/, '')
+  const pages = await User.find({
+    role: 'member',
+    'page.published': true,
+    'page.slug': { $gt: '' },
+    'subscription.status': { $in: ['active', 'trialing'] },
+  })
+    .select('page.slug page.updatedAt updatedAt')
+    .limit(5000)
+
+  const staticUrls = ['', '/abonnement', '/rdv'].map(
+    (path) => `  <url><loc>${origin}${path || '/'}</loc><changefreq>weekly</changefreq></url>`,
+  )
+  const pageUrls = pages.flatMap((user) => {
+    const slug = user.page.slug
+    const lastmod = (user.page?.updatedAt || user.updatedAt || new Date()).toISOString().slice(0, 10)
+    return [
+      `  <url><loc>${origin}/p/${slug}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`,
+      `  <url><loc>${origin}/p/${slug}/a-propos</loc><lastmod>${lastmod}</lastmod><changefreq>monthly</changefreq></url>`,
+      `  <url><loc>${origin}/p/${slug}/reserver</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>`,
+    ]
+  })
+
+  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${[...staticUrls, ...pageUrls].join('\n')}
+</urlset>`)
+})
+
+router.get('/robots.txt', (_req, res) => {
+  const origin = String(process.env.SITE_ORIGIN || process.env.CLIENT_ORIGIN || 'https://nolyo.fr').replace(/\/$/, '')
+  res.type('text/plain').send(`User-agent: *
+Allow: /
+Allow: /p/
+Disallow: /dashboard
+Disallow: /president
+Disallow: /login
+Disallow: /inscription
+Disallow: /facture
+Disallow: /onboarding
+Sitemap: ${origin}/sitemap.xml
+`)
+})
+
+router.get('/seo', async (req, res) => {
+  const raw = String(req.query.path || '')
+  const match = raw.match(/^\/p\/([a-z0-9-]+)(\/a-propos|\/reserver)?\/?$/)
+  if (!match) return res.status(400).json({ error: 'Chemin invalide.' })
+
+  const slug = match[1]
+  const pathSuffix = match[2] || ''
+  const user = await findPublishedOwner(slug)
+  if (!user) return res.status(404).json({ error: 'Page introuvable.' })
+
+  const [services, reviews] = await Promise.all([
+    Service.find({ user: user._id, active: true }).sort({ sort: 1, createdAt: 1 }).limit(40),
+    Review.find({ user: user._id, status: 'approved' }).sort({ createdAt: -1 }).limit(40),
+  ])
+  const page = publicPage(user, {
+    services: services.map(publicService),
+    reviews: reviews.map(publicReview),
+  })
+  const origin = String(process.env.SITE_ORIGIN || process.env.CLIENT_ORIGIN || `${req.protocol}://${req.get('host')}`)
+  const seo = buildPublicSeoPayload(page, { origin, slug, pathSuffix })
+  res.json({ seo })
+})
+
 module.exports = router
 module.exports.RESERVED = RESERVED
+module.exports.buildPublicSeoPayload = buildPublicSeoPayload
+module.exports.injectSeoIntoHtml = injectSeoIntoHtml

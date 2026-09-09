@@ -9,19 +9,46 @@ const { handleMulter, saveImage, removeFile } = require('../utils/uploads')
 const { RESERVED } = require('./public')
 const { TRADE_IDS, WORK_MODES, publicTrades } = require('../data/trades')
 const { pickWorkspace } = require('../data/workspace')
+const { startMemberSubscription } = require('../utils/stripe')
+const { sendWelcome } = require('../utils/emails')
 const { applyOnboarding } = require('../utils/applyOnboarding')
 
 async function sendUser(res, user, status = 200, extras = {}) {
   const json = await AccountDeletionRequest.decorateUser(user)
   const preview = previewExtras(res.req || {})
-  return res.status(status).json({ user: { ...json, ...preview, ...extras } })
+  return res.status(status).json({ user: withPreviewPlan({ ...json, ...preview, ...extras }) })
 }
 
 function previewExtras(req) {
   if (!req.auth?.preview || !req.auth.exp) return {}
+  const previewPlan = req.auth.previewPlan === 'essentiel' ? 'essentiel' : 'pro'
   return {
     preview: true,
+    previewPlan,
     previewExpiresAt: new Date(req.auth.exp * 1000).toISOString(),
+  }
+}
+
+function withPreviewPlan(userJson) {
+  if (!userJson?.preview) return userJson
+  const previewPlan = userJson.previewPlan === 'essentiel' ? 'essentiel' : 'pro'
+  const raw = userJson.subscription
+  const subscription =
+    raw && typeof raw.toObject === 'function'
+      ? raw.toObject({ depopulate: true })
+      : raw && raw._doc
+        ? { ...raw._doc }
+        : { ...(raw || {}) }
+  delete subscription.$__parent
+  delete subscription.$__
+  delete subscription.$isNew
+  return {
+    ...userJson,
+    previewPlan,
+    subscription: {
+      ...subscription,
+      plan: previewPlan,
+    },
   }
 }
 
@@ -97,17 +124,27 @@ router.post('/register', async (req, res) => {
       request: request._id,
       subscription: {
         plan: request.plan,
-        status: 'active',
+        status: 'trialing',
         company: request.company,
         teamSize: request.teamSize,
         activatedAt: now,
       },
     })
 
+    try {
+      await startMemberSubscription(user, request)
+      await user.save()
+    } catch (err) {
+      console.error('Stripe subscription', err.message)
+      await user.save()
+    }
+
     request.status = 'registered'
     request.registeredAt = now
     request.user = user._id
     await request.save()
+
+    sendWelcome(user).catch((e) => console.error('Mail bienvenue', e.message))
 
     return res.status(201).json({
       token: signToken(user),
@@ -146,18 +183,46 @@ router.post('/preview', async (req, res) => {
     return res.status(429).json({ error: 'Trop d’essais. Réessayez dans un moment.' })
   }
 
-  const user = await User.findOne({ email: PREVIEW_EMAIL, role: 'member' })
-  if (!user || user.subscription?.status !== 'active') {
+  const { hasWorkspaceAccess } = require('../utils/billing')
+  const { ensurePreviewAccount } = require('../seed/demoMember')
+
+  let user = await User.findOne({ email: PREVIEW_EMAIL, role: 'member' })
+  if (!user || !hasWorkspaceAccess(user)) {
+    try {
+      user = await ensurePreviewAccount()
+    } catch (err) {
+      console.error('ensurePreviewAccount', err)
+    }
+  }
+  if (!user || !hasWorkspaceAccess(user)) {
     return res.status(503).json({ error: 'La prévisualisation n’est pas disponible pour le moment.' })
   }
 
-  const token = signToken(user, { expiresIn: '5m', preview: true })
+  const previewPlan = req.body?.plan === 'essentiel' ? 'essentiel' : 'pro'
+  const token = signToken(user, { expiresIn: '5m', preview: true, previewPlan })
   const extras = {
     preview: true,
+    previewPlan,
     previewExpiresAt: tokenExpiresAt(token),
   }
+  try {
+    const { trackEvent } = require('../utils/analytics')
+    await trackEvent({
+      type: 'preview_start',
+      plan: previewPlan,
+      path: '/dashboard',
+      referrer: req.get('referer') || '',
+      sessionId: String(req.body?.sessionId || '').slice(0, 64),
+    })
+  } catch (_) {
+    /* ignore */
+  }
   const json = await AccountDeletionRequest.decorateUser(user)
-  res.json({ token, user: { ...json, ...extras }, expiresAt: extras.previewExpiresAt })
+  res.json({
+    token,
+    user: withPreviewPlan({ ...json, ...extras }),
+    expiresAt: extras.previewExpiresAt,
+  })
 })
 
 router.get('/onboarding', requireAuth, (req, res) => {
@@ -171,7 +236,8 @@ router.post('/onboarding', requireAuth, async (req, res) => {
   if (req.user.role === 'president') {
     return res.status(403).json({ error: 'Espace réservé au président.' })
   }
-  if (req.user.subscription?.status !== 'active') {
+  const { hasWorkspaceAccess } = require('../utils/billing')
+  if (!hasWorkspaceAccess(req.user)) {
     return res.status(403).json({ error: 'Un abonnement actif est requis.' })
   }
   if (req.user.onboarding?.completedAt) {
@@ -282,8 +348,29 @@ router.patch('/me', requireAuth, async (req, res) => {
     }
     req.user.quoteFollowUpDays = Math.round(days)
   }
-  if (req.body?.quoteFollowUpChannel === 'email' || req.body?.quoteFollowUpChannel === 'phone') {
+  if (['email', 'phone', 'both'].includes(req.body?.quoteFollowUpChannel)) {
     req.user.quoteFollowUpChannel = req.body.quoteFollowUpChannel
+  }
+  if (req.body?.notifications && typeof req.body.notifications === 'object') {
+    const current = req.user.notifications?.toObject?.() || req.user.notifications || {}
+    const next = { ...current }
+    for (const key of ['emailBooking', 'pushBooking', 'pushReminders', 'pushRelances']) {
+      if (typeof req.body.notifications[key] === 'boolean') next[key] = req.body.notifications[key]
+    }
+    if ([5, 10, 15, 30, 60].includes(Number(req.body.notifications.reminderMinutes))) {
+      next.reminderMinutes = Number(req.body.notifications.reminderMinutes)
+    }
+    if (req.body.notifications.clientBookingEmailSubject !== undefined) {
+      next.clientBookingEmailSubject = String(req.body.notifications.clientBookingEmailSubject || '')
+        .trim()
+        .slice(0, 120)
+    }
+    if (req.body.notifications.clientBookingEmailBody !== undefined) {
+      next.clientBookingEmailBody = String(req.body.notifications.clientBookingEmailBody || '')
+        .trim()
+        .slice(0, 4000)
+    }
+    req.user.notifications = next
   }
   if (req.body?.workspace && typeof req.body.workspace === 'object') {
     const current = req.user.workspace?.toObject?.() || req.user.workspace || {}
@@ -308,6 +395,7 @@ router.patch('/me', requireAuth, async (req, res) => {
       ...incoming,
       photos: incoming.photos || current.photos,
       theme: incoming.theme || current.theme,
+      hours: incoming.hours || current.hours,
       about: incoming.about
         ? {
             body: incoming.about.body !== undefined ? incoming.about.body : current.about.body,

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import { consumePreviewExit } from '../auth/previewSession'
-import { formatPrice, plans as catalog } from '../data/plans'
+import { consumePreviewExit, peekPreviewPlan } from '../auth/previewSession'
+import { formatPrice, paymentNote, plans as catalog } from '../data/plans'
 
 const fieldClass =
   'mt-1.5 w-full rounded-2xl border border-ink/10 bg-cream px-4 py-3 text-sm outline-none transition focus:border-copper'
@@ -30,10 +30,11 @@ function Subscribe() {
 
   useEffect(() => {
     if (planFromUrl === 'pro' || planFromUrl === 'essentiel') return
+    const fallback = trialEnded ? peekPreviewPlan() : 'essentiel'
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev)
-        next.set('plan', trialEnded ? 'pro' : 'essentiel')
+        next.set('plan', fallback)
         return next
       },
       { replace: true },
@@ -98,7 +99,8 @@ function Subscribe() {
           Merci, {form.name.split(' ')[0]}.
         </h1>
         <p className="mt-2 text-sm text-ink-soft">
-          Votre demande {selected.name} est transmise. On vous recontacte. Le premier mois est offert.
+          Un e-mail de confirmation vous a été envoyé. Nous vous adressons un devis. Dès qu’il est signé, vous recevez
+          votre code unique. Le premier mois est offert.
         </p>
         <Link
           to="/login"
@@ -124,7 +126,9 @@ function Subscribe() {
       <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight">Envoyez votre demande.</h1>
       {trialEnded ? (
         <p className="mt-4 rounded-2xl bg-moss px-4 py-3 text-sm text-cream">
-          L’essai est terminé. Demandez Nolyo Pro — le premier mois est offert.
+          L’essai est terminé. Vous avez testé{' '}
+          {plan === 'essentiel' ? 'Nolyo Essentiel' : 'Nolyo Pro'} — demandez la formule qui vous convient. Le premier
+          mois est offert.
         </p>
       ) : null}
       <p className="mt-2 text-sm text-ink-soft">
@@ -137,6 +141,7 @@ function Subscribe() {
           Se connecter
         </Link>
       </p>
+      <p className="mt-4 rounded-2xl bg-cream px-4 py-3 text-sm text-ink-soft ring-1 ring-ink/8">{paymentNote}</p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <fieldset>
@@ -172,7 +177,7 @@ function Subscribe() {
         </fieldset>
 
         <label className="block text-sm font-medium">
-          Nom
+          Nom et prénom
           <input className={fieldClass} name="name" value={form.name} onChange={update} required />
         </label>
         <label className="block text-sm font-medium">

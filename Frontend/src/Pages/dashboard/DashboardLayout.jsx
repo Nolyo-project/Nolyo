@@ -4,9 +4,10 @@ import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { isProPlan, planLabels } from '../../data/plans'
 import Logo from '../../components/Logo'
-import { trialDaysLeft } from './format'
+import { formatDay, trialDaysLeft } from './format'
 import { icons, Avatar } from './ui'
 import FollowUpModal from './FollowUpModal'
+import TrialBillingPrompt from './TrialBillingPrompt'
 import { copyForUser } from '../../data/trades'
 import { hasModule, workspaceLabel } from '../../data/workspace'
 
@@ -19,8 +20,19 @@ function navGroups(copy) {
         { to: '/dashboard/taches', label: 'Tâches', icon: 'journal', module: 'tasks' },
         { to: '/dashboard/clients', label: copy.clients, icon: 'people' },
         { to: '/dashboard/prospects', label: copy.prospects, icon: 'prospect', module: 'prospects' },
+      ],
+    },
+    {
+      label: 'Agenda',
+      links: [
         { to: '/dashboard/rdv', label: copy.appointments, icon: 'calendar', badge: 'rdv', module: 'appointments' },
+        { to: '/dashboard/conges', label: 'Congés', icon: 'absence', module: 'appointments' },
         { to: '/dashboard/notes', label: 'Notes', icon: 'note', module: 'notes' },
+      ],
+    },
+    {
+      label: 'Vitrine',
+      links: [
         { to: '/dashboard/page', label: 'Page', icon: 'page', pro: true, module: 'page' },
         { to: '/dashboard/qr-code', label: 'QR Code', icon: 'qr', pro: true, module: 'qr' },
       ],
@@ -29,20 +41,15 @@ function navGroups(copy) {
       label: 'Suivi',
       links: [
         { to: '/dashboard/finances', label: 'Chiffre d’affaires', icon: 'wallet', module: 'finances' },
-        { to: '/dashboard/relances', label: 'Relances', icon: 'bell', module: 'reminders' },
-      ],
-    },
-    {
-      label: 'Nolyo Pro',
-      links: [
-        { to: '/dashboard/inbox', label: 'Boîte de réception', icon: 'inbox', pro: true, badge: 'inbox', module: 'inbox' },
+        { to: '/dashboard/relances', label: 'Relances', icon: 'bell', badge: 'reminders', module: 'reminders' },
         { to: '/dashboard/statistiques', label: 'Statistiques', icon: 'chart', pro: true, module: 'stats' },
+        { to: '/dashboard/abonnement', label: 'Abonnement', icon: 'card' },
       ],
     },
   ]
 }
 
-const emptyBadges = { rdv: 0, reminders: 0, inbox: 0 }
+const emptyBadges = { rdv: 0, reminders: 0 }
 
 function seenKey(userId) {
   return `nolio_nav_seen:${userId}`
@@ -54,7 +61,6 @@ function readSeen(userId) {
     return {
       rdv: Number(raw.rdv) || 0,
       reminders: Number(raw.reminders) || 0,
-      inbox: Number(raw.inbox) || 0,
     }
   } catch {
     return { ...emptyBadges }
@@ -64,7 +70,6 @@ function readSeen(userId) {
 function badgeRouteKey(pathname) {
   if (pathname === '/dashboard/rdv' || pathname.startsWith('/dashboard/rdv/')) return 'rdv'
   if (pathname.startsWith('/dashboard/relances')) return 'reminders'
-  if (pathname.startsWith('/dashboard/inbox')) return 'inbox'
   return null
 }
 
@@ -111,28 +116,61 @@ function PreviewTag({ expiresAt }) {
   )
 }
 
-function TrialCounter({ activatedAt }) {
-  const days = trialDaysLeft(activatedAt)
+function BillingHint({ subscription }) {
+  const status = subscription?.status
+  const nextAt = subscription?.nextInvoiceAt || subscription?.trialEndsAt || subscription?.currentPeriodEnd
+  const hasCard = Boolean(subscription?.hasPaymentMethod)
+  const auto = subscription?.collectionMethod === 'charge_automatically' && hasCard
 
-  if (days <= 0) {
+  if (status === 'past_due' || status === 'unpaid') return null
+
+  if (status === 'trialing') {
+    const days = trialDaysLeft(subscription?.activatedAt, 30, subscription?.trialEndsAt)
+    if (days <= 0) {
+      return (
+        <Link
+          to="/dashboard/abonnement"
+          className="max-w-[16rem] rounded-2xl border border-ink/10 bg-cream px-3 py-2 text-left text-xs transition hover:border-copper/30 sm:max-w-none sm:px-4"
+        >
+          <p className="font-medium">Mois offert terminé</p>
+          <p className="mt-0.5 text-ink-soft">
+            {hasCard ? 'Prélèvement en cours…' : 'Ajoutez une carte pour éviter le blocage.'}
+          </p>
+        </Link>
+      )
+    }
     return (
-      <div className="whitespace-nowrap rounded-full border border-ink/10 bg-cream px-4 py-2 text-sm">
-        Période gratuite terminée
-      </div>
+      <Link
+        to="/dashboard/abonnement"
+        className="max-w-[16rem] rounded-2xl bg-cream px-3 py-2 text-left text-xs ring-1 ring-ink/6 transition hover:ring-copper/25 sm:max-w-none sm:px-4"
+      >
+        <p className="m-0">
+          <span className="font-medium">Mois offert</span>
+          <span className="text-ink-soft"> · {days} j restant{days > 1 ? 's' : ''}</span>
+        </p>
+        {nextAt ? (
+          <p className="mt-0.5 text-ink-soft">
+            Prochaine facture le {formatDay(nextAt)}
+            {hasCard ? ' · prélèvement auto' : ''}
+          </p>
+        ) : null}
+      </Link>
     )
   }
 
-  const remaining = `${days} jour${days > 1 ? 's' : ''} restant${days > 1 ? 's' : ''}`
+  if (status === 'active' && nextAt) {
+    return (
+      <Link
+        to="/dashboard/abonnement"
+        className="max-w-[16rem] rounded-2xl bg-cream px-3 py-2 text-left text-xs ring-1 ring-ink/6 transition hover:ring-copper/25 sm:max-w-none sm:px-4"
+      >
+        <p className="font-medium">{auto ? 'Prélèvement automatique' : 'Prochaine facture'}</p>
+        <p className="mt-0.5 text-ink-soft">Le {formatDay(nextAt)}</p>
+      </Link>
+    )
+  }
 
-  return (
-    <div className="flex items-center gap-2 whitespace-nowrap rounded-full bg-cream px-4 py-2 text-sm ring-1 ring-ink/6 sm:px-5">
-      <span className="h-1.5 w-1.5 rounded-full bg-copper" aria-hidden />
-      <p className="m-0">
-        <span className="">Période gratuite </span>
-        <span className="text-ink-soft font-semibold"> {remaining}</span>
-      </p>
-    </div>
-  )
+  return null
 }
 
 function NavList({ user, isPro, badges = {}, onNavigate, className, copy }) {
@@ -152,7 +190,7 @@ function NavList({ user, isPro, badges = {}, onNavigate, className, copy }) {
         <div key={group.label}>
           <p
             className={`px-3 pt-4 pb-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase ${
-              group.label === 'Nolyo Pro' && !isPro ? 'text-cream/28' : 'text-cream/40'
+              group.label === 'Vitrine' && !isPro ? 'text-cream/28' : 'text-cream/40'
             }`}
           >
             {group.label}
@@ -312,7 +350,7 @@ function DashboardLayout() {
             {isPreview && user.previewExpiresAt ? (
               <PreviewTag expiresAt={user.previewExpiresAt} />
             ) : (
-              <TrialCounter activatedAt={user.subscription?.activatedAt} />
+              <BillingHint subscription={user.subscription} />
             )}
             <button
               type="button"
@@ -366,6 +404,7 @@ function DashboardLayout() {
           <Outlet />
         </div>
         <FollowUpModal />
+        <TrialBillingPrompt />
       </div>
     </div>
   )

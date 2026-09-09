@@ -10,6 +10,8 @@ import FinancesView from './president/FinancesView'
 import MembersView from './president/MembersView'
 import RequestsView from './president/RequestsView'
 import SettingsView from './president/SettingsView'
+import TestimonialsView from './president/TestimonialsView'
+import AnalyticsView from './president/AnalyticsView'
 import {
   Empty,
   Stat,
@@ -44,6 +46,7 @@ function PresidentDashboard() {
   const [copied, setCopied] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [rdvBadge, setRdvBadge] = useState(0)
+  const [testimonialsBadge, setTestimonialsBadge] = useState(0)
   const [upcomingRdv, setUpcomingRdv] = useState([])
 
   const q = query.trim().toLowerCase()
@@ -93,7 +96,7 @@ function PresidentDashboard() {
     : 0
 
   const inbox = requests.filter((item) => item.status !== 'registered')
-  const todoRequests = requests.filter((item) => item.status === 'received' || item.status === 'paid')
+  const todoRequests = requests.filter((item) => item.status === 'received')
   const codeReady = requests.filter((item) => item.status === 'code_issued')
   const pendingDeletionsList = deletions.filter((item) => item.status === 'pending')
   const pendingDeletions = deletionCounts.pending || pendingDeletionsList.length
@@ -107,7 +110,7 @@ function PresidentDashboard() {
       api('/api/president/requests'),
       api('/api/president/deletions'),
       api('/api/president/members'),
-      api('/api/president/badges').catch(() => ({ badges: { rdv: 0 } })),
+      api('/api/president/badges').catch(() => ({ badges: { rdv: 0, testimonials: 0 } })),
       api(
         `/api/president/appointments?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
       ).catch(() => ({ appointments: [] })),
@@ -123,6 +126,7 @@ function PresidentDashboard() {
     setMemberCounts(mems.counts || {})
     setMembers(mems.members || [])
     setRdvBadge(badges.badges?.rdv || 0)
+    setTestimonialsBadge(badges.badges?.testimonials || 0)
     setUpcomingRdv(
       (rdv.appointments || [])
         .filter((item) => item.status === 'planned' && new Date(item.startAt) >= from)
@@ -178,7 +182,11 @@ function PresidentDashboard() {
         method: 'POST',
         body: action === 'send-quote' ? { quoteNote } : undefined,
       })
-      setRequests((current) => current.map((item) => (item.id === data.request.id ? data.request : item)))
+      setRequests((current) =>
+        current.map((item) =>
+          item.id === data.request.id ? { ...item, ...data.request, avatar: data.request.avatar || item.avatar } : item,
+        ),
+      )
       setSelectedId(data.request.id)
       if (action === 'send-quote') setQuoteNote('')
       const next = await api('/api/president/requests')
@@ -191,7 +199,9 @@ function PresidentDashboard() {
   }
 
   function updateRequest(request) {
-    setRequests((current) => current.map((item) => (item.id === request.id ? request : item)))
+    setRequests((current) =>
+      current.map((item) => (item.id === request.id ? { ...item, ...request, avatar: request.avatar || item.avatar } : item)),
+    )
   }
 
   async function resolveDeletion(action) {
@@ -229,20 +239,24 @@ function PresidentDashboard() {
 
   const titles = {
     home: 'Vue d’ensemble',
+    analytics: 'Analyse',
     subscriptions: 'Demandes',
     rdv: 'Rendez-vous',
     members: 'Membres',
     finances: 'Chiffre d’affaires',
+    testimonials: 'Avis',
     settings: 'Paramètres',
     deletions: 'Suppressions',
   }
 
   const navItems = [
     ['home', 'Vue d’ensemble'],
+    ['analytics', 'Analyse'],
     ['subscriptions', 'Demandes'],
     ['rdv', 'Rendez-vous'],
     ['members', 'Membres'],
     ['finances', 'Chiffre d’affaires'],
+    ['testimonials', 'Avis'],
     ['deletions', 'Suppressions'],
   ]
 
@@ -270,6 +284,11 @@ function PresidentDashboard() {
               {id === 'deletions' && pendingDeletions ? (
                 <span className="grid min-w-[1.15rem] place-items-center rounded-full bg-copper px-1.5 py-0.5 text-[10px] font-semibold">
                   {pendingDeletions}
+                </span>
+              ) : null}
+              {id === 'testimonials' && testimonialsBadge ? (
+                <span className="grid min-w-[1.15rem] place-items-center rounded-full bg-copper px-1.5 py-0.5 text-[10px] font-semibold">
+                  {testimonialsBadge}
                 </span>
               ) : null}
             </button>
@@ -309,7 +328,7 @@ function PresidentDashboard() {
               <a href={publicSiteHref('/rdv')} className="rounded-full border border-ink/10 bg-cream px-4 py-2 text-sm font-medium">
                 Page publique · /rdv
               </a>
-            ) : view === 'settings' || view === 'finances' ? null : (
+            ) : view === 'settings' || view === 'finances' || view === 'analytics' ? null : (
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -543,18 +562,22 @@ function PresidentDashboard() {
                   {recentMembers.length === 0 ? (
                     <p className="mt-5 text-sm text-cream/70">Personne pour le moment.</p>
                   ) : (
-                    <ul className="mt-4 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+                    <ul className="mt-4 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
                       {recentMembers.map((item) => (
-                        <li key={item.id} className="min-h-0 flex-1">
+                        <li key={item.id}>
                           <button
                             type="button"
                             onClick={() => openMember(item.id)}
-                            className="flex h-full w-full flex-col justify-between rounded-2xl bg-cream/10 px-3.5 py-3 text-left ring-1 ring-cream/10 transition hover:bg-cream/16"
+                            className="flex w-full items-center gap-3 rounded-2xl bg-cream/10 px-3.5 py-3 text-left ring-1 ring-cream/10 transition hover:bg-cream/16"
                           >
-                            <span className="line-clamp-2 font-medium">{item.company || item.name}</span>
-                            <span className="mt-2 text-xs text-cream/65">
-                              {planName(item.plan)}
-                              <span className="mt-0.5 block">{formatDay(item.activatedAt || item.createdAt)}</span>
+                            <Avatar user={item} light className="h-11 w-11 text-xs" />
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium">{item.company || item.name}</span>
+                              <span className="mt-0.5 block text-xs text-cream/65">
+                                {planName(item.plan)}
+                                <span className="mx-1 opacity-50">·</span>
+                                {formatDay(item.activatedAt || item.createdAt)}
+                              </span>
                             </span>
                           </button>
                         </li>
@@ -602,6 +625,10 @@ function PresidentDashboard() {
           ) : null}
 
           {view === 'finances' ? <FinancesView /> : null}
+
+          {view === 'analytics' ? <AnalyticsView /> : null}
+
+          {view === 'testimonials' ? <TestimonialsView /> : null}
 
           {view === 'settings' ? <SettingsView /> : null}
 

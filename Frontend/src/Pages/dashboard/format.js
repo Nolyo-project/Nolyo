@@ -44,11 +44,13 @@ export function toDatetimeLocal(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-export function trialDaysLeft(activatedAt, durationDays = 30) {
-  if (!activatedAt) return 0
-  const end = new Date(activatedAt)
-  end.setDate(end.getDate() + durationDays)
-  end.setHours(23, 59, 59, 999)
+export function trialDaysLeft(activatedAt, durationDays = 30, trialEndsAt) {
+  const end = trialEndsAt ? new Date(trialEndsAt) : activatedAt ? new Date(activatedAt) : null
+  if (!end || Number.isNaN(end.getTime())) return 0
+  if (!trialEndsAt && activatedAt) {
+    end.setDate(end.getDate() + durationDays)
+    end.setHours(23, 59, 59, 999)
+  }
   return Math.max(0, Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
 }
 

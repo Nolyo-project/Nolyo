@@ -7,9 +7,14 @@ const Service = require('../models/Service')
 const Transaction = require('../models/Transaction')
 const User = require('../models/User')
 const { requireAuth, requirePresident } = require('../middleware/auth')
-const { createInviteCode } = require('../utils/inviteCode')
+const { ensureInviteCode } = require('../utils/inviteCode')
+const { sendInviteCode } = require('../utils/emails')
 const { deleteMemberAccount } = require('../utils/deleteAccount')
 const { hasOverlap, isDuplicateKey } = require('../utils/overlap')
+const { listInvoicesForUser, downloadInvoicePdf } = require('../utils/stripe')
+const { COTISATION_RATE, SOCIAL_RATE, VERSEMENT_LIBERATOIRE_RATE, URSSAF_PAY_URL } = require('../config/founderTax')
+const SiteReview = require('../models/SiteReview')
+const { presidentSiteReview } = require('../utils/siteReviews')
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 
@@ -91,10 +96,60 @@ function startOfDay(date = new Date()) {
   return d
 }
 
+async function requestWithAvatar(request) {
+  const json = request.toPresidentJSON()
+  const linked = request.user
+    ? await User.findById(request.user).select('avatar')
+    : await User.findOne({ email: String(request.email || '').toLowerCase(), role: 'member' }).select('avatar')
+  json.avatar = linked?.avatar || ''
+  return json
+}
+
 function endOfDay(date = new Date()) {
   const d = new Date(date)
   d.setHours(23, 59, 59, 999)
   return d
+}
+
+function appointmentEndsAt(appointment) {
+  const start = new Date(appointment.startAt).getTime()
+  const minutes = Number(appointment.durationMinutes) || 30
+  return new Date(start + minutes * 60000)
+}
+
+async function emailBecameNolyoClient(email) {
+  const normalized = String(email || '').trim().toLowerCase()
+  if (!normalized) return false
+  const [member, request] = await Promise.all([
+    User.findOne({ email: normalized, role: 'member' }).select('_id'),
+    SubscriptionRequest.findOne({
+      email: normalized,
+      status: { $in: ['paid', 'code_issued', 'registered'] },
+    }).select('_id'),
+  ])
+  return Boolean(member || request)
+}
+
+async function enrichAppointmentOutcome(appointment) {
+  const plain = appointment.toObject ? appointment.toObject() : appointment
+  const email = plain.contact?.email || ''
+  const matched = await emailBecameNolyoClient(email)
+  const manual = plain.clientOutcome || 'none'
+  const converted = manual === 'converted' || (manual === 'none' && matched)
+  return {
+    ...plain,
+    endsAt: appointmentEndsAt(plain),
+    matchedClient: matched,
+    isConverted: converted,
+    conversionLabel:
+      manual === 'converted'
+        ? 'Transformé en client'
+        : manual === 'not_converted'
+          ? 'Non transformé'
+          : matched
+            ? 'Transformé en client'
+            : 'En attente',
+  }
 }
 
 const router = express.Router()
@@ -115,9 +170,27 @@ router.get('/requests', async (_req, res) => {
     if (counts[item.status] !== undefined) counts[item.status] += 1
   }
 
+  const emails = [...new Set(requests.map((item) => String(item.email || '').toLowerCase()).filter(Boolean))]
+  const userIds = requests.map((item) => item.user).filter(Boolean)
+  const users = await User.find({
+    $or: [
+      ...(userIds.length ? [{ _id: { $in: userIds } }] : []),
+      ...(emails.length ? [{ email: { $in: emails }, role: 'member' }] : []),
+    ],
+  }).select('_id email avatar')
+
+  const byId = new Map(users.map((user) => [String(user._id), user]))
+  const byEmail = new Map(users.map((user) => [String(user.email).toLowerCase(), user]))
+
   res.json({
     counts,
-    requests: requests.map((item) => item.toPresidentJSON()),
+    requests: requests.map((item) => {
+      const json = item.toPresidentJSON()
+      const linked =
+        (item.user && byId.get(String(item.user))) || byEmail.get(String(item.email || '').toLowerCase()) || null
+      json.avatar = linked?.avatar || ''
+      return json
+    }),
   })
 })
 
@@ -136,7 +209,7 @@ router.post('/requests/:id/send-quote', async (req, res) => {
   request.quoteSentAt = new Date()
   await request.save()
 
-  res.json({ request: request.toPresidentJSON() })
+  res.json({ request: await requestWithAvatar(request) })
 })
 
 router.post('/requests/:id/confirm-payment', async (req, res) => {
@@ -147,15 +220,18 @@ router.post('/requests/:id/confirm-payment', async (req, res) => {
 
   if (request.status !== 'quote_sent') {
     return res.status(400).json({
-      error: 'Confirmez d’abord l’envoi du devis, puis le retour signé et le paiement.',
+      error: 'Confirmez d’abord l’envoi du devis, puis le retour du devis signé.',
     })
   }
 
   request.status = 'paid'
   request.paidAt = new Date()
+  await ensureInviteCode(request)
+  request.status = 'code_issued'
   await request.save()
+  sendInviteCode(request).catch((err) => console.error('Mail code', err.message))
 
-  res.json({ request: request.toPresidentJSON() })
+  res.json({ request: await requestWithAvatar(request) })
 })
 
 router.post('/requests/:id/issue-code', async (req, res) => {
@@ -164,28 +240,18 @@ router.post('/requests/:id/issue-code', async (req, res) => {
     return res.status(404).json({ error: 'Demande introuvable.' })
   }
 
-  if (request.status !== 'paid' && request.status !== 'code_issued') {
+  if (request.status !== 'paid' && request.status !== 'code_issued' && request.status !== 'quote_sent') {
     return res.status(400).json({
-      error: 'Le devis signé et le paiement doivent être reçus avant de délivrer un code.',
+      error: 'Le devis signé doit être reçu avant de délivrer un code.',
     })
   }
 
-  if (!request.inviteCode) {
-    let code = createInviteCode()
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const clash = await SubscriptionRequest.findOne({ inviteCode: code })
-      if (!clash) break
-      code = createInviteCode()
-    }
-
-    request.inviteCode = code
-    request.inviteCodeCreatedAt = new Date()
-  }
-
+  await ensureInviteCode(request)
   request.status = 'code_issued'
   await request.save()
+  sendInviteCode(request).catch((err) => console.error('Mail code', err.message))
 
-  res.json({ request: request.toPresidentJSON() })
+  res.json({ request: await requestWithAvatar(request) })
 })
 
 router.post('/requests/:id/flag-issue', async (req, res) => {
@@ -196,7 +262,7 @@ router.post('/requests/:id/flag-issue', async (req, res) => {
   request.issueNote = note
   request.issueAt = new Date()
   await request.save()
-  res.json({ request: request.toPresidentJSON() })
+  res.json({ request: await requestWithAvatar(request) })
 })
 
 router.post('/requests/:id/clear-issue', async (req, res) => {
@@ -205,7 +271,7 @@ router.post('/requests/:id/clear-issue', async (req, res) => {
   request.issueNote = ''
   request.issueAt = undefined
   await request.save()
-  res.json({ request: request.toPresidentJSON() })
+  res.json({ request: await requestWithAvatar(request) })
 })
 
 router.get('/members', async (_req, res) => {
@@ -219,6 +285,19 @@ router.get('/members', async (_req, res) => {
     company: user.subscription?.company || user.onboarding?.company || user.business?.tradeName || '',
     plan: user.subscription?.plan || '',
     status: user.subscription?.status || 'none',
+    billing: {
+      trialEndsAt: user.subscription?.trialEndsAt || null,
+      paidAt: user.subscription?.paidAt || null,
+      currentPeriodEnd: user.subscription?.currentPeriodEnd || null,
+      nextInvoiceAt: user.subscription?.nextInvoiceAt || user.subscription?.trialEndsAt || user.subscription?.currentPeriodEnd || null,
+      stripe: Boolean(user.subscription?.stripeCustomerId),
+      hasPaymentMethod: Boolean(user.subscription?.hasPaymentMethod),
+      billingChoice: user.subscription?.billingChoice || '',
+      collectionMethod: user.subscription?.collectionMethod || '',
+      autoDebit:
+        user.subscription?.collectionMethod === 'charge_automatically' &&
+        Boolean(user.subscription?.hasPaymentMethod),
+    },
     slug: user.page?.slug || '',
     published: Boolean(user.page?.published && user.page?.slug),
     city: user.onboarding?.city || '',
@@ -234,6 +313,33 @@ router.get('/members', async (_req, res) => {
     },
     members,
   })
+})
+
+router.get('/members/:id/invoices', async (req, res) => {
+  const member = await User.findOne({ _id: req.params.id, role: 'member' })
+  if (!member) return res.status(404).json({ error: 'Membre introuvable.' })
+  try {
+    const invoices = await listInvoicesForUser(member)
+    res.json({ invoices })
+  } catch (err) {
+    console.error('Member invoices', err.message)
+    res.status(502).json({ error: 'Impossible de récupérer les factures Stripe.' })
+  }
+})
+
+router.get('/members/:id/invoices/:invoiceId/download', async (req, res) => {
+  const member = await User.findOne({ _id: req.params.id, role: 'member' })
+  if (!member) return res.status(404).json({ error: 'Membre introuvable.' })
+  try {
+    const file = await downloadInvoicePdf(member, req.params.invoiceId)
+    if (!file) return res.status(404).json({ error: 'Facture introuvable.' })
+    res.setHeader('Content-Type', file.contentType)
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.fileName)}`)
+    res.send(file.buffer)
+  } catch (err) {
+    console.error('Member invoice download', err.message)
+    res.status(502).json({ error: 'Téléchargement de la facture impossible.' })
+  }
 })
 
 router.get('/deletions', async (_req, res) => {
@@ -265,7 +371,7 @@ router.post('/deletions/:id/accept', async (req, res) => {
   request.status = 'accepted'
   request.resolvedAt = new Date()
   await request.save()
-  res.json({ request: request.toPresidentJSON() })
+  res.json({ request: await requestWithAvatar(request) })
 })
 
 router.post('/deletions/:id/refuse', async (req, res) => {
@@ -279,16 +385,44 @@ router.post('/deletions/:id/refuse', async (req, res) => {
   request.refusalNote = String(req.body?.note || '').trim().slice(0, 500)
   request.resolvedAt = new Date()
   await request.save()
-  res.json({ request: request.toPresidentJSON() })
+  res.json({ request: await requestWithAvatar(request) })
 })
 
 router.get('/badges', async (req, res) => {
-  const rdv = await Appointment.countDocuments({
-    user: req.user._id,
-    status: 'planned',
-    startAt: { $gte: startOfDay(), $lte: endOfDay() },
-  })
-  res.json({ badges: { rdv } })
+  const [rdv, testimonials] = await Promise.all([
+    Appointment.countDocuments({
+      user: req.user._id,
+      status: 'planned',
+      startAt: { $gte: startOfDay(), $lte: endOfDay() },
+    }),
+    SiteReview.countDocuments({ status: 'pending' }),
+  ])
+  res.json({ badges: { rdv, testimonials } })
+})
+
+router.get('/testimonials', async (req, res) => {
+  const filter = {}
+  if (['pending', 'approved', 'rejected'].includes(req.query.status)) {
+    filter.status = req.query.status
+  }
+  const reviews = await SiteReview.find(filter).sort({ createdAt: -1 }).limit(120)
+  res.json({ reviews: reviews.map(presidentSiteReview) })
+})
+
+router.patch('/testimonials/:id', async (req, res) => {
+  const review = await SiteReview.findById(req.params.id)
+  if (!review) return res.status(404).json({ error: 'Avis introuvable.' })
+  if (['pending', 'approved', 'rejected'].includes(req.body?.status)) {
+    review.status = req.body.status
+  }
+  await review.save()
+  res.json({ review: presidentSiteReview(review) })
+})
+
+router.delete('/testimonials/:id', async (req, res) => {
+  const review = await SiteReview.findByIdAndDelete(req.params.id)
+  if (!review) return res.status(404).json({ error: 'Avis introuvable.' })
+  res.json({ ok: true })
 })
 
 router.get('/contacts', async (req, res) => {
@@ -386,6 +520,10 @@ router.patch('/appointments/:id', async (req, res) => {
     appointment.durationMinutes = durationMinutes
   }
   if (['planned', 'done', 'cancelled'].includes(req.body?.status)) appointment.status = req.body.status
+  if (['none', 'converted', 'not_converted'].includes(req.body?.clientOutcome)) {
+    appointment.clientOutcome = req.body.clientOutcome
+    appointment.clientOutcomeAt = req.body.clientOutcome === 'none' ? undefined : new Date()
+  }
   if (appointment.status === 'planned') {
     if (req.body?.startAt && appointment.startAt.getTime() <= Date.now()) {
       return res.status(400).json({ error: 'Choisissez un créneau encore à venir.' })
@@ -395,8 +533,40 @@ router.patch('/appointments/:id', async (req, res) => {
     }
   }
   await appointment.save()
-  await appointment.populate('contact', 'name firstName lastName phone email')
-  res.json({ appointment })
+  await appointment.populate('contact', 'name firstName lastName phone email kind company')
+  const enriched = await enrichAppointmentOutcome(appointment)
+  res.json({ appointment: enriched })
+})
+
+router.get('/appointment-outcomes', async (req, res) => {
+  const now = new Date()
+  const appointments = await Appointment.find({
+    user: req.user._id,
+    status: { $ne: 'cancelled' },
+  })
+    .sort({ startAt: -1 })
+    .populate('contact', 'name firstName lastName phone email kind company')
+    .limit(200)
+
+  const ended = []
+  for (const item of appointments) {
+    const endsAt = appointmentEndsAt(item)
+    if (endsAt > now && item.status !== 'done') continue
+    ended.push(await enrichAppointmentOutcome(item))
+  }
+
+  const converted = ended.filter((item) => item.isConverted)
+  const pending = ended.filter((item) => !item.isConverted && item.clientOutcome !== 'not_converted')
+
+  res.json({
+    counts: {
+      ended: ended.length,
+      converted: converted.length,
+      pending: pending.length,
+    },
+    ended,
+    converted,
+  })
 })
 
 router.delete('/appointments/:id', async (req, res) => {
@@ -423,12 +593,29 @@ router.get('/transactions', async (req, res) => {
   const transactions = await Transaction.find(filter).sort({ date: -1 }).limit(bounds ? 400 : 80)
   const income = transactions.filter((t) => t.kind === 'income').reduce((sum, t) => sum + t.amount, 0)
   const expense = transactions.filter((t) => t.kind === 'expense').reduce((sum, t) => sum + t.amount, 0)
+  const cotisationEstimate = Math.round(income * COTISATION_RATE * 100) / 100
+  const afterCotisation = Math.round((income - cotisationEstimate) * 100) / 100
+  const today = new Date()
+  const reminderDay = today.getDate() >= 5
   res.json({
     transactions,
     totals: {
       income,
       expense,
       balance: Math.round((income - expense) * 100) / 100,
+      cotisationEstimate,
+      cotisationRate: COTISATION_RATE,
+      socialRate: SOCIAL_RATE,
+      versementLiberatoireRate: VERSEMENT_LIBERATOIRE_RATE,
+      afterCotisation,
+      netAfterCotisation: Math.round((afterCotisation - expense) * 100) / 100,
+    },
+    urssaf: {
+      payUrl: URSSAF_PAY_URL,
+      reminderActive: reminderDay,
+      reminderLabel: reminderDay
+        ? 'Pensez à déclarer et payer vos cotisations URSSAF (rappel du 5).'
+        : 'Rappel URSSAF chaque mois à partir du 5.',
     },
   })
 })
@@ -480,6 +667,316 @@ router.delete('/transactions/:id', async (req, res) => {
   const transaction = await Transaction.findOneAndDelete({ _id: req.params.id, user: req.user._id })
   if (!transaction) return res.status(404).json({ error: 'Ligne introuvable.' })
   res.json({ ok: true })
+})
+
+router.get('/analytics', async (req, res) => {
+  const AnalyticsEvent = require('../models/AnalyticsEvent')
+  const SubscriptionRequest = require('../models/SubscriptionRequest')
+  const SiteReview = require('../models/SiteReview')
+  const AccountDeletionRequest = require('../models/AccountDeletionRequest')
+  const { DEMO_EMAILS } = require('../seed/demoMember')
+  const { startOfDaysAgo } = require('../utils/analytics')
+
+  const range = String(req.query.range || '30')
+  const days = range === '7' ? 7 : range === '90' ? 90 : 30
+  const since = startOfDaysAgo(days - 1)
+  const prevSince = startOfDaysAgo(days * 2 - 1)
+  const prevUntil = since
+  const now = new Date()
+
+  const memberFilter = {
+    role: 'member',
+    email: { $nin: DEMO_EMAILS },
+  }
+
+  const [
+    pageViews,
+    pageViewsPrev,
+    uniqueSessions,
+    previews,
+    previewsPrev,
+    requests,
+    requestsPrev,
+    requestsAllTime,
+    membersCreated,
+    membersByPlan,
+    membersByStatus,
+    membersByTrade,
+    reviewsApproved,
+    reviewsPending,
+    reviewsPeriod,
+    deletionsPending,
+    deletionsAccepted,
+    founderRdvPeriod,
+    founderRdvConverted,
+    founderRdvPending,
+    topPaths,
+    topSources,
+    dailyViews,
+    dailyPreviews,
+    dailyRequests,
+    conversionTimes,
+    subscribePageViews,
+  ] = await Promise.all([
+    AnalyticsEvent.countDocuments({ type: 'page_view', createdAt: { $gte: since } }),
+    AnalyticsEvent.countDocuments({ type: 'page_view', createdAt: { $gte: prevSince, $lt: prevUntil } }),
+    AnalyticsEvent.distinct('sessionId', {
+      type: 'page_view',
+      createdAt: { $gte: since },
+      sessionId: { $nin: ['', null] },
+    }),
+    AnalyticsEvent.aggregate([
+      { $match: { type: 'preview_start', createdAt: { $gte: since } } },
+      { $group: { _id: '$plan', count: { $sum: 1 } } },
+    ]),
+    AnalyticsEvent.countDocuments({ type: 'preview_start', createdAt: { $gte: prevSince, $lt: prevUntil } }),
+    SubscriptionRequest.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          essentiel: { $sum: { $cond: [{ $eq: ['$plan', 'essentiel'] }, 1, 0] } },
+          pro: { $sum: { $cond: [{ $eq: ['$plan', 'pro'] }, 1, 0] } },
+          registered: { $sum: { $cond: [{ $eq: ['$status', 'registered'] }, 1, 0] } },
+          quote_sent: { $sum: { $cond: [{ $eq: ['$status', 'quote_sent'] }, 1, 0] } },
+          code_issued: { $sum: { $cond: [{ $eq: ['$status', 'code_issued'] }, 1, 0] } },
+          received: { $sum: { $cond: [{ $eq: ['$status', 'received'] }, 1, 0] } },
+          paid: { $sum: { $cond: [{ $eq: ['$status', 'paid'] }, 1, 0] } },
+        },
+      },
+    ]),
+    SubscriptionRequest.countDocuments({ createdAt: { $gte: prevSince, $lt: prevUntil } }),
+    SubscriptionRequest.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+    User.countDocuments({ ...memberFilter, createdAt: { $gte: since } }),
+    User.aggregate([
+      { $match: memberFilter },
+      { $group: { _id: '$subscription.plan', count: { $sum: 1 } } },
+    ]),
+    User.aggregate([
+      { $match: memberFilter },
+      { $group: { _id: '$subscription.status', count: { $sum: 1 } } },
+    ]),
+    User.aggregate([
+      {
+        $match: {
+          ...memberFilter,
+          'onboarding.tradeLabel': { $exists: true, $nin: ['', null] },
+        },
+      },
+      { $group: { _id: '$onboarding.tradeLabel', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 8 },
+    ]),
+    SiteReview.countDocuments({ status: 'approved' }),
+    SiteReview.countDocuments({ status: 'pending' }),
+    SiteReview.countDocuments({ status: 'approved', createdAt: { $gte: since } }),
+    AccountDeletionRequest.countDocuments({ status: 'pending' }),
+    AccountDeletionRequest.countDocuments({ status: 'accepted', createdAt: { $gte: since } }),
+    Appointment.countDocuments({
+      user: req.user._id,
+      status: { $ne: 'cancelled' },
+      startAt: { $gte: since },
+    }),
+    Appointment.countDocuments({
+      user: req.user._id,
+      status: { $ne: 'cancelled' },
+      clientOutcome: 'converted',
+      startAt: { $gte: since },
+    }),
+    Appointment.countDocuments({
+      user: req.user._id,
+      status: { $ne: 'cancelled' },
+      startAt: { $lt: now },
+      $or: [{ clientOutcome: { $exists: false } }, { clientOutcome: 'none' }],
+    }),
+    AnalyticsEvent.aggregate([
+      { $match: { type: 'page_view', createdAt: { $gte: since }, path: { $ne: '' } } },
+      { $group: { _id: '$path', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+    ]),
+    AnalyticsEvent.aggregate([
+      { $match: { type: 'page_view', createdAt: { $gte: since } } },
+      { $group: { _id: { $ifNull: ['$source', 'direct'] }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+    ]),
+    AnalyticsEvent.aggregate([
+      { $match: { type: 'page_view', createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    AnalyticsEvent.aggregate([
+      { $match: { type: 'preview_start', createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    SubscriptionRequest.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    SubscriptionRequest.aggregate([
+      {
+        $match: {
+          registeredAt: { $exists: true, $ne: null },
+          createdAt: { $gte: since },
+        },
+      },
+      {
+        $project: {
+          days: {
+            $divide: [{ $subtract: ['$registeredAt', '$createdAt'] }, 1000 * 60 * 60 * 24],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          avgDays: { $avg: '$days' },
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+    AnalyticsEvent.countDocuments({
+      type: 'page_view',
+      createdAt: { $gte: since },
+      path: { $regex: '^/abonnement' },
+    }),
+  ])
+
+  const previewMap = Object.fromEntries(previews.map((row) => [row._id || 'pro', row.count]))
+  const previewEssentiel = previewMap.essentiel || 0
+  const previewPro = previewMap.pro || 0
+  const previewTotal = previewEssentiel + previewPro
+  const reqStats = requests[0] || {
+    total: 0,
+    essentiel: 0,
+    pro: 0,
+    registered: 0,
+    quote_sent: 0,
+    code_issued: 0,
+    received: 0,
+    paid: 0,
+  }
+  const pipelineAll = Object.fromEntries(requestsAllTime.map((row) => [row._id, row.count]))
+
+  const planMembers = Object.fromEntries(membersByPlan.map((row) => [row._id || '—', row.count]))
+  const statusMembers = Object.fromEntries(membersByStatus.map((row) => [row._id || 'none', row.count]))
+  const membersTotal = Object.values(statusMembers).reduce((sum, n) => sum + Number(n || 0), 0)
+
+  function delta(current, previous) {
+    if (!previous) return current ? 100 : 0
+    return Math.round(((current - previous) / previous) * 100)
+  }
+
+  function rate(part, whole) {
+    if (!whole) return 0
+    return Math.round((part / whole) * 1000) / 10
+  }
+
+  const sessions = uniqueSessions.length
+  const avgConversionDays = conversionTimes[0]?.avgDays
+  const conversionSample = conversionTimes[0]?.count || 0
+
+  res.json({
+    range: days,
+    since,
+    kpis: {
+      pageViews: { value: pageViews, prev: pageViewsPrev, delta: delta(pageViews, pageViewsPrev) },
+      sessions: sessions,
+      previews: { value: previewTotal, prev: previewsPrev, delta: delta(previewTotal, previewsPrev) },
+      previewEssentiel,
+      previewPro,
+      requests: { value: reqStats.total, prev: requestsPrev, delta: delta(reqStats.total, requestsPrev) },
+      requestsEssentiel: reqStats.essentiel,
+      requestsPro: reqStats.pro,
+      registered: reqStats.registered,
+      membersNew: membersCreated,
+      reviews: reviewsPeriod,
+      subscribeViews: subscribePageViews,
+      founderRdv: founderRdvPeriod,
+    },
+    rates: {
+      previewToRequest: rate(reqStats.total, previewTotal),
+      requestToRegistered: rate(reqStats.registered, reqStats.total),
+      viewToPreview: rate(previewTotal, pageViews),
+      viewToSubscribe: rate(subscribePageViews, pageViews),
+      avgDaysToRegister: avgConversionDays != null ? Math.round(avgConversionDays * 10) / 10 : null,
+      conversionSample,
+    },
+    funnel: {
+      received: reqStats.received,
+      quote_sent: reqStats.quote_sent,
+      paid: reqStats.paid,
+      code_issued: reqStats.code_issued,
+      registered: reqStats.registered,
+      total: reqStats.total,
+    },
+    pipelineAll: {
+      received: pipelineAll.received || 0,
+      quote_sent: pipelineAll.quote_sent || 0,
+      paid: pipelineAll.paid || 0,
+      code_issued: pipelineAll.code_issued || 0,
+      registered: pipelineAll.registered || 0,
+    },
+    members: {
+      total: membersTotal,
+      essentiel: planMembers.essentiel || 0,
+      pro: planMembers.pro || 0,
+      active: statusMembers.active || 0,
+      trialing: statusMembers.trialing || 0,
+      past_due: statusMembers.past_due || 0,
+      unpaid: statusMembers.unpaid || 0,
+      canceled: statusMembers.canceled || 0,
+      incomplete: statusMembers.incomplete || 0,
+    },
+    trades: membersByTrade.map((row) => ({ label: row._id, count: row.count })),
+    reviews: {
+      approved: reviewsApproved,
+      pending: reviewsPending,
+      newInPeriod: reviewsPeriod,
+    },
+    deletions: {
+      pending: deletionsPending,
+      acceptedInPeriod: deletionsAccepted,
+    },
+    founderBookings: {
+      inPeriod: founderRdvPeriod,
+      converted: founderRdvConverted,
+      outcomePending: founderRdvPending,
+    },
+    topPaths: topPaths.map((row) => ({ path: row._id, count: row.count })),
+    topSources: topSources.map((row) => ({ source: row._id || 'direct', count: row.count })),
+    series: {
+      views: dailyViews.map((row) => ({ day: row._id, count: row.count })),
+      previews: dailyPreviews.map((row) => ({ day: row._id, count: row.count })),
+      requests: dailyRequests.map((row) => ({ day: row._id, count: row.count })),
+    },
+  })
 })
 
 module.exports = router

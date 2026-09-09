@@ -6,15 +6,16 @@ import PublicLayout from './components/layouts/PublicLayout'
 import { GuestOnly, ProtectedRoute } from './components/ProtectedRoute'
 import DashboardLayout from './Pages/dashboard/DashboardLayout'
 import Appointments from './Pages/dashboard/Appointments'
+import Absences from './Pages/dashboard/Absences'
 import Clients from './Pages/dashboard/Clients'
 import Finances from './Pages/dashboard/Finances'
-import Inbox from './Pages/dashboard/Inbox'
 import Journal from './Pages/dashboard/Journal'
 import Notes from './Pages/dashboard/Notes'
 import Overview from './Pages/dashboard/Overview'
 import Prospects from './Pages/dashboard/Prospects'
 import Reminders from './Pages/dashboard/Reminders'
 import Settings from './Pages/dashboard/Settings'
+import Subscription from './Pages/dashboard/Subscription'
 import Stats from './Pages/dashboard/Stats'
 import QrCodePage from './Pages/dashboard/QrCode'
 import Page from './Pages/dashboard/Page'
@@ -28,7 +29,9 @@ import FounderBooking from './Pages/FounderBooking'
 import Register from './Pages/Register'
 import Onboarding from './Pages/Onboarding'
 import Subscribe from './Pages/Subscribe'
+import BillingLock from './Pages/BillingLock'
 import PreviewExpiryWatcher from './components/PreviewExpiryWatcher'
+import AnalyticsBeacon from './components/AnalyticsBeacon'
 import { canVisitModule } from './data/workspace'
 import { isAdminHost, siteOrigin } from './config/site'
 import PageLoader from './components/PageLoader'
@@ -108,6 +111,15 @@ function PublicApp() {
           </Route>
 
           <Route
+            path="/facture"
+            element={
+              <ProtectedRoute>
+                <BillingLock />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/president"
             element={
               <ProtectedRoute requirePresident>
@@ -169,6 +181,14 @@ function PublicApp() {
               }
             />
             <Route
+              path="conges"
+              element={
+                <ModuleRoute id="appointments">
+                  <Absences />
+                </ModuleRoute>
+              }
+            />
+            <Route
               path="finances"
               element={
                 <ModuleRoute id="finances">
@@ -184,14 +204,7 @@ function PublicApp() {
                 </ModuleRoute>
               }
             />
-            <Route
-              path="inbox"
-              element={
-                <ModuleRoute id="inbox">
-                  <Inbox />
-                </ModuleRoute>
-              }
-            />
+            <Route path="inbox" element={<Navigate to="/dashboard" replace />} />
             <Route
               path="statistiques"
               element={
@@ -200,8 +213,9 @@ function PublicApp() {
                 </ModuleRoute>
               }
             />
-            <Route path="automatisation" element={<Navigate to="/dashboard/inbox" replace />} />
+            <Route path="automatisation" element={<Navigate to="/dashboard" replace />} />
             <Route path="parametres" element={<Settings />} />
+            <Route path="abonnement" element={<Subscription />} />
             <Route
               path="page"
               element={
@@ -234,6 +248,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <PreviewExpiryWatcher />
+        <AnalyticsBeacon />
         {isAdminHost() ? (
           <AdminGate>
             <AdminApp />

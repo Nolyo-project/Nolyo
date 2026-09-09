@@ -1,6 +1,8 @@
 const express = require('express')
 const { plans, getPlan } = require('../config/plans')
 const SubscriptionRequest = require('../models/SubscriptionRequest')
+const { sendRequestReceived } = require('../utils/emails')
+const { createCustomerForRequest } = require('../utils/stripe')
 
 const router = express.Router()
 
@@ -57,9 +59,17 @@ router.post('/', async (req, res) => {
     status: 'received',
   })
 
+  try {
+    await createCustomerForRequest(request)
+  } catch (err) {
+    console.error('Stripe customer', err.message)
+  }
+
+  sendRequestReceived(request).catch((err) => console.error('Mail demande', err.message))
+
   res.status(201).json({
     message:
-      'Votre demande a bien été transmise. Vous recevrez un devis, puis un code unique pour vous inscrire.',
+      'Votre demande a bien été transmise. Un e-mail de confirmation vous a été envoyé. Vous recevrez ensuite un devis, puis un code unique pour vous inscrire. Le premier mois est offert.',
     request: {
       id: request._id,
       plan: request.plan,

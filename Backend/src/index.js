@@ -6,7 +6,8 @@ const cors = require('cors')
 const express = require('express')
 const { connectDb } = require('./config/db')
 const { ensurePresident } = require('./seed/president')
-const { ensureDemoAccounts, DEMO_EMAILS } = require('./seed/demoMember')
+const { ensureDemoAccounts, DEMO_EMAILS, ensurePreviewAccount } = require('./seed/demoMember')
+const { ensureSeedSiteReviews } = require('./utils/siteReviews')
 const User = require('./models/User')
 const healthRouter = require('./routes/health')
 const itemsRouter = require('./routes/items')
@@ -16,6 +17,11 @@ const presidentRouter = require('./routes/president')
 const notesRouter = require('./routes/notes')
 const workspaceRouter = require('./routes/workspace')
 const publicRouter = require('./routes/public')
+const { handleStripeWebhook } = require('./routes/stripeWebhook')
+const billingRouter = require('./routes/billing')
+const { runBillingJobs } = require('./jobs/billing')
+const { runReminderJobs } = require('./jobs/reminders')
+const { schedule: scheduleCron } = require('node-cron')
 const { UPLOAD_ROOT } = require('./utils/uploads')
 
 function fillMissingEnv() {
@@ -65,6 +71,7 @@ app.use(
     origin: corsOrigin,
   }),
 )
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook)
 app.use(express.json())
 app.use('/uploads', express.static(UPLOAD_ROOT))
 
@@ -76,6 +83,15 @@ app.use('/api/president', presidentRouter)
 app.use('/api/notes', notesRouter)
 app.use('/api/workspace', workspaceRouter)
 app.use('/api/public', publicRouter)
+app.use('/api/billing', billingRouter)
+app.get('/robots.txt', (req, res, next) => {
+  req.url = '/robots.txt'
+  return publicRouter.handle(req, res, next)
+})
+app.get('/sitemap.xml', (req, res, next) => {
+  req.url = '/sitemap.xml'
+  return publicRouter.handle(req, res, next)
+})
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route introuvable.' })
@@ -89,7 +105,12 @@ app.use((err, _req, res, _next) => {
 async function start() {
   await connectDb()
   await ensurePresident()
-  await ensureDemoAccounts()
+  if (process.env.DEMO_SEED === '1' || process.env.DEMO_SEED === 'true') {
+    await ensureDemoAccounts()
+  } else {
+    await ensurePreviewAccount()
+  }
+  await ensureSeedSiteReviews()
   await User.updateMany(
     {
       role: 'member',
@@ -123,6 +144,20 @@ async function start() {
       reject(err)
     })
   })
+
+  scheduleCron(
+    '15 8 * * *',
+    () => {
+      runBillingJobs().catch((err) => console.error('billing job', err))
+    },
+    { timezone: 'Europe/Paris' },
+  )
+  scheduleCron('* * * * *', () => {
+    runReminderJobs().catch((err) => console.error('reminder jobs', err))
+  })
+  setTimeout(() => {
+    runBillingJobs().catch((err) => console.error('billing job', err))
+  }, 8000)
 }
 
 start().catch((err) => {

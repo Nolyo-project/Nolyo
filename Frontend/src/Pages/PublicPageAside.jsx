@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { isQuoteService } from '../data/pageTheme'
+import { isHeadingService, isQuoteService } from '../data/pageTheme'
 
 function Svg({ children, className = 'h-5 w-5' }) {
   return (
@@ -38,6 +38,12 @@ const ICONS = {
       <circle cx="12" cy="10.8" r="1.8" stroke="currentColor" strokeWidth="1.7" />
     </Svg>
   ),
+  hours: (
+    <Svg>
+      <circle cx="12" cy="12" r="8.2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Svg>
+  ),
   instagram: (
     <Svg>
       <rect x="4" y="4" width="16" height="16" rx="4.5" stroke="currentColor" strokeWidth="1.7" />
@@ -66,6 +72,41 @@ const SOCIALS = [
   { kind: 'facebook', label: 'Facebook' },
   { kind: 'linkedin', label: 'LinkedIn' },
 ]
+
+const DAY_NAMES = {
+  0: 'Dimanche',
+  1: 'Lundi',
+  2: 'Mardi',
+  3: 'Mercredi',
+  4: 'Jeudi',
+  5: 'Vendredi',
+  6: 'Samedi',
+}
+
+function formatHoursLabel(hours) {
+  if (!hours) return ''
+  const days = Array.isArray(hours.workDays) ? hours.workDays : []
+  if (!days.length) return ''
+  const names = days.map((d) => DAY_NAMES[d] || '').filter(Boolean)
+  let dayPart = ''
+  if (names.length === 1) dayPart = names[0]
+  else if (names.length > 1) dayPart = `${names[0]} – ${names[names.length - 1]}`
+  const timePart =
+    hours.workStart && hours.workEnd ? `${hours.workStart.replace(':', 'h')} – ${hours.workEnd.replace(':', 'h')}` : ''
+  return [dayPart, timePart].filter(Boolean).join(' · ')
+}
+
+function mapsUrl(page) {
+  if (page?.lat != null && page?.lng != null) {
+    return `https://www.google.com/maps?q=${page.lat},${page.lng}`
+  }
+  const q = [page?.address, page?.postalCode, page?.city].filter(Boolean).join(', ')
+  return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : ''
+}
+
+function addressLabel(page) {
+  return [page?.address, [page?.postalCode, page?.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+}
 
 function ContactRow({ item }) {
   const inner = (
@@ -97,8 +138,9 @@ function ContactRow({ item }) {
 export function publicPageChrome(page, slug) {
   const services = page?.services || []
   const quoteService = services.find((item) => isQuoteService(item))
-  const sessionServices = services.filter((item) => !isQuoteService(item))
-  const bookingPath = page?.bookingAvailable ? `/p/${slug}/reserver` : ''
+  const sessionServices = services.filter((item) => !isQuoteService(item) && !isHeadingService(item))
+  const bookingAvailable = Boolean(page?.bookingAvailable) && services.some((item) => !isHeadingService(item))
+  const bookingPath = bookingAvailable ? `/p/${slug}/reserver` : ''
   const quotePath = quoteService ? `/p/${slug}/reserver?type=devis` : ''
   const bookHref = page?.phone
     ? `tel:${page.phone.replace(/\s/g, '')}`
@@ -120,11 +162,28 @@ export function publicPageChrome(page, slug) {
               external: true,
             }
           : null,
-        page.address ? { key: 'address', title: 'Adresse', href: '', label: page.address } : null,
+        addressLabel(page)
+          ? {
+              key: 'address',
+              title: 'Adresse',
+              href: mapsUrl(page),
+              label: addressLabel(page),
+              external: Boolean(mapsUrl(page)),
+            }
+          : null,
+        formatHoursLabel(page.hours)
+          ? {
+              key: 'hours',
+              title: 'Horaires',
+              href: '',
+              label: [formatHoursLabel(page.hours), page.hours?.note].filter(Boolean).join(' — '),
+            }
+          : null,
       ].filter(Boolean)
     : []
   const socials = SOCIALS.map((item) => ({ ...item, href: page?.[item.kind] })).filter((item) => item.href)
-  const hasAside = contacts.length > 0 || socials.length > 0 || Boolean(bookHref) || Boolean(bookingPath)
+  const hasMap = page?.lat != null && page?.lng != null
+  const hasAside = contacts.length > 0 || socials.length > 0 || Boolean(bookHref) || Boolean(bookingPath) || hasMap
   return {
     services,
     quoteService,
@@ -135,6 +194,8 @@ export function publicPageChrome(page, slug) {
     contacts,
     socials,
     hasAside,
+    hasMap,
+    mapsHref: mapsUrl(page),
   }
 }
 
@@ -145,8 +206,17 @@ export function publicPageMainClass(hasAside) {
 }
 
 export function PublicPageAside({ page, slug, copy }) {
-  const { contacts, socials, bookingPath, quotePath, sessionServices, bookHref, hasAside } = publicPageChrome(page, slug)
+  const { contacts, socials, bookingPath, quotePath, sessionServices, bookHref, hasAside, hasMap, mapsHref } =
+    publicPageChrome(page, slug)
   if (!hasAside) return null
+
+  const delta = 0.012
+  const mapSrc =
+    hasMap
+      ? `https://www.openstreetmap.org/export/embed.html?bbox=${page.lng - delta}%2C${page.lat - delta}%2C${
+          page.lng + delta
+        }%2C${page.lat + delta}&layer=mapnik&marker=${page.lat}%2C${page.lng}`
+      : ''
 
   return (
     <aside className="mt-12 min-w-0 lg:sticky lg:top-8 lg:mt-2">
@@ -162,8 +232,27 @@ export function PublicPageAside({ page, slug, copy }) {
           </ul>
         ) : null}
 
-        {socials.length ? (
+        {hasMap ? (
           <div className={`${contacts.length ? 'mt-2 border-t border-ink/8 pt-6' : 'mt-6'}`}>
+            <p className="page-muted text-[10px] font-semibold tracking-[0.18em] uppercase">Sur la carte</p>
+            <div className="mt-4 overflow-hidden rounded-[1.2rem] ring-1 ring-ink/8">
+              <iframe title="Carte" src={mapSrc} className="h-52 w-full border-0" loading="lazy" />
+            </div>
+            {mapsHref ? (
+              <a
+                href={mapsHref}
+                target="_blank"
+                rel="noreferrer"
+                className="page-accent mt-3 inline-block text-sm font-medium underline underline-offset-4"
+              >
+                Ouvrir dans Maps
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+
+        {socials.length ? (
+          <div className={`${contacts.length || hasMap ? 'mt-2 border-t border-ink/8 pt-6' : 'mt-6'}`}>
             <p className="page-muted text-[10px] font-semibold tracking-[0.18em] uppercase">Réseaux</p>
             <ul className="mt-4 flex flex-wrap gap-2.5">
               {socials.map((item) => (

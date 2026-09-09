@@ -122,19 +122,6 @@ function Login() {
         >
           {pending ? 'Connexion…' : 'Se connecter'}
         </button>
-        {admin ? null : (
-          <p className="text-center text-xs text-ink-soft">
-            Mot de passe : NolioDemo2026!
-            <br />
-            Soins : ines@nolio.test
-            <br />
-            Développeur : adam@nolio.test
-            <br />
-            Photo : maya@nolio.test
-            <br />
-            Coiffure : leo@nolio.test
-          </p>
-        )}
       </form>
     </div>
   )

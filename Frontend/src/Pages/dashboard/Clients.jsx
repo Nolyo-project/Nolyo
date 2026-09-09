@@ -262,7 +262,9 @@ function Clients({ mode = 'clients' }) {
   useEffect(() => {
     load().catch((err) => setError(err.message))
     api('/api/workspace/services')
-      .then((data) => setCatalog((data.services || []).filter((item) => item.active !== false)))
+      .then((data) =>
+        setCatalog((data.services || []).filter((item) => item.active !== false && item.kind !== 'heading')),
+      )
       .catch(() => {})
     function refresh() {
       load().catch((err) => setError(err.message))

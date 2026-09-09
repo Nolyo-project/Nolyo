@@ -90,9 +90,13 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
   const [pending, setPending] = useState(false)
   const [selected, setSelected] = useState(null)
   const [drag, setDrag] = useState(null)
+  const [rdvTab, setRdvTab] = useState('agenda')
+  const [outcomes, setOutcomes] = useState({ ended: [], converted: [], counts: {} })
+  const [outcomePending, setOutcomePending] = useState('')
   const dragRef = useRef(null)
   const ghostRef = useRef(null)
   const suppressClickRef = useRef(false)
+  const isFounder = variant === 'founder'
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
   const slots = useMemo(
@@ -145,15 +149,31 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
     setContacts(carnet.contacts || [])
   }
 
+  async function loadOutcomes() {
+    if (!isFounder) return
+    const data = await api(`${base}/appointment-outcomes`)
+    setOutcomes({
+      ended: data.ended || [],
+      converted: data.converted || [],
+      counts: data.counts || {},
+    })
+  }
+
   useEffect(() => {
     loadWeek(weekStart).catch((err) => setError(err.message))
     function refresh() {
       if (dragRef.current?.activated) return
       loadWeek(weekStart).catch((err) => setError(err.message))
+      if (isFounder) loadOutcomes().catch(() => {})
     }
     window.addEventListener('nolio-workspace-changed', refresh)
     return () => window.removeEventListener('nolio-workspace-changed', refresh)
   }, [weekStart])
+
+  useEffect(() => {
+    if (!isFounder || rdvTab === 'agenda') return
+    loadOutcomes().catch((err) => setError(err.message))
+  }, [isFounder, rdvTab])
 
   useEffect(() => {
     if (!drag) return undefined
@@ -277,6 +297,19 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
     setAppointments((current) => current.filter((item) => item._id !== id))
     setSelected(null)
     window.dispatchEvent(new Event('nolio-workspace-changed'))
+  }
+
+  async function setClientOutcome(id, clientOutcome) {
+    setOutcomePending(id)
+    setError('')
+    try {
+      await api(`${base}/appointments/${id}`, { method: 'PATCH', body: { clientOutcome } })
+      await loadOutcomes()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setOutcomePending('')
+    }
   }
 
   function hoverFromPoint(clientX, clientY, item) {
@@ -462,7 +495,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
             <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">{copy.agendaKicker}</p>
             <h1 className="font-display text-2xl tracking-tight">{copy.appointments}</h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">{weekActions}</div>
+          {rdvTab === 'agenda' ? <div className="flex flex-wrap items-center gap-2">{weekActions}</div> : null}
         </div>
       ) : (
         <PageHeader
@@ -472,6 +505,79 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
           actions={weekActions}
         />
       )}
+
+      {isFounder ? (
+        <div className="mt-3 flex shrink-0 flex-wrap gap-2">
+          {[
+            ['agenda', 'Agenda'],
+            ['ended', `Terminés · ${outcomes.counts.ended || 0}`],
+            ['converted', `Clients · ${outcomes.counts.converted || 0}`],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setRdvTab(id)}
+              className={`rounded-full px-3.5 py-1.5 text-sm ${rdvTab === id ? 'bg-moss text-cream' : 'bg-cream ring-1 ring-ink/8'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {error ? <p className="mt-3 shrink-0 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
+
+      {isFounder && rdvTab !== 'agenda' ? (
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+          {(rdvTab === 'converted' ? outcomes.converted : outcomes.ended).length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-ink/12 bg-cream/40 px-6 py-12 text-center text-sm text-ink-soft">
+              {rdvTab === 'converted'
+                ? 'Personne n’est encore passé de rendez-vous à client.'
+                : 'Aucun rendez-vous terminé pour le moment.'}
+            </div>
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {(rdvTab === 'converted' ? outcomes.converted : outcomes.ended).map((item) => (
+                <li key={item._id} className="rounded-[1.4rem] bg-cream p-5 ring-1 ring-ink/6">
+                  <p className="font-medium">{personName(item.contact, item.title)}</p>
+                  <p className="mt-1 text-sm text-ink-soft">
+                    {new Date(item.startAt).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}{' '}
+                    · {formatTime(item.startAt)}
+                  </p>
+                  {item.contact?.email ? <p className="mt-1 truncate text-xs text-ink-soft">{item.contact.email}</p> : null}
+                  <p className={`mt-3 text-sm font-medium ${item.isConverted ? 'text-moss' : 'text-ink-soft'}`}>
+                    {item.conversionLabel}
+                  </p>
+                  {rdvTab === 'ended' ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={outcomePending === item._id}
+                        onClick={() => setClientOutcome(item._id, 'converted')}
+                        className="rounded-full bg-moss px-3.5 py-1.5 text-sm font-semibold text-cream disabled:opacity-60"
+                      >
+                        Devenu client
+                      </button>
+                      <button
+                        type="button"
+                        disabled={outcomePending === item._id}
+                        onClick={() => setClientOutcome(item._id, 'not_converted')}
+                        className="rounded-full border border-ink/10 px-3.5 py-1.5 text-sm disabled:opacity-60"
+                      >
+                        Non
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
 
       {settingsOpen ? (
         <Modal onClose={() => setSettingsOpen(false)} panelClassName="max-w-xl">
@@ -556,8 +662,8 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
         </Modal>
       ) : null}
 
-      {error ? <p className="mt-4 shrink-0 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
-
+      {(!isFounder || rdvTab === 'agenda') ? (
+        <>
       <Surface className={fill ? 'mt-4 flex min-h-0 flex-1 flex-col overflow-hidden p-3' : 'mt-6 overflow-x-auto p-4'}>
         <div className={fill ? 'min-h-0 min-w-[52rem] flex-1 overflow-auto' : 'min-w-[52rem]'}>
           {slots.length === 0 ? (
@@ -702,6 +808,8 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
           <p className="truncate text-xs font-semibold">{drag.label}</p>
           <p className="truncate text-[11px] text-cream/85">{drag.hint}</p>
         </div>
+      ) : null}
+        </>
       ) : null}
 
       {booking ? (

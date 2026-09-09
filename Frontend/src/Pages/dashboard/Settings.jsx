@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, apiUpload } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
-import { formatPrice, isProPlan, planLabels, plans } from '../../data/plans'
-import { fieldClass, normalizeDepositPlan, trialDaysLeft } from './format'
+import { isProPlan } from '../../data/plans'
+import { fieldClass, normalizeDepositPlan } from './format'
 import { DepositPlanEditor } from './DepositPlanEditor'
 import { ServicesEditor } from './ServicesEditor'
 import { Accordion, Avatar, PageHeader, PageShell, ghostBtn, icons, primaryBtn, quietBtn } from './ui'
 import { MODULES, workspaceForUser } from '../../data/workspace'
+import { ensurePushSubscription } from '../../utils/push'
 
 const LEGAL_FORMS = [
   'Micro-entreprise',
@@ -45,6 +46,7 @@ const emptyBusiness = {
 function Settings() {
   const { user, updateUser, logout } = useAuth()
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
   const isPro = isProPlan(user)
   const [open, setOpen] = useState({
     workspace: true,
@@ -53,8 +55,8 @@ function Settings() {
     business: false,
     deposits: false,
     followUp: false,
+    notifications: false,
     password: false,
-    plan: false,
     session: false,
     deletion: false,
   })
@@ -65,8 +67,24 @@ function Settings() {
   const [depositPlan, setDepositPlan] = useState(() => normalizeDepositPlan(user.depositPlan))
   const [followUp, setFollowUp] = useState({
     quoteFollowUpDays: user.quoteFollowUpDays ?? 3,
-    quoteFollowUpChannel: user.quoteFollowUpChannel === 'phone' ? 'phone' : 'email',
+    quoteFollowUpChannel:
+      user.quoteFollowUpChannel === 'phone' || user.quoteFollowUpChannel === 'both'
+        ? user.quoteFollowUpChannel
+        : 'email',
   })
+  const [notif, setNotif] = useState(() => ({
+    emailBooking: user.notifications?.emailBooking !== false,
+    pushBooking: user.notifications?.pushBooking !== false,
+    pushReminders: user.notifications?.pushReminders !== false,
+    pushRelances: user.notifications?.pushRelances !== false,
+    reminderMinutes: user.notifications?.reminderMinutes || 15,
+    clientBookingEmailSubject: user.notifications?.clientBookingEmailSubject || '',
+    clientBookingEmailBody: user.notifications?.clientBookingEmailBody || '',
+  }))
+  const [notifError, setNotifError] = useState('')
+  const [notifOk, setNotifOk] = useState('')
+  const [pendingNotif, setPendingNotif] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirm: '' })
   const [profileError, setProfileError] = useState('')
   const [passwordError, setPasswordError] = useState('')
@@ -93,21 +111,48 @@ function Settings() {
   const [pendingDeletion, setPendingDeletion] = useState(false)
   const deletion = user.deletionRequest
 
-  const planId = user.subscription?.plan
-  const plan = plans.find((item) => item.id === planId)
-  const planName = planLabels[planId] || 'Nolyo'
-  const trialDays = trialDaysLeft(user.subscription?.activatedAt)
-
   useEffect(() => {
     setProfile({ name: user.name, email: user.email })
     setBusiness({ ...emptyBusiness, ...(user.business || {}) })
     setDepositPlan(normalizeDepositPlan(user.depositPlan))
     setFollowUp({
       quoteFollowUpDays: user.quoteFollowUpDays ?? 3,
-      quoteFollowUpChannel: user.quoteFollowUpChannel === 'phone' ? 'phone' : 'email',
+      quoteFollowUpChannel:
+      user.quoteFollowUpChannel === 'phone' || user.quoteFollowUpChannel === 'both'
+        ? user.quoteFollowUpChannel
+        : 'email',
+    })
+    setNotif({
+      emailBooking: user.notifications?.emailBooking !== false,
+      pushBooking: user.notifications?.pushBooking !== false,
+      pushReminders: user.notifications?.pushReminders !== false,
+      pushRelances: user.notifications?.pushRelances !== false,
+      reminderMinutes: user.notifications?.reminderMinutes || 15,
+      clientBookingEmailSubject: user.notifications?.clientBookingEmailSubject || '',
+      clientBookingEmailBody: user.notifications?.clientBookingEmailBody || '',
     })
     setWorkspace(workspaceForUser(user))
-  }, [user.name, user.email, user.business, user.depositPlan, user.quoteFollowUpDays, user.quoteFollowUpChannel, user.workspace])
+  }, [
+    user.name,
+    user.email,
+    user.business,
+    user.depositPlan,
+    user.quoteFollowUpDays,
+    user.quoteFollowUpChannel,
+    user.notifications,
+    user.workspace,
+  ])
+
+  useEffect(() => {
+    if (params.get('suppression') !== '1') return
+    setOpen((current) => ({ ...current, deletion: true }))
+    const next = new URLSearchParams(params)
+    next.delete('suppression')
+    setParams(next, { replace: true })
+    window.requestAnimationFrame(() => {
+      document.getElementById('settings-deletion')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [params, setParams])
 
   function toggle(key) {
     setOpen((current) => ({ ...current, [key]: !current[key] }))
@@ -179,6 +224,41 @@ function Settings() {
       setFollowUpError(err.message)
     } finally {
       setPendingFollowUp(false)
+    }
+  }
+
+  async function saveNotifications(event) {
+    event.preventDefault()
+    setNotifError('')
+    setNotifOk('')
+    setPendingNotif(true)
+    try {
+      const data = await api('/api/auth/me', {
+        method: 'PATCH',
+        body: { notifications: notif },
+      })
+      updateUser(data.user)
+      setNotifOk('Notifications enregistrées.')
+    } catch (err) {
+      setNotifError(err.message)
+    } finally {
+      setPendingNotif(false)
+    }
+  }
+
+  async function enablePush() {
+    setNotifError('')
+    setNotifOk('')
+    setPushBusy(true)
+    try {
+      const nextUser = await ensurePushSubscription()
+      updateUser(nextUser)
+      setNotifOk('Notifications activées sur cet appareil.')
+      await api('/api/workspace/push/test', { method: 'POST' })
+    } catch (err) {
+      setNotifError(err.message)
+    } finally {
+      setPushBusy(false)
     }
   }
 
@@ -344,7 +424,7 @@ function Settings() {
   const modulesOn = MODULES.filter((item) => workspace.modules[item.id] && !(item.plan === 'pro' && !isPro))
   const modulesOff = MODULES.filter((item) => !workspace.modules[item.id] && !(item.plan === 'pro' && !isPro))
   const modulesLocked = MODULES.filter((item) => item.plan === 'pro' && !isPro)
-  const showServices = Boolean(workspace.modules.appointments || workspace.modules.page)
+  const showServices = Boolean(workspace.modules.appointments && !workspace.modules.page)
   const showDeposits = Boolean(workspace.modules.deposits)
   const showQuotes = Boolean(workspace.modules.quotes)
 
@@ -465,7 +545,7 @@ function Settings() {
                   </li>
                 ))}
               </ul>
-              <Link to="/abonnement?plan=pro" className={`${primaryBtn} mt-5`}>
+              <Link to="/dashboard/abonnement?upgrade=pro" className={`${primaryBtn} mt-5`}>
                 Passer à Nolyo Pro
               </Link>
             </section>
@@ -522,11 +602,7 @@ function Settings() {
         {showServices ? (
         <Accordion
           title="Prestations"
-          hint={
-            isPro
-              ? 'Nom, prix, durée. Elles apparaissent sur la page de réservation.'
-              : 'Nom, prix, durée. Elles servent dans l’agenda.'
-          }
+          hint="Nom, prix, durée. Elles servent dans l’agenda."
           open={open.services}
           onToggle={() => toggle('services')}
         >
@@ -756,6 +832,7 @@ function Settings() {
               >
                 <option value="email">E-mail</option>
                 <option value="phone">Téléphone</option>
+                <option value="both">E-mail et téléphone</option>
               </select>
             </label>
             {followUpError ? (
@@ -770,6 +847,87 @@ function Settings() {
           </form>
         </Accordion>
         ) : null}
+
+        <Accordion
+          title="Notifications"
+          hint="E-mails de confirmation, rappels et notifications téléphone / ordinateur."
+          open={open.notifications}
+          onToggle={() => toggle('notifications')}
+        >
+          <form onSubmit={saveNotifications} className="space-y-4">
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={notif.emailBooking}
+                onChange={(event) => setNotif((current) => ({ ...current, emailBooking: event.target.checked }))}
+              />
+              Recevoir un e-mail quand un rendez-vous est pris
+            </label>
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={notif.pushBooking}
+                onChange={(event) => setNotif((current) => ({ ...current, pushBooking: event.target.checked }))}
+              />
+              Notification push pour un nouveau rendez-vous
+            </label>
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={notif.pushReminders}
+                onChange={(event) => setNotif((current) => ({ ...current, pushReminders: event.target.checked }))}
+              />
+              Rappel avant le rendez-vous
+            </label>
+            <label className="block text-sm font-medium">
+              Rappeler
+              <select
+                className={fieldClass}
+                value={notif.reminderMinutes}
+                onChange={(event) =>
+                  setNotif((current) => ({ ...current, reminderMinutes: Number(event.target.value) }))
+                }
+              >
+                <option value={5}>5 minutes avant</option>
+                <option value={10}>10 minutes avant</option>
+                <option value={15}>15 minutes avant</option>
+                <option value={30}>30 minutes avant</option>
+                <option value={60}>1 heure avant</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={notif.pushRelances}
+                onChange={(event) => setNotif((current) => ({ ...current, pushRelances: event.target.checked }))}
+              />
+              Notifications pour les relances
+            </label>
+
+            <p className="rounded-2xl bg-paper px-4 py-3 text-sm text-ink-soft">
+              L’e-mail envoyé au client se personnalise dans{' '}
+              <Link to="/dashboard/page" className="font-medium text-moss underline">
+                Page → E-mail
+              </Link>
+              .
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" disabled={pushBusy} className={quietBtn} onClick={enablePush}>
+                {pushBusy
+                  ? 'Activation…'
+                  : user.notifications?.pushEnabled
+                    ? 'Réactiver sur cet appareil'
+                    : 'Autoriser les notifications'}
+              </button>
+              <button type="submit" disabled={pendingNotif} className={primaryBtn}>
+                {pendingNotif ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            </div>
+            {notifError ? <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{notifError}</p> : null}
+            {notifOk ? <p className="text-sm text-moss">{notifOk}</p> : null}
+          </form>
+        </Accordion>
 
         <Accordion
           title="Mot de passe"
@@ -826,35 +984,6 @@ function Settings() {
           </form>
         </Accordion>
 
-        <Accordion title="Abonnement" hint={planName} open={open.plan} onToggle={() => toggle('plan')}>
-          <p className="text-sm font-medium">{planName}</p>
-          {plan ? (
-            <p className="mt-1 text-sm text-ink-soft">
-              {formatPrice(plan.price)} / {plan.period}
-              {plan.trial ? ` · ${plan.trial}` : ''}
-              {plan.commitment ? ` · ${plan.commitment}` : ''}
-              {plan.totalMonths ? ` · ${plan.totalMonths} mois au total` : ''}
-            </p>
-          ) : null}
-          <p className="mt-4 text-sm text-ink-soft">
-            {trialDays > 0
-              ? `${trialDays} jour${trialDays > 1 ? 's' : ''} restant${trialDays > 1 ? 's' : ''} de la période gratuite.`
-              : 'Période gratuite terminée.'}
-          </p>
-          {isProPlan(user) ? (
-            <p className="mt-4 text-sm text-moss">Vous avez tout Nolyo.</p>
-          ) : (
-            <>
-              <p className="mt-4 text-sm text-ink-soft">
-                Inbox, statistiques, page professionnelle et QR Code restent dans Nolyo Pro.
-              </p>
-              <Link to="/abonnement?plan=pro" className={`${primaryBtn} mt-5`}>
-                Passer à Nolyo Pro
-              </Link>
-            </>
-          )}
-        </Accordion>
-
         <Accordion
           title="Session"
           hint="Déconnexion de cet appareil."
@@ -867,6 +996,7 @@ function Settings() {
         </Accordion>
 
         <Accordion
+          id="settings-deletion"
           title="Supprimer le compte"
           hint="Un message au fondateur. Rien ne part sans son accord."
           open={open.deletion}

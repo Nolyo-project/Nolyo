@@ -37,7 +37,15 @@ function requireSubscription(req, res, next) {
     return res.status(403).json({ error: 'Utilisez le dashboard président.' })
   }
 
-  if (req.user.subscription?.status !== 'active') {
+  const { hasWorkspaceAccess, needsPayment } = require('../utils/billing')
+  if (needsPayment(req.user)) {
+    return res.status(403).json({
+      error: 'Réglez votre facture pour rouvrir le tableau de bord.',
+      code: 'BILLING_LOCK',
+    })
+  }
+
+  if (!hasWorkspaceAccess(req.user)) {
     return res.status(403).json({
       error: 'Un abonnement actif est requis.',
       code: 'SUBSCRIPTION_REQUIRED',

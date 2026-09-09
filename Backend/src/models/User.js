@@ -10,12 +10,44 @@ const subscriptionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['none', 'active'],
+      enum: ['none', 'active', 'trialing', 'past_due', 'unpaid', 'canceled'],
       default: 'none',
     },
     company: { type: String, trim: true, default: '' },
     teamSize: { type: String, trim: true, default: '' },
     activatedAt: Date,
+    trialEndsAt: Date,
+    currentPeriodEnd: Date,
+    paidAt: Date,
+    reminderSentAt: Date,
+    invoiceNoticeAt: Date,
+    stripeCustomerId: { type: String, trim: true, default: '' },
+    stripeSubscriptionId: { type: String, trim: true, default: '' },
+    stripePriceId: { type: String, trim: true, default: '' },
+    hasPaymentMethod: { type: Boolean, default: false },
+    collectionMethod: {
+      type: String,
+      enum: ['charge_automatically', 'send_invoice', ''],
+      default: '',
+    },
+    nextInvoiceAt: Date,
+    /** auto = carte + prélèvement · invoice = payer chaque mois · stop = demande d’arrêt */
+    billingChoice: {
+      type: String,
+      enum: ['auto', 'invoice', 'stop', ''],
+      default: '',
+    },
+    billingChoiceAt: Date,
+    billingPromptSeenAt: Date,
+    /** Fin des 7 mois (1 offert + 6 engagement) */
+    commitmentEndsAt: Date,
+    commitmentChoice: {
+      type: String,
+      enum: ['continue_auto', 'continue_invoice', 'stop', ''],
+      default: '',
+    },
+    commitmentChoiceAt: Date,
+    commitmentPromptSeenAt: Date,
   },
   { _id: false },
 )
@@ -139,6 +171,13 @@ const workspaceSchema = new mongoose.Schema(
 
 const DEFAULT_THEME = { accent: '#c45c26', background: '#f3eee4', surface: '#ffffff' }
 
+const DEFAULT_PAGE_HOURS = {
+  workStart: '09:00',
+  workEnd: '18:00',
+  workDays: [1, 2, 3, 4, 5],
+  note: '',
+}
+
 const PAGE_DEFAULTS = {
   slug: '',
   published: false,
@@ -151,8 +190,13 @@ const PAGE_DEFAULTS = {
   linkedin: '',
   website: '',
   address: '',
+  city: '',
+  postalCode: '',
+  lat: null,
+  lng: null,
   phone: '',
   email: '',
+  hours: { ...DEFAULT_PAGE_HOURS, workDays: [...DEFAULT_PAGE_HOURS.workDays] },
   theme: { ...DEFAULT_THEME },
   about: { body: '', people: [] },
 }
@@ -204,12 +248,33 @@ function pickTheme(source = {}) {
   }
 }
 
+function pickPageHours(source = {}) {
+  const start = String(source?.workStart || DEFAULT_PAGE_HOURS.workStart).trim()
+  const end = String(source?.workEnd || DEFAULT_PAGE_HOURS.workEnd).trim()
+  const days = Array.isArray(source?.workDays)
+    ? source.workDays.map(Number).filter((d) => d >= 0 && d <= 6)
+    : [...DEFAULT_PAGE_HOURS.workDays]
+  return {
+    workStart: /^\d{2}:\d{2}$/.test(start) ? start : DEFAULT_PAGE_HOURS.workStart,
+    workEnd: /^\d{2}:\d{2}$/.test(end) ? end : DEFAULT_PAGE_HOURS.workEnd,
+    workDays: days.length ? [...new Set(days)].sort((a, b) => a - b) : [...DEFAULT_PAGE_HOURS.workDays],
+    note: String(source?.note || '').trim().slice(0, 160),
+  }
+}
+
+function pickGeo(value) {
+  if (value === null || value === undefined || value === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
 function pickPage(source = {}) {
   const next = {
     ...PAGE_DEFAULTS,
     photos: [...PAGE_DEFAULTS.photos],
     theme: { ...DEFAULT_THEME },
     about: { body: '', people: [] },
+    hours: { ...DEFAULT_PAGE_HOURS, workDays: [...DEFAULT_PAGE_HOURS.workDays] },
   }
   if (source.slug !== undefined) next.slug = slugify(source.slug)
   if (source.published !== undefined) next.published = Boolean(source.published)
@@ -221,9 +286,18 @@ function pickPage(source = {}) {
     next.photos = [0, 1, 2].map((i) => String(source.photos?.[i] || '').trim())
   }
   if (source.banner !== undefined) next.banner = String(source.banner).trim().slice(0, 240)
-  for (const key of ['instagram', 'facebook', 'linkedin', 'website', 'address', 'phone', 'email']) {
+  for (const key of ['instagram', 'facebook', 'linkedin', 'website', 'address', 'city', 'postalCode', 'phone', 'email']) {
     if (source[key] !== undefined) next[key] = String(source[key]).trim().slice(0, 200)
   }
+  if (source.lat !== undefined) {
+    const lat = pickGeo(source.lat)
+    next.lat = lat != null && lat >= -90 && lat <= 90 ? lat : null
+  }
+  if (source.lng !== undefined) {
+    const lng = pickGeo(source.lng)
+    next.lng = lng != null && lng >= -180 && lng <= 180 ? lng : null
+  }
+  next.hours = pickPageHours(source.hours)
   next.theme = pickTheme(source.theme)
   next.about = pickAbout(source.about)
   return next
@@ -242,8 +316,18 @@ const pageSchema = new mongoose.Schema(
     linkedin: { type: String, trim: true, default: '', maxlength: 200 },
     website: { type: String, trim: true, default: '', maxlength: 200 },
     address: { type: String, trim: true, default: '', maxlength: 200 },
+    city: { type: String, trim: true, default: '', maxlength: 80 },
+    postalCode: { type: String, trim: true, default: '', maxlength: 20 },
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null },
     phone: { type: String, trim: true, default: '', maxlength: 40 },
     email: { type: String, trim: true, lowercase: true, default: '', maxlength: 120 },
+    hours: {
+      workStart: { type: String, default: '09:00' },
+      workEnd: { type: String, default: '18:00' },
+      workDays: { type: [Number], default: () => [1, 2, 3, 4, 5] },
+      note: { type: String, trim: true, default: '', maxlength: 160 },
+    },
     theme: {
       accent: { type: String, default: '#c45c26', maxlength: 7 },
       background: { type: String, default: '#f3eee4', maxlength: 7 },
@@ -302,8 +386,34 @@ const userSchema = new mongoose.Schema(
       default: () => DEFAULT_DEPOSIT_PLAN.map((step) => ({ ...step })),
     },
     quoteFollowUpDays: { type: Number, min: -1, max: 90, default: 3 },
-    quoteFollowUpChannel: { type: String, enum: ['email', 'phone'], default: 'email' },
+    quoteFollowUpChannel: { type: String, enum: ['email', 'phone', 'both'], default: 'email' },
     avatar: { type: String, trim: true, default: '' },
+    notifications: {
+      type: {
+        emailBooking: { type: Boolean, default: true },
+        pushBooking: { type: Boolean, default: true },
+        pushReminders: { type: Boolean, default: true },
+        pushRelances: { type: Boolean, default: true },
+        reminderMinutes: { type: Number, enum: [5, 10, 15, 30, 60], default: 15 },
+        clientBookingEmailSubject: { type: String, trim: true, default: '', maxlength: 120 },
+        clientBookingEmailBody: { type: String, trim: true, default: '', maxlength: 4000 },
+        pushSubscriptions: {
+          type: [
+            {
+              endpoint: { type: String, required: true },
+              keys: {
+                p256dh: { type: String, default: '' },
+                auth: { type: String, default: '' },
+              },
+              userAgent: { type: String, default: '', maxlength: 200 },
+              createdAt: { type: Date, default: Date.now },
+            },
+          ],
+          default: [],
+        },
+      },
+      default: () => ({}),
+    },
     page: {
       type: pageSchema,
       default: () => ({}),
@@ -342,13 +452,42 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     name: this.name,
     email: this.email,
     role: this.role || 'member',
-    subscription: this.subscription || { status: 'none' },
+    subscription: this.subscription?.toObject?.({ depopulate: true }) || {
+      status: this.subscription?.status || 'none',
+      plan: this.subscription?.plan,
+      company: this.subscription?.company,
+      teamSize: this.subscription?.teamSize,
+      activatedAt: this.subscription?.activatedAt,
+      trialEndsAt: this.subscription?.trialEndsAt,
+      currentPeriodEnd: this.subscription?.currentPeriodEnd,
+      cancelAtPeriodEnd: this.subscription?.cancelAtPeriodEnd,
+      billingMode: this.subscription?.billingMode,
+      stripeCustomerId: this.subscription?.stripeCustomerId,
+      stripeSubscriptionId: this.subscription?.stripeSubscriptionId,
+    },
     business: pickBusiness(this.business?.toObject?.() || this.business),
     depositPlan: pickDepositPlan(this.depositPlan),
     quoteFollowUpDays:
       this.quoteFollowUpDays === undefined || this.quoteFollowUpDays === null ? 3 : this.quoteFollowUpDays,
-    quoteFollowUpChannel: this.quoteFollowUpChannel === 'phone' ? 'phone' : 'email',
+    quoteFollowUpChannel:
+      this.quoteFollowUpChannel === 'phone' || this.quoteFollowUpChannel === 'both'
+        ? this.quoteFollowUpChannel
+        : 'email',
     avatar: this.avatar || '',
+    notifications: {
+      emailBooking: this.notifications?.emailBooking !== false,
+      pushBooking: this.notifications?.pushBooking !== false,
+      pushReminders: this.notifications?.pushReminders !== false,
+      pushRelances: this.notifications?.pushRelances !== false,
+      reminderMinutes: [5, 10, 15, 30, 60].includes(this.notifications?.reminderMinutes)
+        ? this.notifications.reminderMinutes
+        : 15,
+      clientBookingEmailSubject: this.notifications?.clientBookingEmailSubject || '',
+      clientBookingEmailBody: this.notifications?.clientBookingEmailBody || '',
+      pushEnabled: Array.isArray(this.notifications?.pushSubscriptions)
+        ? this.notifications.pushSubscriptions.length > 0
+        : false,
+    },
     page: pickPage(this.page?.toObject?.() || this.page || {}),
     onboarding: {
       completedAt: this.onboarding?.completedAt || null,

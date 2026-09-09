@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '../api/client'
-import TestimonialsCarousel, { reviewFaces, reviewStats } from '../components/TestimonialsCarousel'
+import TestimonialsCarousel, { reviewStats } from '../components/TestimonialsCarousel'
 import TryPreviewButton from '../components/TryPreviewButton'
-import { formatPrice, plans } from '../data/plans'
+import { formatPrice, paymentNote, plans } from '../data/plans'
 
 const dashboardPoints = [
   { title: 'Le fil du jour', text: 'Rendez-vous, relances, ce qui rentre ce mois-ci.' },
-  { title: 'Vos gens', text: 'Clients et prospects : une fiche, des notes, une prochaine action.' },
-  { title: 'L’agenda', text: 'Un rendez-vous, une carte. Vos créneaux, lisibles.' },
+  { title: 'Vos clients', text: 'Clients et prospects : une fiche, des notes, une prochaine action.' },
+  { title: 'L’agenda', text: 'Créneaux, congés, rendez-vous — tout au même endroit.' },
   { title: 'Ce qui rentre', text: 'La trésorerie, un mois à la fois.' },
 ]
 
@@ -18,22 +18,56 @@ const pagePoints = [
   { title: 'À partager', text: 'Un QR Code, un lien. Comptoir, carte de visite, stories.' },
 ]
 
+const trustPoints = [
+  {
+    title: 'Paiements Stripe',
+    text: 'Vos abonnements passent par Stripe : carte sécurisée, normes bancaires.',
+  },
+  {
+    title: 'Au choix chaque mois',
+    text: 'Prélèvement automatique, ou paiement manuel — vous choisissez comment régler.',
+  },
+  {
+    title: '1er mois offert',
+    text: 'Puis 6 mois d’engagement. Transparent, sans surprise sur la durée.',
+  },
+  {
+    title: 'Essai 5 minutes',
+    text: 'Testez Essentiel ou Pro tout de suite, sans créer de compte.',
+  },
+]
+
 const subscribeSteps = [
-  { n: '01', title: 'Vous demandez', text: 'Essentiel ou Pro. Nom, e-mail, activité.' },
-  { n: '02', title: 'On vous recontacte', text: 'Le premier mois est offert.' },
-  { n: '03', title: 'Un code, c’est ouvert', text: 'Vous vous inscrivez. Le tableau de bord est prêt.' },
+  {
+    n: '01',
+    title: 'Vous essayez',
+    text: 'Cinq minutes sur Essentiel ou Pro, sans compte ni carte. Vous ouvrez le vrai tableau de bord, cliquez partout, voyez si ça vous correspond.',
+  },
+  {
+    n: '02',
+    title: 'Vous demandez',
+    text: 'À la fin de l’essai — ou quand vous êtes prêt — vous envoyez une demande. On vous recontacte, on vous envoie un devis. Le premier mois est offert.',
+  },
+  {
+    n: '03',
+    title: 'Vous démarrez',
+    text: 'Dès le devis signé, vous recevez un code unique. Vous créez votre compte, vous configurez votre activité, et votre espace Nolyo est prêt.',
+  },
 ]
 
 const compareRows = [
   { label: 'Tableau de bord', essentiel: true, pro: true },
-  { label: 'Clients, notes, agenda', essentiel: true, pro: true },
-  { label: 'Relances et e-mail', essentiel: true, pro: true },
+  { label: 'Clients, prospects, notes', essentiel: true, pro: true },
+  { label: 'Agenda et congés', essentiel: true, pro: true },
+  { label: 'Relances', essentiel: true, pro: true },
   { label: 'Revenus, mois par mois', essentiel: true, pro: true },
+  { label: 'Paiement Stripe (auto ou manuel)', essentiel: true, pro: true },
   { label: 'Page professionnelle', essentiel: false, pro: true },
-  { label: 'Réservation en ligne', essentiel: false, pro: true },
+  { label: 'Réservation et devis en ligne', essentiel: false, pro: true },
   { label: 'QR Code', essentiel: false, pro: true },
-  { label: 'Boîte de réception', essentiel: false, pro: true },
+  { label: 'Avis clients', essentiel: false, pro: true },
   { label: 'Statistiques', essentiel: false, pro: true },
+  { label: 'Dépenses et cotisations', essentiel: false, pro: true },
 ]
 
 const previewStats = [
@@ -79,7 +113,8 @@ function formatMembers(count) {
 
 function Home() {
   const location = useLocation()
-  const [members, setMembers] = useState(null)
+  const [stats, setStats] = useState({ members: null, faces: [] })
+  const [avisStats, setAvisStats] = useState({ rating: reviewStats.rating, count: reviewStats.count })
 
   useEffect(() => {
     if (!location.hash) return
@@ -89,11 +124,18 @@ function Home() {
 
   useEffect(() => {
     api('/api/public/stats')
-      .then((data) => setMembers(Number(data.members) || 0))
-      .catch(() => setMembers(0))
+      .then((data) =>
+        setStats({
+          members: Number(data.members) || 0,
+          faces: Array.isArray(data.faces) ? data.faces : [],
+        }),
+      )
+      .catch(() => setStats({ members: 0, faces: [] }))
   }, [])
 
-  const ratingLabel = reviewStats.rating.toLocaleString('fr-FR', {
+  const members = stats.members
+  const faces = stats.faces
+  const ratingLabel = Number(avisStats.rating || 0).toLocaleString('fr-FR', {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })
@@ -114,24 +156,16 @@ function Home() {
               <span className="italic text-copper">Développer.</span>
             </h1>
             <p className="mt-6 max-w-md text-lg leading-relaxed text-cream/75">
-              Un tableau de bord pour l’atelier. En Pro, une page pour vous faire trouver.
+              L’outil des indépendants : agenda, clients, relances. En Pro, une page pour être trouvé et réserver en
+              ligne.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <TryPreviewButton>Essayer le tableau de bord</TryPreviewButton>
-              <Link
-                to="/abonnement"
-                className="rounded-full border border-cream/20 px-6 py-3 text-sm font-semibold text-cream transition hover:border-cream/40 hover:bg-cream/5"
-              >
-                Demander un abonnement
-              </Link>
-              <Link
-                to="/rdv"
-                className="text-sm font-semibold text-cream/75 underline decoration-cream/25 underline-offset-4 transition hover:text-cream"
-              >
-                Prendre un rendez-vous
-              </Link>
+              <TryPreviewButton plan="pro">Essayer Pro · 5 min</TryPreviewButton>
+              <TryPreviewButton plan="essentiel" variant="ghost">
+                Essayer Essentiel · 5 min
+              </TryPreviewButton>
             </div>
-            <p className="mt-4 text-sm text-cream/50">Cinq minutes, tout Nolyo Pro. Sans compte.</p>
+            <p className="mt-4 text-sm text-cream/50">Sans compte. Sans carte. Vous choisissez la formule à tester.</p>
           </div>
 
           <div className="rounded-[1.5rem] bg-cream p-5 text-ink shadow-2xl shadow-ink/25 ring-1 ring-ink/6">
@@ -141,7 +175,7 @@ function Home() {
                 <p className="mt-0.5 text-sm font-medium">Maison Brume</p>
               </div>
               <span className="rounded-full bg-moss px-3 py-1.5 text-[11px] font-semibold tracking-wide text-cream uppercase">
-                Nolyo Pro 19,99€
+                Nolyo Pro
               </span>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3">
@@ -170,17 +204,29 @@ function Home() {
         <div className="relative mx-auto max-w-6xl px-5 pb-12 sm:px-8 lg:pb-16">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex items-center gap-4 rounded-[1.35rem] bg-cream/12 px-5 py-4 ring-1 ring-cream/12 backdrop-blur-sm">
-              <div className="flex -space-x-2.5">
-                {reviewFaces.map((face) => (
-                  <span
-                    key={face.name}
-                    title={face.name}
-                    className="grid h-10 w-10 place-items-center rounded-full bg-cream text-[11px] font-semibold text-moss ring-2 ring-moss"
-                  >
-                    {face.initials}
-                  </span>
-                ))}
-              </div>
+              {faces.length > 0 ? (
+                <div className="flex -space-x-2.5">
+                  {faces.map((face) =>
+                    face.avatar ? (
+                      <img
+                        key={`${face.name}-${face.avatar}`}
+                        src={face.avatar}
+                        alt=""
+                        title={face.name}
+                        className="h-10 w-10 rounded-full object-cover ring-2 ring-moss"
+                      />
+                    ) : (
+                      <span
+                        key={`${face.name}-${face.initials}`}
+                        title={face.name}
+                        className="grid h-10 w-10 place-items-center rounded-full bg-cream text-[11px] font-semibold text-moss ring-2 ring-moss"
+                      >
+                        {face.initials}
+                      </span>
+                    ),
+                  )}
+                </div>
+              ) : null}
               <div>
                 <p className="font-display text-3xl tracking-tight">
                   {members === null ? '…' : formatMembers(members)}
@@ -202,10 +248,28 @@ function Home() {
                 </p>
               </div>
               <div className="text-right">
-                <Stars rating={reviewStats.rating} />
-                <p className="mt-1 text-sm text-ink-soft">{reviewStats.count} avis</p>
+                <Stars rating={avisStats.rating} />
+                <p className="mt-1 text-sm text-ink-soft">{avisStats.count} avis</p>
               </div>
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section id="confiance" className="border-b border-ink/6 bg-cream/40">
+        <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
+          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">En toute confiance</p>
+          <h2 className="mt-3 max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            Payez sereinement. Testez avant de vous engager.
+          </h2>
+          <p className="mt-3 max-w-xl text-sm text-ink-soft">{paymentNote}</p>
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {trustPoints.map((item) => (
+              <article key={item.title}>
+                <p className="font-medium text-ink">{item.title}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{item.text}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
@@ -214,7 +278,7 @@ function Home() {
         <div className="max-w-2xl">
           <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Le produit</p>
           <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-            L’atelier, et la vitrine.
+            Votre espace, et votre vitrine.
           </h2>
         </div>
 
@@ -223,7 +287,7 @@ function Home() {
             <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Essentiel et Pro</p>
             <h3 className="mt-2 font-display text-3xl">Le tableau de bord</h3>
             <p className="mt-3 text-ink-soft">
-              Votre espace privé. On s’y connecte. Clients, agenda, notes, ce qui rentre.
+              Votre espace privé. Clients, agenda, congés, notes, ce qui rentre — et les relances qui comptent.
             </p>
             <ul className="mt-6 space-y-3">
               {dashboardPoints.map((item) => (
@@ -233,14 +297,19 @@ function Home() {
                 </li>
               ))}
             </ul>
+            <div className="mt-8">
+              <TryPreviewButton plan="essentiel" variant="header">
+                Tester Essentiel
+              </TryPreviewButton>
+            </div>
           </article>
 
           <article className="rounded-[1.5rem] bg-moss p-7 text-cream sm:p-8">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Nolyo Pro</p>
             <h3 className="mt-2 font-display text-3xl">La page professionnelle</h3>
             <p className="mt-3 text-cream/75">
-              Votre devanture. Les gens vous voient, réservent, demandent un devis. Vous, vous restez dans le
-              tableau de bord.
+              Votre devanture. Les gens vous voient, réservent, laissent un avis. Vous, vous restez dans le tableau de
+              bord.
             </p>
             <ul className="mt-6 space-y-3">
               {pagePoints.map((item) => (
@@ -250,6 +319,9 @@ function Home() {
                 </li>
               ))}
             </ul>
+            <div className="mt-8">
+              <TryPreviewButton plan="pro">Tester Pro</TryPreviewButton>
+            </div>
           </article>
         </div>
       </section>
@@ -258,8 +330,12 @@ function Home() {
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Comment ça marche</p>
           <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-            Trois gestes.
+            De l’essai au vrai compte.
           </h2>
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-soft">
+            Pas d’inscription forcée pour tester. Vous essayez d’abord, vous demandez ensuite, puis vous activez votre
+            espace avec un code. Le premier mois est offert sur Essentiel comme sur Pro.
+          </p>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {subscribeSteps.map((step) => (
               <article key={step.n} className="rounded-[1.5rem] bg-cream p-6 ring-1 ring-ink/6">
@@ -277,6 +353,7 @@ function Home() {
         <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
           Deux formules. Le premier mois est offert.
         </h2>
+        <p className="mt-3 max-w-2xl text-sm text-ink-soft">{paymentNote}</p>
 
         <div className="mt-12 overflow-hidden rounded-[1.5rem] bg-cream ring-1 ring-ink/6">
           <div className="grid grid-cols-[minmax(0,1.4fr)_7rem_7rem] border-b border-ink/8 px-5 py-4 text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase sm:grid-cols-[minmax(0,1fr)_10rem_10rem] sm:px-8">
@@ -302,9 +379,8 @@ function Home() {
 
         <div className="mt-8 grid gap-5 lg:grid-cols-2">
           {plans.map((item) => (
-            <Link
+            <div
               key={item.id}
-              to={`/abonnement?plan=${item.id}`}
               className={`flex flex-col rounded-[1.5rem] bg-cream p-7 ring-1 sm:p-8 ${
                 item.featured ? 'ring-copper/35' : 'ring-ink/6'
               }`}
@@ -331,41 +407,50 @@ function Home() {
                   <li key={feature}>— {feature}</li>
                 ))}
               </ul>
-              <span
-                className={`mt-8 inline-flex rounded-full px-5 py-2.5 text-sm font-semibold ${
-                  item.featured ? 'bg-copper text-cream' : 'bg-moss text-cream'
-                }`}
-              >
-                Demander {item.id === 'pro' ? 'Pro' : 'Essentiel'}
-              </span>
-            </Link>
+              <div className="mt-8 flex flex-wrap gap-2">
+                <TryPreviewButton
+                  plan={item.id}
+                  variant={item.featured ? 'hero' : 'header'}
+                  className={item.featured ? '' : '!bg-moss'}
+                >
+                  Essayer 5 min
+                </TryPreviewButton>
+                <Link
+                  to={`/abonnement?plan=${item.id}`}
+                  className={`inline-flex items-center rounded-full px-5 py-2.5 text-sm font-semibold ring-1 transition ${
+                    item.featured
+                      ? 'ring-copper/40 text-ink hover:bg-copper/5'
+                      : 'ring-ink/12 text-ink hover:bg-ink/5'
+                  }`}
+                >
+                  Demander {item.id === 'pro' ? 'Pro' : 'Essentiel'}
+                </Link>
+              </div>
+            </div>
           ))}
         </div>
       </section>
 
-      <TestimonialsCarousel />
+      <TestimonialsCarousel onStats={setAvisStats} />
 
       <section id="contact" className="px-5 py-20 sm:px-8">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 rounded-[1.5rem] bg-moss px-8 py-12 text-cream sm:px-12 lg:flex-row lg:items-center">
           <div>
-            <h2 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              Essayez 5 minutes.
-            </h2>
-            <p className="mt-3 max-w-lg text-cream/80">Le premier mois est offert. Ensuite, on vous ouvre l’espace.</p>
+            <h2 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Essayez 5 minutes.</h2>
+            <p className="mt-3 max-w-lg text-cream/80">
+              Essentiel ou Pro — sans compte. Ensuite, le premier mois est offert. Paiement sécurisé via Stripe.
+            </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <TryPreviewButton>Essayer 5 minutes</TryPreviewButton>
+            <TryPreviewButton plan="pro">Essayer Pro</TryPreviewButton>
+            <TryPreviewButton plan="essentiel" variant="ghost">
+              Essayer Essentiel
+            </TryPreviewButton>
             <Link
               to="/abonnement"
               className="rounded-full bg-cream px-7 py-3.5 text-sm font-semibold text-ink transition hover:bg-paper"
             >
               Faire une demande
-            </Link>
-            <Link
-              to="/rdv"
-              className="rounded-full border border-cream/25 px-7 py-3.5 text-sm font-semibold text-cream transition hover:bg-cream/10"
-            >
-              Prendre un rendez-vous
             </Link>
           </div>
         </div>

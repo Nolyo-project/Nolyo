@@ -1,4 +1,5 @@
 const Appointment = require('../models/Appointment')
+const Absence = require('../models/Absence')
 
 const TIMEZONE = 'Europe/Paris'
 const WEEKDAY = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
@@ -81,6 +82,23 @@ function todayYmd() {
   return { year: parts.year, month: parts.month, day: parts.day }
 }
 
+function ymdFromDate(date) {
+  const parts = zonedParts(date)
+  return ymdKey(parts)
+}
+
+function overlapsAbsence(ymd, absences) {
+  return absences.some((item) => item.startDate <= ymd && item.endDate >= ymd)
+}
+
+async function loadAbsencesInRange(userId, fromYmd, toYmd) {
+  return Absence.find({
+    user: userId,
+    startDate: { $lte: toYmd },
+    endDate: { $gte: fromYmd },
+  }).select('startDate endDate title')
+}
+
 function isValidPublicSlot(startAt, durationMinutes, schedule) {
   if (!(startAt instanceof Date) || Number.isNaN(startAt.getTime())) return false
   const parts = zonedParts(startAt)
@@ -91,6 +109,16 @@ function isValidPublicSlot(startAt, durationMinutes, schedule) {
   )
 }
 
+async function isAbsentOn(userId, startAt) {
+  const ymd = ymdFromDate(startAt)
+  const count = await Absence.countDocuments({
+    user: userId,
+    startDate: { $lte: ymd },
+    endDate: { $gte: ymd },
+  })
+  return count > 0
+}
+
 async function listAvailability(user, durationMinutes, dayCount = 21) {
   const schedule = resolveSchedule(user)
   const slotsTemplate = buildDaySlots(schedule.workStart, schedule.workEnd, durationMinutes)
@@ -98,16 +126,24 @@ async function listAvailability(user, durationMinutes, dayCount = 21) {
   const start = zonedTimeToDate(from.year, from.month, from.day, 0, 0)
   const endYmd = addDaysYmd(from.year, from.month, from.day, dayCount)
   const end = zonedTimeToDate(endYmd.year, endYmd.month, endYmd.day, 0, 0)
-  const appointments = await Appointment.find({
-    user: user._id,
-    status: 'planned',
-    startAt: { $gte: new Date(start.getTime() - 4 * 3600000), $lt: new Date(end.getTime() + 24 * 3600000) },
-  }).select('startAt durationMinutes')
+  const fromKey = ymdKey(from)
+  const toKey = ymdKey(endYmd)
+
+  const [appointments, absences] = await Promise.all([
+    Appointment.find({
+      user: user._id,
+      status: 'planned',
+      startAt: { $gte: new Date(start.getTime() - 4 * 3600000), $lt: new Date(end.getTime() + 24 * 3600000) },
+    }).select('startAt durationMinutes'),
+    loadAbsencesInRange(user._id, fromKey, toKey),
+  ])
 
   const now = Date.now()
   const days = []
   for (let index = 0; index < dayCount; index += 1) {
     const ymd = addDaysYmd(from.year, from.month, from.day, index)
+    const dateKey = ymdKey(ymd)
+    if (overlapsAbsence(dateKey, absences)) continue
     const noon = zonedTimeToDate(ymd.year, ymd.month, ymd.day, 12, 0)
     const weekday = zonedParts(noon).weekday
     if (!schedule.workDays.includes(weekday)) continue
@@ -129,7 +165,7 @@ async function listAvailability(user, durationMinutes, dayCount = 21) {
       })
       if (!busy) slots.push({ label: slot.label, startAt: startAt.toISOString() })
     }
-    if (slots.length) days.push({ date: ymdKey(ymd), slots })
+    if (slots.length) days.push({ date: dateKey, slots })
   }
   return days
 }
@@ -138,6 +174,8 @@ module.exports = {
   TIMEZONE,
   resolveSchedule,
   isValidPublicSlot,
+  isAbsentOn,
   listAvailability,
   zonedParts,
+  ymdFromDate,
 }

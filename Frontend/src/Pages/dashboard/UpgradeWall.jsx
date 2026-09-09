@@ -5,7 +5,7 @@ import { PageShell, Surface, icons, primaryBtn } from './ui'
 const pro = plans.find((item) => item.id === 'pro')
 
 const defaultHighlights = [
-  'Boîte de réception Instagram, Facebook et e-mail',
+  'Page professionnelle et réservation en ligne',
   'Statistiques avancées',
   'Plusieurs connexions sur le même espace',
 ]
@@ -36,7 +36,7 @@ export function UpgradeWall({
         </ul>
 
         <Link
-          to="/abonnement?plan=pro"
+          to="/dashboard/abonnement?upgrade=pro"
           className={`${primaryBtn} mt-9 bg-copper px-7 py-3 hover:bg-copper-dark`}
         >
           Passer à Pro
@@ -44,7 +44,7 @@ export function UpgradeWall({
         <p className="mt-3 text-sm text-ink-soft">
           {pro ? `${formatPrice(pro.price)} / ${pro.period}` : '19,99 € / mois'}
           <span className="text-ink/30"> · </span>
-          1er mois offert
+          Clients, agenda et notes conservés
         </p>
       </Surface>
     </PageShell>
@@ -65,7 +65,7 @@ export function ProLock({ isPro, title, children, className = '' }) {
         </span>
         <p className="mt-2 font-medium">{title}</p>
         <Link
-          to="/abonnement?plan=pro"
+          to="/dashboard/abonnement?upgrade=pro"
           className="mt-3 rounded-full bg-copper px-4 py-2 text-sm font-semibold text-cream transition hover:bg-copper-dark"
         >
           Débloquer

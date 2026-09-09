@@ -1,13 +1,16 @@
 const jwt = require('jsonwebtoken')
 
-function signToken(user, { expiresIn = '7d', preview = false } = {}) {
+function signToken(user, { expiresIn = '7d', preview = false, previewPlan } = {}) {
   const secret = process.env.JWT_SECRET
   if (!secret) {
     throw new Error('JWT_SECRET is missing from environment variables')
   }
 
   const payload = { sub: user._id.toString() }
-  if (preview) payload.preview = true
+  if (preview) {
+    payload.preview = true
+    payload.previewPlan = previewPlan === 'essentiel' ? 'essentiel' : 'pro'
+  }
 
   return jwt.sign(payload, secret, { expiresIn })
 }

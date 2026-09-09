@@ -520,6 +520,7 @@ function Journal() {
                 >
                   <option value="email">E-mail</option>
                   <option value="phone">Téléphone</option>
+                  <option value="both">E-mail et téléphone</option>
                 </select>
               </label>
             </div>

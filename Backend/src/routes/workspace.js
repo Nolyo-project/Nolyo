@@ -6,11 +6,14 @@ const DayLog = require('../models/DayLog')
 const InboxItem = require('../models/InboxItem')
 const Note = require('../models/Note')
 const Reminder = require('../models/Reminder')
+const Absence = require('../models/Absence')
+const Review = require('../models/Review')
 const Service = require('../models/Service')
 const Transaction = require('../models/Transaction')
 const { requireAuth, requireSubscription } = require('../middleware/auth')
 const { hasOverlap, isDuplicateKey } = require('../utils/overlap')
 const { userHasModule, asksSessionPayment, sessionAmount, parsePaymentMethod, paymentMethodLabel } = require('../data/workspace')
+const { publicVapidKey, pushEnabled, sendPushToUser } = require('../utils/push')
 
 const router = express.Router()
 router.use(requireAuth, requireSubscription)
@@ -293,16 +296,37 @@ router.patch('/settings', async (req, res) => {
 
 function parseServiceBody(body, previous = {}) {
   const name = String(body?.name ?? previous.name ?? '').trim()
-  const kind = body?.kind === 'quote' || (body?.kind === undefined && previous.kind === 'quote') ? 'quote' : 'session'
+  let kind = 'session'
+  if (body?.kind === 'quote' || (body?.kind === undefined && previous.kind === 'quote')) kind = 'quote'
+  if (body?.kind === 'heading' || (body?.kind === undefined && previous.kind === 'heading')) kind = 'heading'
   const price = Number(body?.price ?? previous.price ?? 0)
-  const durationMinutes = Number(body?.durationMinutes ?? previous.durationMinutes ?? 60)
+  const durationMinutes = Number(
+    body?.durationMinutes ?? previous.durationMinutes ?? (kind === 'heading' ? 0 : 60),
+  )
   const active = body?.active === undefined ? previous.active !== false : Boolean(body.active)
-  if (name.length < 2) return { error: 'Donnez un nom à la prestation.' }
+  let headingId = null
+  if (kind !== 'heading') {
+    const rawHeading = body?.headingId !== undefined ? body.headingId : previous.headingId
+    if (rawHeading && mongoose.isValidObjectId(rawHeading)) headingId = rawHeading
+  }
+  if (name.length < 2) return { error: kind === 'heading' ? 'Donnez un titre de section.' : 'Donnez un nom à la prestation.' }
+  if (kind === 'heading') {
+    return { service: { name: name.slice(0, 80), kind: 'heading', price: 0, durationMinutes: 0, active, headingId: null } }
+  }
   if (!Number.isFinite(price) || price < 0) return { error: 'Prix invalide.' }
   if (!Number.isFinite(durationMinutes) || durationMinutes < 15 || durationMinutes > 240) {
     return { error: 'La durée doit être entre 15 et 240 minutes.' }
   }
-  return { service: { name: name.slice(0, 80), kind, price: kind === 'quote' && !price ? 0 : price, durationMinutes, active } }
+  return {
+    service: {
+      name: name.slice(0, 80),
+      kind,
+      price: kind === 'quote' && !price ? 0 : price,
+      durationMinutes,
+      active,
+      headingId,
+    },
+  }
 }
 
 router.get('/services', async (req, res) => {
@@ -313,8 +337,16 @@ router.get('/services', async (req, res) => {
 router.post('/services', async (req, res) => {
   const parsed = parseServiceBody(req.body)
   if (parsed.error) return res.status(400).json({ error: parsed.error })
+  if (parsed.service.headingId) {
+    const heading = await Service.findOne({
+      _id: parsed.service.headingId,
+      user: req.user._id,
+      kind: 'heading',
+    })
+    if (!heading) return res.status(400).json({ error: 'Titre introuvable.' })
+  }
   const count = await Service.countDocuments({ user: req.user._id })
-  if (count >= 20) return res.status(400).json({ error: 'Vous avez atteint la limite de 20 prestations.' })
+  if (count >= 40) return res.status(400).json({ error: 'Vous avez atteint la limite de prestations / titres.' })
   const service = await Service.create({
     user: req.user._id,
     ...parsed.service,
@@ -328,6 +360,14 @@ router.patch('/services/:id', async (req, res) => {
   if (!service) return res.status(404).json({ error: 'Prestation introuvable.' })
   const parsed = parseServiceBody(req.body, service.toObject())
   if (parsed.error) return res.status(400).json({ error: parsed.error })
+  if (parsed.service.headingId) {
+    const heading = await Service.findOne({
+      _id: parsed.service.headingId,
+      user: req.user._id,
+      kind: 'heading',
+    })
+    if (!heading) return res.status(400).json({ error: 'Titre introuvable.' })
+  }
   Object.assign(service, parsed.service)
   await service.save()
   res.json({ service })
@@ -336,6 +376,35 @@ router.patch('/services/:id', async (req, res) => {
 router.delete('/services/:id', async (req, res) => {
   const service = await Service.findOneAndDelete({ _id: req.params.id, user: req.user._id })
   if (!service) return res.status(404).json({ error: 'Prestation introuvable.' })
+  if (service.kind === 'heading') {
+    await Service.updateMany({ user: req.user._id, headingId: service._id }, { $set: { headingId: null } })
+  }
+  res.json({ ok: true })
+})
+
+router.get('/reviews', async (req, res) => {
+  const status = String(req.query.status || '').trim()
+  const filter = { user: req.user._id }
+  if (['pending', 'approved', 'rejected'].includes(status)) filter.status = status
+  const reviews = await Review.find(filter).sort({ createdAt: -1 }).limit(100)
+  res.json({ reviews })
+})
+
+router.patch('/reviews/:id', async (req, res) => {
+  const review = await Review.findOne({ _id: req.params.id, user: req.user._id })
+  if (!review) return res.status(404).json({ error: 'Avis introuvable.' })
+  const status = String(req.body?.status || '').trim()
+  if (!['pending', 'approved', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Statut invalide.' })
+  }
+  review.status = status
+  await review.save()
+  res.json({ review })
+})
+
+router.delete('/reviews/:id', async (req, res) => {
+  const review = await Review.findOneAndDelete({ _id: req.params.id, user: req.user._id })
+  if (!review) return res.status(404).json({ error: 'Avis introuvable.' })
   res.json({ ok: true })
 })
 
@@ -473,7 +542,10 @@ async function scheduleQuoteReminder(user, contact) {
   const days = user.quoteFollowUpDays === undefined || user.quoteFollowUpDays === null ? 3 : user.quoteFollowUpDays
   const dueAt = followUpDueAt(days, user.schedule)
   if (!dueAt) return null
-  const channel = user.quoteFollowUpChannel === 'phone' ? 'phone' : 'email'
+  const channel =
+    user.quoteFollowUpChannel === 'phone' || user.quoteFollowUpChannel === 'both'
+      ? user.quoteFollowUpChannel
+      : 'email'
   const title = `Relancer le devis — ${contact.name}`
   const existing = await Reminder.findOne({
     user: user._id,
@@ -1163,7 +1235,7 @@ router.post('/reminders', async (req, res) => {
     user: req.user._id,
     title,
     dueAt,
-    channel: ['email', 'phone', 'other'].includes(req.body?.channel) ? req.body.channel : 'email',
+    channel: ['email', 'phone', 'both', 'other'].includes(req.body?.channel) ? req.body.channel : 'email',
     contact: req.body?.contact || undefined,
     kind: req.body?.kind === 'task' || req.body?.kind === 'quote' ? req.body.kind : 'manual',
   })
@@ -1189,6 +1261,89 @@ router.patch('/reminders/:id', async (req, res) => {
 router.delete('/reminders/:id', async (req, res) => {
   const reminder = await Reminder.findOneAndDelete({ _id: req.params.id, user: req.user._id })
   if (!reminder) return res.status(404).json({ error: 'Rappel introuvable.' })
+  res.json({ ok: true })
+})
+
+const ABSENCE_KINDS = new Set(['vacation', 'sick', 'personal', 'other'])
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function parseYmd(value) {
+  const raw = String(value || '').trim().slice(0, 10)
+  if (!YMD_RE.test(raw)) return null
+  const [year, month, day] = raw.split('-').map(Number)
+  const check = new Date(Date.UTC(year, month - 1, day))
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() + 1 !== month ||
+    check.getUTCDate() !== day
+  ) {
+    return null
+  }
+  return raw
+}
+
+router.get('/absences', async (req, res) => {
+  const absences = await Absence.find({ user: req.user._id }).sort({ startDate: 1, endDate: 1 }).limit(120)
+  res.json({ absences })
+})
+
+router.post('/absences', async (req, res) => {
+  const title = String(req.body?.title || '').trim().slice(0, 120)
+  const startDate = parseYmd(req.body?.startDate)
+  const endDate = parseYmd(req.body?.endDate || req.body?.startDate)
+  const kind = ABSENCE_KINDS.has(req.body?.kind) ? req.body.kind : 'vacation'
+  const note = String(req.body?.note || '').trim().slice(0, 500)
+
+  if (!title) return res.status(400).json({ error: 'Indiquez un libellé (ex. Vacances).' })
+  if (!startDate || !endDate) return res.status(400).json({ error: 'Indiquez des dates valides.' })
+  if (endDate < startDate) {
+    return res.status(400).json({ error: 'La date de fin doit être après (ou égale à) la date de début.' })
+  }
+
+  const absence = await Absence.create({
+    user: req.user._id,
+    title,
+    kind,
+    startDate,
+    endDate,
+    note,
+  })
+  res.status(201).json({ absence })
+})
+
+router.patch('/absences/:id', async (req, res) => {
+  const absence = await Absence.findOne({ _id: req.params.id, user: req.user._id })
+  if (!absence) return res.status(404).json({ error: 'Absence introuvable.' })
+
+  if (req.body?.title !== undefined) {
+    const title = String(req.body.title || '').trim().slice(0, 120)
+    if (!title) return res.status(400).json({ error: 'Indiquez un libellé.' })
+    absence.title = title
+  }
+  if (req.body?.kind !== undefined && ABSENCE_KINDS.has(req.body.kind)) {
+    absence.kind = req.body.kind
+  }
+  if (req.body?.note !== undefined) {
+    absence.note = String(req.body.note || '').trim().slice(0, 500)
+  }
+  if (req.body?.startDate !== undefined || req.body?.endDate !== undefined) {
+    const startDate = parseYmd(req.body?.startDate ?? absence.startDate)
+    const endDate = parseYmd(req.body?.endDate ?? absence.endDate)
+    if (!startDate || !endDate) return res.status(400).json({ error: 'Indiquez des dates valides.' })
+    if (endDate < startDate) {
+      return res.status(400).json({ error: 'La date de fin doit être après (ou égale à) la date de début.' })
+    }
+    absence.startDate = startDate
+    absence.endDate = endDate
+  }
+
+  await absence.save()
+  res.json({ absence })
+})
+
+router.delete('/absences/:id', async (req, res) => {
+  const absence = await Absence.findOneAndDelete({ _id: req.params.id, user: req.user._id })
+  if (!absence) return res.status(404).json({ error: 'Absence introuvable.' })
   res.json({ ok: true })
 })
 
@@ -1321,6 +1476,52 @@ router.delete('/journal/:dateKey/tasks/:taskId', async (req, res) => {
   task.deleteOne()
   await log.save()
   res.json({ log })
+})
+
+router.get('/push/vapid-key', (_req, res) => {
+  if (!pushEnabled()) return res.json({ publicKey: '', enabled: false })
+  res.json({ publicKey: publicVapidKey(), enabled: true })
+})
+
+router.post('/push/subscribe', async (req, res) => {
+  const endpoint = String(req.body?.endpoint || '').trim()
+  const p256dh = String(req.body?.keys?.p256dh || '').trim()
+  const auth = String(req.body?.keys?.auth || '').trim()
+  if (!endpoint || !p256dh || !auth) {
+    return res.status(400).json({ error: 'Abonnement push invalide.' })
+  }
+  const current = req.user.notifications?.toObject?.() || req.user.notifications || {}
+  const subs = Array.isArray(current.pushSubscriptions) ? [...current.pushSubscriptions] : []
+  const existing = subs.findIndex((item) => item.endpoint === endpoint)
+  const entry = {
+    endpoint,
+    keys: { p256dh, auth },
+    userAgent: String(req.headers['user-agent'] || '').slice(0, 200),
+    createdAt: new Date(),
+  }
+  if (existing >= 0) subs[existing] = entry
+  else subs.push(entry)
+  req.user.notifications = { ...current, pushSubscriptions: subs.slice(-8) }
+  await req.user.save()
+  res.json({ ok: true, user: req.user.toSafeJSON() })
+})
+
+router.post('/push/unsubscribe', async (req, res) => {
+  const endpoint = String(req.body?.endpoint || '').trim()
+  const current = req.user.notifications?.toObject?.() || req.user.notifications || {}
+  const subs = (current.pushSubscriptions || []).filter((item) => item.endpoint !== endpoint)
+  req.user.notifications = { ...current, pushSubscriptions: subs }
+  await req.user.save()
+  res.json({ ok: true, user: req.user.toSafeJSON() })
+})
+
+router.post('/push/test', async (req, res) => {
+  await sendPushToUser(req.user, {
+    title: 'Nolyo',
+    body: 'Les notifications sont actives sur cet appareil.',
+    url: '/dashboard',
+  })
+  res.json({ ok: true })
 })
 
 module.exports = router

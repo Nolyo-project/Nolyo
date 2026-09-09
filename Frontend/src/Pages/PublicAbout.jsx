@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { copyForTrade } from '../data/trades'
+import SeoHead from '../components/SeoHead'
 import { PublicPageAside, publicPageChrome, publicPageMainClass } from './PublicPageAside'
 import { PublicPageFrame } from './PublicPageFrame'
 
@@ -88,9 +89,22 @@ function PublicAbout() {
   const copy = copyForTrade(page?.trade)
   const { hasAside } = publicPageChrome(page, slug)
   const teamLabel = people.length > 1 ? 'L’équipe' : 'Portrait'
+  const pageUrl = typeof window !== 'undefined' ? `${window.location.origin}/p/${slug}/a-propos` : `/p/${slug}/a-propos`
+  const seoDescription =
+    about.body?.replace(/\s+/g, ' ').trim().slice(0, 160) ||
+    `À propos de ${page?.title || 'ce professionnel'} — ${page?.tradeLabel || copy.label} sur Nolyo.`
+  const seoImage = page?.banner || page?.avatar || ''
 
   return (
     <PublicPageFrame slug={slug} page={page} error={error} current="about">
+      {page ? (
+        <SeoHead
+          title={`À propos — ${page.title} | Nolyo`}
+          description={seoDescription}
+          image={seoImage.startsWith('http') ? seoImage : seoImage ? `${window.location.origin}${seoImage}` : undefined}
+          url={pageUrl}
+        />
+      ) : null}
       {page ? (
         <main className={publicPageMainClass(hasAside)}>
           <div className="min-w-0">

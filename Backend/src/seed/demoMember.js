@@ -1022,8 +1022,21 @@ async function ensureDemoAccounts() {
   }
 }
 
+/** Garantit le compte utilisé pour l’essai 5 minutes (même sans DEMO_SEED). */
+async function ensurePreviewAccount() {
+  const email = String(process.env.PREVIEW_EMAIL || 'ines@nolio.test').toLowerCase()
+  const existing = await User.findOne({ email, role: 'member' }).select('_id subscription.status')
+  if (existing && ['active', 'trialing'].includes(existing.subscription?.status)) {
+    return existing
+  }
+  const profile = PROFILES.find((item) => item.email === email) || PROFILES[0]
+  await ensureDemoAccount(profile)
+  return User.findOne({ email: profile.email, role: 'member' })
+}
+
 module.exports = {
   ensureDemoAccounts,
+  ensurePreviewAccount,
   DEMO_EMAILS: PROFILES.map((item) => item.email),
   DEMO_PASSWORD: PASSWORD,
 }

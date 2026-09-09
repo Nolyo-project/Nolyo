@@ -1,8 +1,9 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { homeForUser, needsOnboarding } from '../auth/homeForUser'
-import { consumePreviewExit } from '../auth/previewSession'
+import { consumePreviewExit, consumePreviewPlan } from '../auth/previewSession'
 import { isAdminHost } from '../config/site'
 import { useAuth } from '../context/AuthContext'
+import { needsPayment } from '../data/billing'
 import PageLoader from './PageLoader'
 
 export function ProtectedRoute({ children, requireSubscription = false, requirePresident = false }) {
@@ -23,7 +24,8 @@ export function ProtectedRoute({ children, requireSubscription = false, requireP
   if (!user) {
     const exit = consumePreviewExit()
     if (exit === 'subscribe') {
-      return <Navigate to="/abonnement?plan=pro&essai=termine" replace />
+      const plan = consumePreviewPlan()
+      return <Navigate to={`/abonnement?plan=${plan}&essai=termine`} replace />
     }
     if (exit === 'home') {
       return <Navigate to="/" replace />
@@ -33,6 +35,7 @@ export function ProtectedRoute({ children, requireSubscription = false, requireP
 
   if (requireSubscription) {
     if (isPresident) return <Navigate to={homeForUser(user)} replace />
+    if (needsPayment(user)) return <Navigate to="/facture" replace />
     if (!isSubscribed) return <Navigate to="/inscription" replace />
     const onOnboarding = location.pathname === '/onboarding'
     if (needsOnboarding(user) && !onOnboarding) {

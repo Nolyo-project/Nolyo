@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { publicPageSeoPlugin } from './vite-plugins/publicPageSeo.js'
 
 function backendOrigin() {
   const envPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../Backend/.env')
@@ -20,7 +21,7 @@ function backendOrigin() {
 const api = backendOrigin()
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), publicPageSeoPlugin(api)],
   resolve: {
     dedupe: ['react', 'react-dom'],
   },
@@ -38,6 +39,16 @@ export default defineConfig({
       '/uploads': {
         target: api,
         changeOrigin: true,
+      },
+      '/robots.txt': {
+        target: api,
+        changeOrigin: true,
+        rewrite: () => '/api/public/robots.txt',
+      },
+      '/sitemap.xml': {
+        target: api,
+        changeOrigin: true,
+        rewrite: () => '/api/public/sitemap.xml',
       },
     },
   },

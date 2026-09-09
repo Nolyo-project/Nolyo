@@ -4,19 +4,20 @@ const plans = [
     name: 'Nolyo Essentiel',
     price: 9.99,
     period: 'mois',
-    audience: 'Pour démarrer, en interne',
+    audience: 'Tout pour gérer votre activité, en privé.',
     trial: '1er mois offert',
+    trialDays: 30,
     commitmentMonths: 6,
     totalMonths: 7,
     commitment: 'Engagement 6 mois',
     features: [
       'Tableau de bord privé',
       'Clients et prospects',
-      'Notes',
-      'Agenda',
-      'Revenus, un mois à la fois',
-      'Relances',
-      'Connexion e-mail',
+      'Agenda et congés',
+      'Notes et tâches',
+      'Revenus, mois par mois',
+      'Relances clients',
+      'Paiement Stripe sécurisé',
     ],
   },
   {
@@ -24,21 +25,23 @@ const plans = [
     name: 'Nolyo Pro',
     price: 19.99,
     period: 'mois',
-    audience: 'Tableau de bord + page professionnelle',
+    audience: 'Le tableau de bord + votre page pour être trouvé et réserver.',
     featured: true,
     trial: '1er mois offert',
+    trialDays: 30,
     commitmentMonths: 6,
     totalMonths: 7,
     commitment: 'Engagement 6 mois',
     features: [
       'Tout Nolyo Essentiel',
-      'Page d’accueil et à propos (votre vitrine)',
-      'Photos, couleurs, présentation de l’équipe',
+      'Page professionnelle (accueil & à propos)',
       'Réservation et devis en ligne',
+      'Photos, couleurs, équipe',
       'QR Code vers votre page',
-      'Boîte de réception (Instagram, Facebook, e-mail)',
+      'Avis clients modérés',
       'Statistiques',
       'Dépenses et cotisations',
+      'Paiement Stripe sécurisé',
     ],
   },
 ]
@@ -47,4 +50,6 @@ function getPlan(id) {
   return plans.find((plan) => plan.id === id) || null
 }
 
-module.exports = { plans, getPlan }
+const TRIAL_DAYS = 30
+
+module.exports = { plans, getPlan, TRIAL_DAYS }

@@ -11,7 +11,6 @@ export const MODULES = [
   { id: 'reminders', label: 'Relances', hint: 'Ce qui attend une réponse.', plan: 'essentiel' },
   { id: 'page', label: 'Page professionnelle', hint: 'Votre vitrine publique, la réservation, et une demande de devis sur rendez-vous.', plan: 'pro', settings: 'Menu Page' },
   { id: 'qr', label: 'QR Code', hint: 'Un scan vers votre page.', plan: 'pro' },
-  { id: 'inbox', label: 'Boîte de réception', hint: 'Messages Instagram, Facebook et e-mail.', plan: 'pro' },
   { id: 'stats', label: 'Statistiques', hint: 'Une lecture plus fine de l’activité.', plan: 'pro' },
 ]
 
@@ -52,15 +51,14 @@ export function workspaceForUser(user) {
   const defaults = tradeModules(user?.onboarding?.trade, user?.onboarding?.workMode)
   const incoming = user?.workspace?.modules || {}
   const modules = { ...defaults, ...incoming }
+  modules.inbox = false
   if (!isProPlan(user)) {
     modules.page = false
     modules.qr = false
-    modules.inbox = false
     modules.stats = false
   } else {
     if (incoming.page === undefined) modules.page = true
     if (incoming.qr === undefined) modules.qr = true
-    if (incoming.inbox === undefined) modules.inbox = true
     if (incoming.stats === undefined) modules.stats = true
   }
   return {
@@ -73,7 +71,7 @@ export function hasModule(user, id) {
   return Boolean(workspaceForUser(user).modules[id])
 }
 
-const PRO_TEASERS = new Set(['page', 'qr', 'inbox', 'stats'])
+const PRO_TEASERS = new Set(['page', 'qr', 'stats'])
 
 export function canVisitModule(user, id) {
   if (hasModule(user, id)) return true

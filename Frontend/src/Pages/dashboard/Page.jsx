@@ -29,7 +29,7 @@ function Page() {
       <PageHeader
         kicker="Vitrine"
         title="Page"
-        description="Trois étapes : accueil, à propos, couleurs. Cochez pour mettre en ligne."
+        description="Infos, horaires, prestations, avis, e-mail client — tout pour votre vitrine."
       />
       <PageStudio isPro={isPro} showQr={hasModule(user, 'qr')} />
     </PageShell>

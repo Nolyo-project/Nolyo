@@ -12,12 +12,13 @@ const variants = {
     'mt-2 rounded-xl bg-moss px-3 py-2.5 text-center text-sm font-semibold text-cream disabled:opacity-60',
 }
 
-function TryPreviewButton({ variant = 'hero', className = '', children, onStarted }) {
+function TryPreviewButton({ variant = 'hero', className = '', children, onStarted, plan = 'pro' }) {
   const { user, startPreview, loading } = useAuth()
   const navigate = useNavigate()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const styles = `${variants[variant] || variants.hero} ${className}`.trim()
+  const previewPlan = plan === 'essentiel' ? 'essentiel' : 'pro'
 
   if (loading) return null
 
@@ -41,7 +42,7 @@ function TryPreviewButton({ variant = 'hero', className = '', children, onStarte
     setError('')
     setPending(true)
     try {
-      await startPreview()
+      await startPreview(previewPlan)
       onStarted?.()
       navigate('/dashboard')
     } catch (err) {

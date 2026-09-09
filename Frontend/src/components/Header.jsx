@@ -7,8 +7,8 @@ import TryPreviewButton from './TryPreviewButton'
 
 const marketingLinks = [
   { to: '/#produit', label: 'Produit' },
-  { to: '/#fonctionnement', label: 'Comment ça marche' },
   { to: '/#offres', label: 'Offres' },
+  { to: '/#confiance', label: 'Paiements' },
   { to: '/rdv', label: 'Rendez-vous' },
   { to: '/inscription', label: 'J’ai un code' },
 ]

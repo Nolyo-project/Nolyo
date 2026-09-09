@@ -4,9 +4,10 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { homeForUser } from '../auth/homeForUser'
 import { copyForTrade } from '../data/trades'
-import { isQuoteService, publicPageStyle, servicePriceLabel } from '../data/pageTheme'
+import { groupServicesByHeading, isQuoteService, publicPageStyle, servicePriceLabel } from '../data/pageTheme'
 import { buildIcs, downloadIcs, googleCalendarUrl } from '../data/calendarEvent'
 import Logo from '../components/Logo'
+import SeoHead from '../components/SeoHead'
 import { formatLongDate, formatMoney, formatTime } from './dashboard/format'
 import { primaryBtn, quietBtn } from './dashboard/ui'
 
@@ -24,6 +25,7 @@ function PublicBooking() {
   const [serviceId, setServiceId] = useState('')
   const [days, setDays] = useState([])
   const [date, setDate] = useState('')
+  const [dayOffset, setDayOffset] = useState(0)
   const [slot, setSlot] = useState(null)
   const [guest, setGuest] = useState(emptyGuest)
   const [pending, setPending] = useState(false)
@@ -47,10 +49,14 @@ function PublicBooking() {
         setServices(next)
         const wanted = params.get('service')
         const type = params.get('type')
-        const match = wanted && next.find((item) => item._id === wanted)
+        const match = wanted && next.find((item) => item._id === wanted && item.kind !== 'heading')
         const quote = next.find((item) => isQuoteService(item))
         if (match) setServiceId(match._id)
         else if (type === 'devis' && quote) setServiceId(quote._id)
+        else {
+          const first = next.find((item) => item.kind !== 'heading')
+          if (first) setServiceId(first._id)
+        }
       })
       .catch((err) => setError(err.message))
   }, [slug, params])
@@ -68,6 +74,7 @@ function PublicBooking() {
         if (cancelled) return
         const nextDays = data.days || []
         setDays(nextDays)
+        setDayOffset(0)
         setDate((current) => (nextDays.some((item) => item.date === current) ? current : nextDays[0]?.date || ''))
         setSlot(null)
       })
@@ -93,6 +100,12 @@ function PublicBooking() {
       }),
     [days],
   )
+
+  const DAY_WINDOW = 7
+  const maxDayOffset = Math.max(0, dayLabels.length - DAY_WINDOW)
+  const visibleDays = dayLabels.slice(dayOffset, dayOffset + DAY_WINDOW)
+  const canShiftLeft = dayOffset > 0
+  const canShiftRight = dayOffset < maxDayOffset
 
   function updateGuest(event) {
     setGuest((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -176,6 +189,11 @@ function PublicBooking() {
   if (done) {
     return (
       <div className="public-page min-h-svh" style={themeStyle}>
+        <SeoHead
+          title={`Réservation confirmée — ${page.title || page.name} | Nolyo`}
+          description={`Votre rendez-vous chez ${page.name || page.title} est confirmé.`}
+          url={`${window.location.origin}/p/${slug}/reserver`}
+        />
         <div className="mx-auto flex min-h-svh max-w-lg flex-col px-5 py-8 sm:px-8">
           <header className="flex items-center justify-between gap-3">
             <Link to={`/p/${slug}`} className="min-w-0 truncate text-[11px] font-semibold tracking-[0.26em] uppercase opacity-70">
@@ -234,7 +252,43 @@ function PublicBooking() {
 
   return (
     <div className="public-page min-h-svh" style={themeStyle}>
+      <SeoHead
+        title={`Réserver — ${page.title || page.name} | Nolyo`}
+        description={`Prenez rendez-vous en ligne avec ${page.name || page.title}. ${page.tradeLabel || copy.label || ''}`.trim()}
+        image={
+          page.banner?.startsWith('http')
+            ? page.banner
+            : page.banner
+              ? `${window.location.origin}${page.banner}`
+              : page.avatar?.startsWith('http')
+                ? page.avatar
+                : page.avatar
+                  ? `${window.location.origin}${page.avatar}`
+                  : undefined
+        }
+        url={`${window.location.origin}/p/${slug}/reserver`}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'ReserveAction',
+          name: `Réserver chez ${page.title || page.name}`,
+          target: `${window.location.origin}/p/${slug}/reserver`,
+          provider: {
+            '@type': 'LocalBusiness',
+            name: page.title || page.name,
+            telephone: page.phone || undefined,
+          },
+        }}
+      />
       <div className="mx-auto max-w-3xl px-5 py-8 sm:px-8">
+        {page.away ? (
+          <div
+            className="mb-6 rounded-2xl bg-[color-mix(in_srgb,var(--page-accent)_12%,transparent)] px-4 py-3 text-center text-sm font-medium ring-1 ring-ink/8"
+            role="status"
+          >
+            Actuellement en congés
+            <span className="page-muted font-normal"> — la réservation reprend bientôt</span>
+          </div>
+        ) : null}
         <header className="flex items-center justify-between gap-3">
           <Link to={`/p/${slug}`} className="min-w-0 truncate text-[11px] font-semibold tracking-[0.26em] text-ink-soft uppercase">
             {page.name}
@@ -268,6 +322,15 @@ function PublicBooking() {
           </div>
         </div>
 
+        {page.away ? (
+          <div className="page-card mt-10 rounded-[1.6rem] px-6 py-10 text-center ring-1 ring-ink/8 sm:px-8">
+            <p className="font-display text-2xl">Réservation fermée pour le moment</p>
+            <p className="page-muted mt-3 text-sm">Cette activité est actuellement en congés. Revenez un peu plus tard.</p>
+            <Link to={`/p/${slug}`} className={`${quietBtn} mt-6 inline-flex`}>
+              Retour à la page
+            </Link>
+          </div>
+        ) : (
         <form onSubmit={submit} className="mt-10 space-y-8">
             <section className="page-card rounded-[1.6rem] px-6 py-7 ring-1 ring-ink/8 sm:px-8">
               <h2 className="font-display text-2xl">Prestation</h2>
@@ -275,30 +338,41 @@ function PublicBooking() {
                 <p className="page-muted mt-3 text-sm">Les réservations en ligne ne sont pas encore ouvertes.</p>
               ) : (
                 <ul className="mt-4 space-y-2">
-                  {services.map((item) => {
-                    const active = item._id === serviceId
-                    return (
-                      <li key={item._id}>
-                        <button
-                          type="button"
-                          onClick={() => setServiceId(item._id)}
-                          className={`flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left ring-1 transition ${
-                            active
-                              ? 'page-chip-active ring-[var(--page-accent)]'
-                              : 'page-chip ring-ink/8 hover:ring-[var(--page-accent)]'
-                          }`}
-                        >
-                          <span>
-                            <span className="block font-medium">{item.name}</span>
-                            <span className={`mt-0.5 block text-xs ${active ? 'opacity-75' : 'page-muted'}`}>
-                              {item.durationMinutes} min
-                              {isQuoteService(item) ? ' · pour cadrer le projet' : ''}
+                  {groupServicesByHeading(services).flatMap((block) => {
+                    const rows = []
+                    if (block.title) {
+                      rows.push(
+                        <li key={`h-${block.headingId || block.title}`} className="pt-3 first:pt-0">
+                          <p className="page-accent text-[11px] font-semibold tracking-[0.18em] uppercase">{block.title}</p>
+                        </li>,
+                      )
+                    }
+                    for (const item of block.items) {
+                      const active = item._id === serviceId
+                      rows.push(
+                        <li key={item._id}>
+                          <button
+                            type="button"
+                            onClick={() => setServiceId(item._id)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left ring-1 transition ${
+                              active
+                                ? 'page-chip-active ring-[var(--page-accent)]'
+                                : 'page-chip ring-ink/8 hover:ring-[var(--page-accent)]'
+                            }`}
+                          >
+                            <span>
+                              <span className="block font-medium">{item.name}</span>
+                              <span className={`mt-0.5 block text-xs ${active ? 'opacity-75' : 'page-muted'}`}>
+                                {item.durationMinutes} min
+                                {isQuoteService(item) ? ' · pour cadrer le projet' : ''}
+                              </span>
                             </span>
-                          </span>
-                          <span className="shrink-0 font-display text-lg">{servicePriceLabel(item, formatMoney)}</span>
-                        </button>
-                      </li>
-                    )
+                            <span className="shrink-0 font-display text-lg">{servicePriceLabel(item, formatMoney)}</span>
+                          </button>
+                        </li>,
+                      )
+                    }
+                    return rows
                   })}
                 </ul>
               )}
@@ -313,35 +387,60 @@ function PublicBooking() {
                   </p>
                 ) : null}
                 {days.length === 0 ? (
-                  <p className="page-muted mt-3 text-sm">Aucun créneau libre sur les trois prochaines semaines.</p>
+                  <p className="page-muted mt-3 text-sm">Aucun créneau libre sur les prochaines semaines.</p>
                 ) : (
                   <>
-                    <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-                      {dayLabels.map((item) => {
-                        const active = item.date === date
-                        return (
-                          <button
-                            key={item.date}
-                            type="button"
-                            onClick={() => {
-                              setDate(item.date)
-                              setSlot(null)
-                            }}
-                            className={`min-w-16 rounded-2xl px-3 py-3 text-center ${
-                              active ? 'page-chip-active' : 'page-chip ring-1 ring-ink/8'
-                            }`}
-                          >
-                            <span className={`block text-[11px] uppercase ${active ? 'opacity-75' : 'page-muted'}`}>
-                              {item.weekday}
-                            </span>
-                            <span className="mt-0.5 block text-sm font-semibold">{item.day}</span>
-                            <span className={`block text-[11px] ${active ? 'opacity-75' : 'page-muted'}`}>
-                              {item.month}
-                            </span>
-                          </button>
-                        )
-                      })}
+                    <div className="mt-4 flex items-center gap-2">
+                      <button
+                        type="button"
+                        aria-label="Semaine précédente"
+                        disabled={!canShiftLeft}
+                        onClick={() => setDayOffset((current) => Math.max(0, current - DAY_WINDOW))}
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-[var(--page-accent)] disabled:opacity-30"
+                      >
+                        ‹
+                      </button>
+                      <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+                        {visibleDays.map((item) => {
+                          const active = item.date === date
+                          return (
+                            <button
+                              key={item.date}
+                              type="button"
+                              onClick={() => {
+                                setDate(item.date)
+                                setSlot(null)
+                              }}
+                              className={`min-w-16 flex-1 rounded-2xl px-3 py-3 text-center ${
+                                active ? 'page-chip-active' : 'page-chip ring-1 ring-ink/8'
+                              }`}
+                            >
+                              <span className={`block text-[11px] uppercase ${active ? 'opacity-75' : 'page-muted'}`}>
+                                {item.weekday}
+                              </span>
+                              <span className="mt-0.5 block text-sm font-semibold">{item.day}</span>
+                              <span className={`block text-[11px] ${active ? 'opacity-75' : 'page-muted'}`}>
+                                {item.month}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Semaine suivante"
+                        disabled={!canShiftRight}
+                        onClick={() => setDayOffset((current) => Math.min(maxDayOffset, current + DAY_WINDOW))}
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-[var(--page-accent)] disabled:opacity-30"
+                      >
+                        ›
+                      </button>
                     </div>
+                    {canShiftRight || canShiftLeft ? (
+                      <p className="page-muted mt-2 text-xs">
+                        Flèches pour voir d’autres dates (jusqu’à ~8 semaines).
+                      </p>
+                    ) : null}
                     <div className="mt-4 flex flex-wrap gap-2">
                       {(selectedDay?.slots || []).map((item) => {
                         const active = slot?.startAt === item.startAt
@@ -403,6 +502,7 @@ function PublicBooking() {
               <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
             ) : null}
           </form>
+        )}
 
         <p className="mt-10 text-center text-xs text-ink-soft">
           <Link to={`/p/${slug}`} className="underline decoration-ink/20 underline-offset-2 hover:text-ink">

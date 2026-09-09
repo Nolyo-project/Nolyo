@@ -18,6 +18,13 @@ const appointmentSchema = new mongoose.Schema(
     paymentStatus: { type: String, enum: ['none', 'paid', 'unpaid', 'absent'], default: 'none' },
     paymentMethod: { type: String, enum: ['cash', 'card', 'cheque', 'transfer'] },
     paymentTransaction: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' },
+    clientOutcome: {
+      type: String,
+      enum: ['none', 'converted', 'not_converted'],
+      default: 'none',
+    },
+    clientOutcomeAt: Date,
+    reminderNotifiedAt: Date,
   },
   { timestamps: true },
 )

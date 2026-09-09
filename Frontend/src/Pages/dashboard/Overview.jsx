@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
-import { isProPlan } from '../../data/plans'
 import { copyForUser, pluralLabel } from '../../data/trades'
 import { hasModule } from '../../data/workspace'
 import { formatDateTime, formatLongDate, formatMoney, formatTime } from './format'
@@ -14,7 +13,6 @@ function Overview() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const firstName = user.name.split(' ')[0]
-  const isPro = isProPlan(user)
 
   useEffect(() => {
     api('/api/workspace/overview')
@@ -197,35 +195,6 @@ function Overview() {
                 </Link>
               </li>
             ))}
-            {hasModule(user, 'inbox') ? (
-              <li>
-                <Link
-                  to="/dashboard/inbox"
-                  className="flex items-center gap-3 rounded-2xl bg-paper px-3 py-3 text-sm font-medium transition hover:bg-moss hover:text-cream"
-                >
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-moss/10 text-moss">{icons.inbox}</span>
-                  Messages
-                  {data.unreadInbox ? (
-                    <span className="ml-auto rounded-full bg-copper px-2 py-0.5 text-[11px] text-cream">
-                      {data.unreadInbox}
-                    </span>
-                  ) : null}
-                </Link>
-              </li>
-            ) : !isPro ? (
-              <li>
-                <Link
-                  to="/dashboard/inbox"
-                  className="flex items-center gap-3 rounded-2xl bg-paper/70 px-3 py-3 text-sm font-medium text-ink-soft"
-                >
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-ink/5 text-ink/35">{icons.inbox}</span>
-                  Messages
-                  <span className="ml-auto rounded-full bg-ink/8 px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
-                    Pro
-                  </span>
-                </Link>
-              </li>
-            ) : null}
           </ul>
         </Surface>
       </section>

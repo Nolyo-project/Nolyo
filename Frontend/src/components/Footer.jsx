@@ -6,6 +6,7 @@ const columns = [
     title: 'Produit',
     links: [
       { to: '/#produit', label: 'Produit' },
+      { to: '/#confiance', label: 'Paiements' },
       { to: '/#fonctionnement', label: 'Comment ça marche' },
       { to: '/#offres', label: 'Offres' },
     ],
@@ -37,7 +38,7 @@ function Footer() {
           <Logo to="/" inverted />
           <p className="mt-3 text-sm text-cream/55">Gérer. Présenter. Développer.</p>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-cream/70">
-            Gérer l’atelier. Présenter votre maison. Développer l’activité. Premier mois offert.
+            Gérer votre activité. Présenter votre maison. Développer ce qui compte. Premier mois offert.
           </p>
         </div>
 

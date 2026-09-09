@@ -3,17 +3,17 @@ import { planLabels } from '../../data/plans'
 export const statusLabels = {
   received: 'Nouvelle',
   quote_sent: 'Devis envoyé',
-  paid: 'Payé',
+  paid: 'Devis signé',
   code_issued: 'Code prêt',
   registered: 'Inscrit',
 }
 
 export const statusHint = {
-  received: 'À relancer : envoyer le devis',
-  quote_sent: 'En attente de signature',
-  paid: 'Générer le code',
+  received: 'Ouvrir Gmail, joindre le devis, envoyer',
+  quote_sent: 'En attente du devis signé',
+  paid: 'Code envoyé',
   code_issued: 'À transmettre au client',
-  registered: 'Espace ouvert',
+  registered: 'Espace ouvert · mois offert',
 }
 
 export const deletionLabels = {
@@ -25,7 +25,6 @@ export const deletionLabels = {
 export const pipeline = [
   ['received', 'Les demandes'],
   ['quote_sent', 'Devis'],
-  ['paid', 'Paiement'],
   ['code_issued', 'Code'],
   ['registered', 'Inscrits'],
 ]
@@ -103,9 +102,10 @@ export function navClass(active) {
 }
 
 export function PipelineBar({ status }) {
-  const current = pipeline.findIndex((step) => step[0] === status)
+  const normalized = status === 'paid' ? 'code_issued' : status
+  const current = pipeline.findIndex((step) => step[0] === normalized)
   return (
-    <ol className="grid grid-cols-5 gap-1">
+    <ol className="grid grid-cols-4 gap-1">
       {pipeline.map(([id, label], index) => {
         const done = index <= current
         const here = index === current
