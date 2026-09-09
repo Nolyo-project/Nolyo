@@ -33,7 +33,13 @@ async function handleStripeWebhook(req, res) {
   if (!Buffer.isBuffer(payload)) {
     console.error('Stripe webhook: body non brut', typeof payload)
     if (typeof payload === 'string') payload = Buffer.from(payload, 'utf8')
-    else payload = Buffer.from(JSON.stringify(payload ?? {}), 'utf8')
+    else {
+      return res.status(400).json({ error: 'Body webhook Stripe invalide.' })
+    }
+  }
+  if (!payload.length) {
+    console.error('Stripe webhook: body vide')
+    return res.status(400).json({ error: 'Body webhook Stripe vide.' })
   }
 
   let event

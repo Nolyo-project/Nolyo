@@ -91,12 +91,21 @@ app.use(
   }),
 )
 
-// Stripe exige le body brut (Buffer). Ne pas passer par express.json() avant.
-app.post(
-  '/api/stripe/webhook',
-  express.raw({ type: '*/*' }),
-  handleStripeWebhook,
-)
+// Stripe exige les octets exacts du body (signature HMAC).
+function stripeRawBody(req, res, next) {
+  if (req.method !== 'POST') return next()
+  const chunks = []
+  req.on('data', (chunk) => {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  })
+  req.on('end', () => {
+    req.body = Buffer.concat(chunks)
+    next()
+  })
+  req.on('error', next)
+}
+
+app.post('/api/stripe/webhook', stripeRawBody, handleStripeWebhook)
 app.use(express.json())
 app.use('/uploads', express.static(UPLOAD_ROOT))
 
