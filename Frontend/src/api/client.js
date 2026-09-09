@@ -1,3 +1,20 @@
+const API_BASE = String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+/** Préfixe l’URL API en prod (Vercel → Railway). En local : chemin relatif (proxy Vite). */
+export function apiUrl(path = '') {
+  if (!path) return API_BASE || ''
+  if (/^https?:\/\//i.test(path)) return path
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  return API_BASE ? `${API_BASE}${normalized}` : normalized
+}
+
+/** Images /uploads hébergées sur le backend Railway. */
+export function mediaUrl(url = '') {
+  if (!url) return ''
+  if (/^https?:\/\//i.test(url) || url.startsWith('data:') || url.startsWith('blob:')) return url
+  return apiUrl(url)
+}
+
 function fail(data, res) {
   const error = new Error(data.error || 'Une erreur est survenue.')
   error.status = res.status
@@ -20,7 +37,7 @@ export async function api(path, options = {}) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     method: options.method || 'GET',
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -38,7 +55,7 @@ export async function apiUpload(path, formData, options = {}) {
   const headers = { ...(options.headers || {}) }
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     method: options.method || 'POST',
     headers,
     body: formData,
@@ -54,7 +71,7 @@ export async function apiDownload(path, fileName, options = {}) {
   const headers = { ...(options.headers || {}) }
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(path, { method: options.method || 'GET', headers })
+  const res = await fetch(apiUrl(path), { method: options.method || 'GET', headers })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     fail(data, res)

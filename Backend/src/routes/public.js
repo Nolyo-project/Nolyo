@@ -177,11 +177,10 @@ router.get('/stats', async (_req, res) => {
 router.get('/landing-demo', async (_req, res) => {
   try {
     const { ensurePreviewAccount } = require('../seed/demoMember')
-    const Note = require('../models/Note')
     const Reminder = require('../models/Reminder')
     const Transaction = require('../models/Transaction')
 
-    const user = await ensurePreviewAccount()
+    const user = await ensurePreviewAccount('pro')
     if (!user) return res.status(404).json({ error: 'Compte démo introuvable.' })
 
     const full = await User.findById(user._id)
@@ -194,7 +193,7 @@ router.get('/landing-demo', async (_req, res) => {
     todayEnd.setHours(23, 59, 59, 999)
     const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1)
 
-    const [clients, todayAppointments, pendingReminders, monthTx] = await Promise.all([
+    const [clients, todayAppointments, pendingReminders, monthTx, upcomingRdv] = await Promise.all([
       Contact.countDocuments({ user: userId, kind: 'client' }),
       Appointment.find({
         user: userId,
@@ -211,18 +210,23 @@ router.get('/landing-demo', async (_req, res) => {
         .limit(6)
         .lean(),
       Transaction.find({ user: userId, date: { $gte: monthStart } }).lean(),
+      Appointment.countDocuments({
+        user: userId,
+        status: 'planned',
+        startAt: { $gte: new Date() },
+      }),
     ])
 
     const monthIncome = monthTx.filter((t) => t.kind === 'income').reduce((sum, t) => sum + t.amount, 0)
+    const safe = full.toSafeJSON()
+    // Pas de secrets Stripe dans l’aperçu public
+    if (safe.subscription) {
+      delete safe.subscription.stripeCustomerId
+      delete safe.subscription.stripeSubscriptionId
+    }
 
     res.json({
-      user: {
-        name: full.name,
-        company: full.subscription?.company || 'Maison Brume',
-        plan: full.subscription?.plan || 'pro',
-        pageSlug: full.page?.slug || 'maison-brume',
-        pagePublished: Boolean(full.page?.published && full.page?.slug),
-      },
+      user: safe,
       overview: {
         clients,
         monthIncome,
@@ -230,6 +234,11 @@ router.get('/landing-demo', async (_req, res) => {
         todayAppointments,
         reminders: pendingReminders,
       },
+      badges: {
+        rdv: upcomingRdv,
+        reminders: pendingReminders.length,
+      },
+      pageSlug: full.page?.slug || 'maison-brume',
     })
   } catch (err) {
     console.error('landing-demo', err.message)
@@ -753,6 +762,22 @@ router.post('/founder/book', async (req, res) => {
     contact,
     appointment,
     pageTitle: 'Nolyo',
+    guestConfirm: {
+      subject: `Confirmation de rendez-vous — Nolyo`,
+      fallbackBody: `Bonjour ${firstName},
+
+Votre rendez-vous avec ${user.name.split(' ')[0] || 'Florentin'} (Nolyo) est confirmé.
+
+Quand : le ${when}
+Durée : ${service.durationMinutes} min
+Sujet : ${service.name}
+
+Un e-mail de rappel n’est pas obligatoire : ce créneau est déjà dans l’agenda.
+
+À très bientôt,
+${user.name.split(' ')[0] || 'Florentin'}
+Fondateur de Nolyo`,
+    },
   }).catch((err) => console.error('Founder booking mail', err.message))
 
   if (user.notifications?.pushBooking !== false) {

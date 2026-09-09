@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, mediaUrl } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { homeForUser } from '../auth/homeForUser'
 import { copyForTrade } from '../data/trades'
@@ -255,17 +255,7 @@ function PublicBooking() {
       <SeoHead
         title={`Réserver — ${page.title || page.name} | Nolyo`}
         description={`Prenez rendez-vous en ligne avec ${page.name || page.title}. ${page.tradeLabel || copy.label || ''}`.trim()}
-        image={
-          page.banner?.startsWith('http')
-            ? page.banner
-            : page.banner
-              ? `${window.location.origin}${page.banner}`
-              : page.avatar?.startsWith('http')
-                ? page.avatar
-                : page.avatar
-                  ? `${window.location.origin}${page.avatar}`
-                  : undefined
-        }
+        image={mediaUrl(page.banner || page.avatar) || undefined}
         url={`${window.location.origin}/p/${slug}/reserver`}
         jsonLd={{
           '@context': 'https://schema.org',
@@ -308,7 +298,7 @@ function PublicBooking() {
 
         <div className="mt-10 flex items-center gap-4">
           {page.avatar ? (
-            <img src={page.avatar} alt="" className="h-16 w-16 rounded-full object-cover ring-4 ring-cream" />
+            <img src={mediaUrl(page.avatar)} alt="" className="h-16 w-16 rounded-full object-cover ring-4 ring-cream" />
           ) : (
             <div className="grid h-16 w-16 place-items-center rounded-full bg-[var(--page-accent)] font-display text-2xl text-[var(--page-accent-ink)]">
               {initial}

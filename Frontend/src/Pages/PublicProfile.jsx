@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, mediaUrl } from '../api/client'
 import { copyForTrade } from '../data/trades'
 import { hasAboutContent, groupServicesByHeading, servicePriceLabel } from '../data/pageTheme'
 import { formatMoney } from './dashboard/format'
@@ -184,7 +184,7 @@ function PublicProfile() {
     }
   }, [lightbox, page])
 
-  const photos = page?.photos || []
+  const photos = (page?.photos || []).map((src) => mediaUrl(src)).filter(Boolean)
   const copy = copyForTrade(page?.trade)
   const { hasAside } = publicPageChrome(page, slug)
   const lightboxSrc = lightbox >= 0 ? photos[lightbox] : ''
@@ -192,7 +192,7 @@ function PublicProfile() {
   const seoDescription =
     page?.description?.replace(/\s+/g, ' ').trim().slice(0, 160) ||
     `${page?.title || 'Professionnel'} sur Nolyo — réservation et prestations.`
-  const seoImage = page?.banner || page?.avatar || photos[0] || ''
+  const seoImage = mediaUrl(page?.banner || page?.avatar || page?.photos?.[0] || '')
   const reviewAvg =
     page?.reviews?.length > 0
       ? Math.round(

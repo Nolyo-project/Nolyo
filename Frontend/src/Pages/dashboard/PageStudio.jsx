@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, apiUpload } from '../../api/client'
+import { api, apiUpload, mediaUrl } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { ghostBtn, primaryBtn, quietBtn } from './ui'
 import { ACCENT_PRESETS, BACKGROUND_PRESETS, SURFACE_PRESETS, parseHex, pickTheme } from '../../data/pageTheme'
@@ -652,7 +652,7 @@ export function PageStudio({ showQr, isPro }) {
                     <p className="text-sm font-semibold text-ink">Bannière</p>
                     <div className="mt-1.5 overflow-hidden rounded-2xl bg-[#faf8f5] ring-1 ring-ink/10">
                       {page.banner ? (
-                        <img src={page.banner} alt="" className="aspect-21/9 w-full object-cover" />
+                        <img src={mediaUrl(page.banner)} alt="" className="aspect-21/9 w-full object-cover" />
                       ) : (
                         <div className="grid aspect-21/9 place-items-center text-xs text-ink-soft">Image large</div>
                       )}
@@ -683,7 +683,7 @@ export function PageStudio({ showQr, isPro }) {
                       {[0, 1, 2].map((index) => (
                         <li key={index} className="overflow-hidden rounded-2xl bg-[#faf8f5] ring-1 ring-ink/10">
                           {page.photos[index] ? (
-                            <img src={page.photos[index]} alt="" className="aspect-4/5 w-full object-cover" />
+                            <img src={mediaUrl(page.photos[index])} alt="" className="aspect-4/5 w-full object-cover" />
                           ) : (
                             <div className="grid aspect-4/5 place-items-center text-xs text-ink-soft">{index + 1}</div>
                           )}
@@ -856,7 +856,7 @@ export function PageStudio({ showQr, isPro }) {
                     <li key={index} className="flex gap-4 rounded-[1.4rem] border border-ink/12 bg-[#faf8f5] p-4">
                       <div className="w-28 shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-ink/10">
                         {person.photo ? (
-                          <img src={person.photo} alt="" className="aspect-square w-full object-cover" />
+                          <img src={mediaUrl(person.photo)} alt="" className="aspect-square w-full object-cover" />
                         ) : (
                           <div className="grid aspect-square place-items-center text-[11px] text-ink-soft">Photo</div>
                         )}

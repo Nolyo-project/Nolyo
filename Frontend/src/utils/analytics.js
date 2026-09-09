@@ -1,4 +1,4 @@
-const API = import.meta.env.VITE_API_URL || ''
+import { apiUrl } from '../api/client'
 
 const SESSION_KEY = 'nolio_analytics_sid'
 const LAST_PATH_KEY = 'nolio_analytics_last_path'
@@ -64,7 +64,7 @@ export async function trackPageView(pathname = window.location.pathname) {
   try {
     if (navigator.sendBeacon) {
       const blob = new Blob([JSON.stringify(body)], { type: 'application/json' })
-      navigator.sendBeacon(`${API}/api/public/track`, blob)
+      navigator.sendBeacon(apiUrl('/api/public/track'), blob)
       return
     }
   } catch {
@@ -72,7 +72,7 @@ export async function trackPageView(pathname = window.location.pathname) {
   }
 
   try {
-    await fetch(`${API}/api/public/track`, {
+    await fetch(apiUrl('/api/public/track'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

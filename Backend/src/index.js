@@ -6,7 +6,7 @@ const cors = require('cors')
 const express = require('express')
 const { connectDb } = require('./config/db')
 const { ensurePresident } = require('./seed/president')
-const { ensureDemoAccounts, DEMO_EMAILS, ensurePreviewAccount } = require('./seed/demoMember')
+const { ensureDemoAccounts, DEMO_EMAILS } = require('./seed/demoMember')
 const { ensureSeedSiteReviews } = require('./utils/siteReviews')
 const User = require('./models/User')
 const healthRouter = require('./routes/health')
@@ -107,11 +107,8 @@ async function start() {
   await ensurePresident()
   const SiteSettings = require('./models/SiteSettings')
   await SiteSettings.getSiteSettings()
-  if (process.env.DEMO_SEED === '1' || process.env.DEMO_SEED === 'true') {
-    await ensureDemoAccounts()
-  } else {
-    await ensurePreviewAccount()
-  }
+  // Toujours : fondateur conservé, 2 comptes visiteurs (Essentiel + Pro page publique), reste purgé
+  await ensureDemoAccounts()
   await ensureSeedSiteReviews()
   await User.updateMany(
     {

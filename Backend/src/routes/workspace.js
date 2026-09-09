@@ -864,11 +864,20 @@ router.get('/appointments', async (req, res) => {
 })
 
 router.get('/follow-ups', async (req, res) => {
+  const now = new Date()
   const found = await Appointment.find({
     user: req.user._id,
     status: 'planned',
     contact: { $ne: null },
-    startAt: { $lte: new Date() },
+    // RDV terminé seulement (début + durée), pas ceux encore en cours
+    $expr: {
+      $lte: [
+        {
+          $add: ['$startAt', { $multiply: [{ $ifNull: ['$durationMinutes', 60] }, 60000] }],
+        },
+        now,
+      ],
+    },
   })
     .sort({ startAt: -1 })
     .populate('contact', 'name firstName lastName kind company phone price')

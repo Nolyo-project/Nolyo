@@ -10,6 +10,8 @@ const Note = require('../models/Note')
 const Reminder = require('../models/Reminder')
 const Service = require('../models/Service')
 const Transaction = require('../models/Transaction')
+const Review = require('../models/Review')
+const Absence = require('../models/Absence')
 const User = require('../models/User')
 const { getTrade } = require('../data/trades')
 const { pickWorkspace } = require('../data/workspace')
@@ -23,8 +25,11 @@ const RETIRED_EMAILS = [
   'nora@nolio.test',
   'test.pro@nolio.test',
   'test.essentiel@nolio.test',
+  'adam@nolio.test',
+  'maya@nolio.test',
+  'leo@nolio.test',
 ]
-const RETIRED_SLUGS = ['maison-seve', 'atelier-lina']
+const RETIRED_SLUGS = ['maison-seve', 'atelier-lina', 'khelifi-studio', 'studio-soler', 'salon-marin']
 
 const unsplash = (id, w, h) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&h=${h}&q=80`
@@ -32,6 +37,8 @@ const unsplash = (id, w, h) =>
 const PROFILES = [
   {
     email: 'ines@nolio.test',
+    plan: 'pro',
+    publishPage: true,
     name: 'Inès Daroux',
     company: 'Maison Brume',
     legalName: 'Maison Brume',
@@ -89,21 +96,23 @@ const PROFILES = [
       { name: 'Massage', price: 90, durationMinutes: 75 },
       { name: 'Rituel découverte', price: 45, durationMinutes: 45 },
     ],
-    seed: wellnessSeed(),
+    getSeed: wellnessSeed,
   },
   {
-    email: 'adam@nolio.test',
-    name: 'Adam Khelifi',
-    company: 'Khelifi Studio',
-    legalName: 'Khelifi Studio',
-    pageEmail: 'adam@khelifi.studio',
-    slug: 'khelifi-studio',
+    email: 'essentiel@nolio.test',
+    plan: 'essentiel',
+    publishPage: false,
+    name: 'Jules Morel',
+    company: 'Cabinet Morel',
+    legalName: 'Jules Morel',
+    pageEmail: 'jules@cabinetmorel.fr',
+    slug: '',
     phone: '06 51 22 08 44',
     city: 'Paris',
     postalCode: '75011',
     address: '22 rue de la Folie-Méricourt',
-    addressExtra: '3e étage, code 2418',
-    website: 'https://khelifi.studio',
+    addressExtra: '3e étage',
+    website: '',
     siret: '851 204 778 00021',
     vatNumber: 'FR32851204778',
     rcs: 'RCS Paris 851 204 778',
@@ -113,27 +122,13 @@ const PROFILES = [
     workMode: 'projects',
     displayAs: 'person',
     legalForm: 'Micro-entreprise',
-    title: 'Adam Khelifi — sites et outils, à Paris',
-    description:
-      'Je conçois des sites et des outils pour les indépendants et les petites équipes. Pas de jargon, un cadrage clair, une livraison qui tient.\n\n' +
-      'Un premier rendez-vous pour parler du projet, puis un devis. Travail à distance ou sur place, à Paris.\n\n' +
-      'Khelifi Studio : du site vitrine à l’outil du quotidien.',
-    instagram: '@khelifi.studio',
+    title: '',
+    description: '',
+    instagram: '',
     facebook: '',
-    linkedin: 'adam-khelifi',
+    linkedin: 'jules-morel',
     theme: { accent: '#243026', background: '#f3eee4', surface: '#ffffff' },
-    about: {
-      body:
-        'Je travaille seul, à Paris et à distance. Un cadrage clair, une livraison qui tient, pas de jargon.\n\nKhelifi Studio accompagne les indépendants et les petites équipes, du site vitrine à l’outil du quotidien.',
-      people: [
-        {
-          name: 'Adam Khelifi',
-          role: 'Développeur',
-          bio: 'Sites, outils internes, un peu de conseil. Je préfère les projets où l’on se parle vraiment.',
-          photo: unsplash('photo-1507003211169-0a1dd7228f2d', 900, 1125),
-        },
-      ],
-    },
+    about: { body: '', people: [] },
     images: {
       avatar: unsplash('photo-1507003211169-0a1dd7228f2d', 900, 1125),
       banner: unsplash('photo-1517694712202-14dd9538aa97', 1600, 640),
@@ -148,145 +143,7 @@ const PROFILES = [
       { name: 'Mission demi-journée', price: 450, durationMinutes: 240 },
       { name: 'Accompagnement mensuel', price: 900, durationMinutes: 60 },
     ],
-    seed: developerSeed(),
-  },
-  {
-    email: 'maya@nolio.test',
-    name: 'Maya Soler',
-    company: 'Studio Soler',
-    legalName: 'Studio Soler',
-    pageEmail: 'hello@studiosoler.fr',
-    slug: 'studio-soler',
-    phone: '07 44 18 02 91',
-    city: 'Bordeaux',
-    postalCode: '33000',
-    address: '8 rue des Tilleuls',
-    addressExtra: 'Rez-de-jardin, sonnette Soler',
-    website: 'https://studiosoler.fr',
-    siret: '847 331 209 00024',
-    vatNumber: 'FR31847331209',
-    rcs: 'RCS Bordeaux 847 331 209',
-    iban: 'FR76 3000 4008 0300 0123 4567 891',
-    apeCode: '74.20Z',
-    trade: 'creative',
-    workMode: 'mix',
-    displayAs: 'company',
-    legalForm: 'Micro-entreprise',
-    title: 'Studio Soler — portraits et images, à Bordeaux',
-    description:
-      'Studio indépendant à Bordeaux. Portraits, reportages, images pour les marques et les personnes.\n\n' +
-      'Je travaille sur rendez-vous et au projet. Un premier échange pour cadrer, puis un devis clair. Lumière posée, peu de bruit.\n\n' +
-      'Séances au studio, en extérieur, ou chez vous.',
-    instagram: '@studiosoler',
-    facebook: 'studiosoler.bordeaux',
-    linkedin: 'maya-soler',
-    theme: { accent: '#8b3a2d', background: '#f3eee4', surface: '#ffffff' },
-    about: {
-      body:
-        'Studio indépendant à Bordeaux. Portraits, reportages, images pour les marques et les personnes.\n\nOn est deux : Maya à la prise de vue, Léna à la retouche et à l’accueil.',
-      people: [
-        {
-          name: 'Maya Soler',
-          role: 'Photographe',
-          bio: 'Lumière posée, peu de bruit. Séances au studio, en extérieur, ou chez vous.',
-          photo: unsplash('photo-1534528741775-53994a69daeb', 900, 1125),
-        },
-        {
-          name: 'Léna Ruiz',
-          role: 'Retouche et studio',
-          bio: 'Elle prépare le studio, trie les séries, et tient le fil avec les clients entre deux séances.',
-          photo: unsplash('photo-1544005313-94ddf0286df2', 900, 1125),
-        },
-      ],
-    },
-    images: {
-      avatar: unsplash('photo-1534528741775-53994a69daeb', 900, 1125),
-      banner: unsplash('photo-1471341971476-ae15ff5dd4ea', 1600, 640),
-      photos: [
-        unsplash('photo-1554048612-b6a482bc67e5', 1200, 900),
-        unsplash('photo-1542038784456-1ea8e935640e', 900, 1125),
-        unsplash('photo-1516035069371-29a1b244cc32', 900, 1125),
-      ],
-    },
-    services: [
-      { name: 'Demande de devis', price: 0, durationMinutes: 30, kind: 'quote' },
-      { name: 'Séance portrait', price: 280, durationMinutes: 90 },
-      { name: 'Reportage demi-journée', price: 650, durationMinutes: 240 },
-    ],
-    seed: photographerSeed(),
-  },
-  {
-    email: 'leo@nolio.test',
-    name: 'Léo Marin',
-    company: 'Salon Marin',
-    legalName: 'Salon Marin',
-    pageEmail: 'bonjour@salonmarin.fr',
-    slug: 'salon-marin',
-    phone: '06 98 11 70 23',
-    city: 'Nantes',
-    postalCode: '44000',
-    address: '9 rue des Halles',
-    addressExtra: 'Rdc, vitrine verte',
-    website: 'https://salonmarin.fr',
-    siret: '882 410 663 00018',
-    vatNumber: 'FR44882410663',
-    rcs: 'RCS Nantes 882 410 663',
-    iban: 'FR76 3000 4000 0100 0123 4567 893',
-    apeCode: '96.02A',
-    trade: 'beauty',
-    workMode: 'appointments',
-    displayAs: 'company',
-    legalForm: 'Micro-entreprise',
-    title: 'Salon Marin — coupe et couleur, à Nantes',
-    description:
-      'Un salon où l’on prend le temps. Coupe, couleur, barbe : une table à la fois, une carte claire.\n\n' +
-      'Je reçois sur rendez-vous, du mardi au samedi. Pas de chaîne, pas de précipitation. On se voit, on parle de ce que vous voulez, et on fait.\n\n' +
-      'Salon Marin, centre-ville de Nantes. Réservation en ligne, places limitées.',
-    instagram: '@salonmarin',
-    facebook: 'salonmarin.nantes',
-    linkedin: '',
-    theme: { accent: '#1d4e4e', background: '#f3eee4', surface: '#ffffff' },
-    about: {
-      body:
-        'Un salon où l’on prend le temps. Coupe, couleur, barbe : une table à la fois, une carte claire.\n\n' +
-        'L’équipe est petite, volontairement. Léo, Chloé et Mehdi se voient tous les jours, se passent les clients, et gardent le même rythme : on se parle, on explique, puis on fait.\n\n' +
-        'Le salon est au centre-ville de Nantes, rdc, vitrine verte. On reçoit du mardi au samedi, sur rendez-vous. Pas de chaîne, pas de précipitation.',
-      people: [
-        {
-          name: 'Léo Marin',
-          role: 'Fondateur · coupe et barbe',
-          bio: 'Le salon porte son nom. Il reçoit du mardi au samedi, sans précipitation.',
-          photo: unsplash('photo-1622286342621-4bd786c2447c', 900, 1125),
-        },
-        {
-          name: 'Chloé Tessier',
-          role: 'Coloriste',
-          bio: 'Couleur, balayage, soins. Elle prend le temps d’expliquer avant de poser.',
-          photo: unsplash('photo-1580618672591-eb180b1a809e', 900, 1125),
-        },
-        {
-          name: 'Mehdi Bensaïd',
-          role: 'Coiffeur',
-          bio: 'Coupes nettes, barbes propres. Il aime les rendez-vous un peu plus longs le samedi.',
-          photo: unsplash('photo-1506794778202-cad84cf45f1d', 900, 1125),
-        },
-      ],
-    },
-    images: {
-      avatar: unsplash('photo-1622286342621-4bd786c2447c', 900, 1125),
-      banner: unsplash('photo-1560066984-138dadb4c035', 1600, 640),
-      photos: [
-        unsplash('photo-1522337360788-8b13dee7a37e', 1200, 900),
-        unsplash('photo-1599351431202-1e0f0137899a', 900, 1125),
-        unsplash('photo-1562322140-8baeececf3df', 900, 1125),
-      ],
-    },
-    services: [
-      { name: 'Coupe', price: 42, durationMinutes: 45 },
-      { name: 'Couleur', price: 85, durationMinutes: 90 },
-      { name: 'Barbe', price: 22, durationMinutes: 30 },
-    ],
-    seed: hairdresserSeed(),
+    getSeed: developerSeed,
   },
 ]
 
@@ -426,26 +283,56 @@ function wellnessSeed() {
     ],
     appointments: [
       { contact: 0, title: 'Massage — Claire Dupont', hours: -2, location: 'Cabine 1', durationMinutes: 75 },
-      { contact: 1, title: 'Soin visage — Hugo Fernandes', hours: 6, location: 'Cabine 2', durationMinutes: 60 },
+      { contact: 1, title: 'Soin visage — Hugo Fernandes', hours: 1.5, location: 'Cabine 2', durationMinutes: 60 },
+      { contact: 4, title: 'Soin visage — Amélie Bernard', hours: 4, location: 'Cabine 1', durationMinutes: 60 },
+      { contact: 5, title: 'Massage — Camille Roux', hours: 6.5, location: 'Cabine 1', durationMinutes: 75 },
       { contact: 2, title: 'Rituel découverte — Inès Verde', days: 2, location: 'Cabine 1', durationMinutes: 45 },
     ],
     transactions: [
       { kind: 'income', label: 'Massage Claire Dupont', amount: 90, days: -1, category: 'Séance' },
       { kind: 'income', label: 'Soin visage Hugo Fernandes', amount: 75, hours: -20, category: 'Séance' },
+      { kind: 'income', label: 'Massage Léa Noël', amount: 90, days: -4, category: 'Séance' },
+      { kind: 'income', label: 'Rituel découverte David Petit', amount: 45, days: -6, category: 'Séance' },
       { kind: 'expense', label: 'Huiles et linges', amount: 48, days: -3, category: 'Fournitures' },
     ],
     reminders: [],
     notes: [
       { contact: 0, title: 'Claire — nuque', body: 'Éviter trop de pression sur la nuque. Huile sésame.' },
       { title: 'Carte d’hiver', body: 'Proposer un rituel plus long en décembre, 90 minutes.' },
+      { contact: 1, title: 'Hugo — samedi', body: 'Préfère les créneaux du samedi matin.' },
     ],
     inbox: [
       { source: 'instagram', from: '@claire.d', preview: 'Est-ce qu’il reste une place samedi pour un massage ?', hours: -5 },
       { source: 'email', from: 'hugo.fernandes@gmail.com', preview: 'Je confirme le soin visage de cet après-midi.', hours: -2 },
+      { source: 'email', from: 'amelie.bernard@gmail.com', preview: 'Puis-je décaler mon soin de 30 minutes ?', hours: -12 },
     ],
     journal: [
       { days: -1, tasks: [{ title: 'Préparer la cabine', done: true }, { title: 'Commander les huiles', done: false }] },
-      { days: 0, tasks: [{ title: 'Massage Claire 14h', done: false }, { title: 'Répondre à Instagram', done: true }] },
+      {
+        days: 0,
+        tasks: [
+          { title: 'Massage Claire 14h', done: true },
+          { title: 'Soin Hugo cet après-midi', done: false },
+          { title: 'Répondre à Instagram', done: true },
+        ],
+      },
+    ],
+    reviews: [
+      {
+        authorName: 'Claire Dupont',
+        rating: 5,
+        body: 'Un vrai cocon. Le massage a détendu toute ma semaine. Je reviens.',
+      },
+      {
+        authorName: 'Hugo Fernandes',
+        rating: 5,
+        body: 'Soin visage précis, accueil calme. On se sent pris en charge sans bruit.',
+      },
+      {
+        authorName: 'Amélie Bernard',
+        rating: 4,
+        body: 'Très belle expérience. Cabine soignée, horaires respectés.',
+      },
     ],
   }
 }
@@ -771,6 +658,9 @@ function whenFrom(item) {
 async function fillCompleteDemoAccount(user, profile) {
   const images = await fillDemoImages(user, profile.images, true)
   const trade = getTrade(profile.trade)
+  const plan = profile.plan === 'essentiel' ? 'essentiel' : 'pro'
+  const publishPage = plan === 'pro' && profile.publishPage !== false && Boolean(profile.slug)
+
   user.name = profile.name
   user.avatar = images.avatar
   user.quoteFollowUpDays = 3
@@ -783,7 +673,7 @@ async function fillCompleteDemoAccount(user, profile) {
     workDays: [...trade.schedule.workDays],
   }
   if (!user.subscription) user.subscription = { status: 'active' }
-  user.subscription.plan = 'pro'
+  user.subscription.plan = plan
   user.subscription.status = 'active'
   user.subscription.company = profile.company
   user.business = {
@@ -805,23 +695,35 @@ async function fillCompleteDemoAccount(user, profile) {
     iban: profile.iban,
     bic: 'BNPAFRPPXXX',
   }
-  user.page = User.pickPage({
-    slug: profile.slug,
-    published: true,
-    title: profile.title,
-    description: profile.description,
-    banner: images.banner,
-    photos: images.photos,
-    instagram: profile.instagram,
-    facebook: profile.facebook,
-    linkedin: profile.linkedin,
-    website: profile.website,
-    address: `${profile.address}, ${profile.postalCode} ${profile.city}`,
-    phone: profile.phone,
-    email: profile.pageEmail,
-    theme: profile.theme,
-    about: profile.about,
-  })
+  if (publishPage) {
+    user.page = User.pickPage({
+      slug: profile.slug,
+      published: true,
+      title: profile.title,
+      description: profile.description,
+      banner: images.banner,
+      photos: images.photos,
+      instagram: profile.instagram,
+      facebook: profile.facebook,
+      linkedin: profile.linkedin,
+      website: profile.website,
+      address: `${profile.address}, ${profile.postalCode} ${profile.city}`,
+      phone: profile.phone,
+      email: profile.pageEmail,
+      theme: profile.theme,
+      about: profile.about,
+    })
+  } else {
+    user.page = User.pickPage({
+      slug: '',
+      published: false,
+      title: '',
+      description: '',
+      banner: '',
+      photos: [],
+      about: { body: '', people: [] },
+    })
+  }
   user.onboarding = {
     completedAt: new Date(),
     trade: profile.trade,
@@ -832,7 +734,7 @@ async function fillCompleteDemoAccount(user, profile) {
   }
   user.workspace = pickWorkspace(
     { displayAs: profile.displayAs },
-    { plan: 'pro', tradeId: profile.trade, workMode: profile.workMode },
+    { plan, tradeId: profile.trade, workMode: profile.workMode },
   )
   await user.save()
 }
@@ -852,6 +754,60 @@ async function ensureDemoServices(user, profile) {
   )
 }
 
+async function profileSeed(profile) {
+  if (typeof profile.getSeed === 'function') return profile.getSeed()
+  return profile.seed || { contacts: [] }
+}
+
+async function clearDemoWorkspace(userId) {
+  await Promise.all([
+    Appointment.deleteMany({ user: userId }),
+    Contact.deleteMany({ user: userId }),
+    DayLog.deleteMany({ user: userId }),
+    InboxItem.deleteMany({ user: userId }),
+    Note.deleteMany({ user: userId }),
+    Reminder.deleteMany({ user: userId }),
+    Service.deleteMany({ user: userId }),
+    Transaction.deleteMany({ user: userId }),
+    Review.deleteMany({ user: userId }),
+    Absence.deleteMany({ user: userId }),
+  ])
+}
+
+async function seedDemoReviews(user, profile) {
+  const seed = await profileSeed(profile)
+  const reviews = seed.reviews || []
+  if (!reviews.length) return
+  const existing = await Review.countDocuments({ user: user._id })
+  if (existing > 0) return
+  await Review.create(
+    reviews.map((item) => ({
+      user: user._id,
+      authorName: item.authorName,
+      authorEmail: item.authorEmail || '',
+      rating: item.rating,
+      body: item.body,
+      status: 'approved',
+    })),
+  )
+}
+
+async function seedDemoAbsences(user, profile) {
+  if (profile.plan !== 'pro') return
+  const existing = await Absence.countDocuments({ user: user._id })
+  if (existing > 0) return
+  const start = daysFromNow(12)
+  const end = daysFromNow(14)
+  await Absence.create({
+    user: user._id,
+    title: 'Congés',
+    kind: 'vacation',
+    startDate: toDateKey(start),
+    endDate: toDateKey(end),
+    note: 'Salon fermé — réservation en ligne fermée ces jours-là.',
+  })
+}
+
 async function topUpMissingContacts(user, wanted) {
   if (!wanted?.length) return
   const rows = await Contact.find({ user: user._id }).select('email')
@@ -862,13 +818,22 @@ async function topUpMissingContacts(user, wanted) {
   console.log(`${missing.length} fiche${missing.length > 1 ? 's' : ''} ajoutée${missing.length > 1 ? 's' : ''} pour ${user.email}`)
 }
 
-async function seedDemoWorkspace(user, profile) {
+async function seedDemoWorkspace(user, profile, { force = false } = {}) {
+  if (force) await clearDemoWorkspace(user._id)
+
   const existing = await Contact.countDocuments({ user: user._id })
+  const seed = await profileSeed(profile)
   if (existing > 0) {
-    await topUpMissingContacts(user, profile.seed?.contacts)
+    await topUpMissingContacts(user, seed.contacts)
+    await seedDemoReviews(user, profile)
+    await seedDemoAbsences(user, profile)
     return
   }
-  const seed = profile.seed
+  if (!seed.contacts?.length) {
+    console.warn(`Seed démo vide pour ${user.email}`)
+    return
+  }
+
   const contacts = await Contact.create(
     seed.contacts.map((item) => ({
       user: user._id,
@@ -940,13 +905,17 @@ async function seedDemoWorkspace(user, profile) {
     )
   }
 
+  await seedDemoReviews(user, profile)
+  await seedDemoAbsences(user, profile)
   console.log(`Espace démo prêt pour ${user.email}`)
 }
 
-async function seedDemoJournal(user, profile) {
+async function seedDemoJournal(user, profile, { force = false } = {}) {
+  if (force) await DayLog.deleteMany({ user: user._id })
   const existing = await DayLog.countDocuments({ user: user._id })
   if (existing > 0) return
-  const rows = profile.seed.journal || []
+  const seed = await profileSeed(profile)
+  const rows = seed.journal || []
   if (!rows.length) return
   await DayLog.create(
     rows.map((item) => ({
@@ -957,24 +926,110 @@ async function seedDemoJournal(user, profile) {
   )
 }
 
-async function removeRetiredAccounts() {
-  const extra = [process.env.DEMO_EMAIL, process.env.DEMO_ESSENTIEL_EMAIL]
-    .filter(Boolean)
-    .map((email) => String(email).trim().toLowerCase())
-  const keep = new Set(PROFILES.map((item) => item.email))
-  const emails = [...new Set([...RETIRED_EMAILS, ...extra])].filter((email) => !keep.has(email))
-  const users = await User.find({
+const BILLING_TEST_EMAIL = 'florentin.essai@nolio.test'
+const BILLING_TEST_PASSWORD = process.env.BILLING_TEST_PASSWORD || 'NolioEssai2026!'
+
+async function ensureBillingTestAccount({ force = false } = {}) {
+  const trialEndsAt = daysFromNow(1)
+  const activatedAt = daysFromNow(-29)
+  let user = await User.findOne({ email: BILLING_TEST_EMAIL })
+  const passwordHash = await User.hashPassword(BILLING_TEST_PASSWORD)
+
+  if (!user) {
+    user = await User.create({
+      name: 'Florentin Essai',
+      email: BILLING_TEST_EMAIL,
+      passwordHash,
+      role: 'member',
+      onboarding: {
+        completedAt: new Date(),
+        trade: 'other',
+        workMode: 'mix',
+        company: 'Test fin d’essai',
+      },
+      subscription: {
+        plan: 'essentiel',
+        status: 'trialing',
+        company: 'Test fin d’essai',
+        teamSize: '1',
+        activatedAt,
+        trialEndsAt,
+        hasPaymentMethod: false,
+        billingChoice: '',
+        commitmentChoice: '',
+      },
+    })
+    console.log(
+      `Compte test fin d’essai prêt : ${BILLING_TEST_EMAIL} / ${BILLING_TEST_PASSWORD} (essai jusqu’au ${trialEndsAt.toISOString().slice(0, 10)})`,
+    )
+    return user
+  }
+
+  user.passwordHash = passwordHash
+  const sub = user.subscription || {}
+  const midPaymentTest = Boolean(sub.stripeSubscriptionId || sub.billingChoice || sub.hasPaymentMethod)
+  if (force || !midPaymentTest) {
+    user.name = 'Florentin Essai'
+    user.onboarding = {
+      ...(user.onboarding?.toObject?.() || user.onboarding || {}),
+      completedAt: user.onboarding?.completedAt || new Date(),
+      trade: user.onboarding?.trade || 'other',
+      workMode: user.onboarding?.workMode || 'mix',
+      company: 'Test fin d’essai',
+    }
+    user.subscription = {
+      ...(sub.toObject?.() || sub),
+      plan: 'essentiel',
+      status: 'trialing',
+      company: 'Test fin d’essai',
+      teamSize: '1',
+      activatedAt,
+      trialEndsAt,
+      hasPaymentMethod: false,
+      billingChoice: '',
+      billingChoiceAt: undefined,
+      commitmentChoice: '',
+      commitmentChoiceAt: undefined,
+      stripeCustomerId: '',
+      stripeSubscriptionId: '',
+      stripePriceId: '',
+      collectionMethod: '',
+    }
+    console.log(
+      `Compte test fin d’essai réinitialisé : ${BILLING_TEST_EMAIL} (essai jusqu’au ${trialEndsAt.toISOString().slice(0, 10)})`,
+    )
+  }
+  await user.save()
+  return user
+}
+
+async function purgeOtherMembers() {
+  const keep = new Set([
+    ...PROFILES.map((item) => String(item.email).toLowerCase()),
+    BILLING_TEST_EMAIL.toLowerCase(),
+  ])
+  const members = await User.find({ role: 'member' })
+  for (const user of members) {
+    const email = String(user.email || '').toLowerCase()
+    if (keep.has(email)) continue
+    await deleteMemberAccount(user)
+    console.log(`Compte membre retiré : ${email}`)
+  }
+
+  const retired = await User.find({
     role: 'member',
-    $or: [{ email: { $in: emails } }, { 'page.slug': { $in: RETIRED_SLUGS } }],
+    $or: [{ email: { $in: RETIRED_EMAILS } }, { 'page.slug': { $in: RETIRED_SLUGS } }],
   })
-  for (const user of users) {
+  for (const user of retired) {
+    if (keep.has(String(user.email || '').toLowerCase())) continue
     const email = user.email
     await deleteMemberAccount(user)
     console.log(`Compte fictif retiré : ${email}`)
   }
 }
 
-async function ensureDemoAccount(profile) {
+async function ensureDemoAccount(profile, { force = false } = {}) {
+  const plan = profile.plan === 'essentiel' ? 'essentiel' : 'pro'
   let user = await User.findOne({ email: profile.email })
   if (!user) {
     user = await User.create({
@@ -983,14 +1038,14 @@ async function ensureDemoAccount(profile) {
       passwordHash: await User.hashPassword(PASSWORD),
       role: 'member',
       subscription: {
-        plan: 'pro',
+        plan,
         status: 'active',
         company: profile.company,
         teamSize: '1',
         activatedAt: daysFromNow(-10),
       },
     })
-    console.log(`Compte démo prêt : ${profile.email}`)
+    console.log(`Compte démo prêt : ${profile.email} (${plan})`)
   } else if (!(await user.checkPassword(PASSWORD))) {
     user.passwordHash = await User.hashPassword(PASSWORD)
     await user.save()
@@ -998,45 +1053,84 @@ async function ensureDemoAccount(profile) {
   }
 
   const photos = user.page?.photos || []
-  const imagesIncomplete = !user.avatar || !user.page?.banner || photos.filter(Boolean).length < 3
+  const imagesIncomplete =
+    !user.avatar ||
+    (plan === 'pro' && (!user.page?.banner || photos.filter(Boolean).length < 3))
+  const planMismatch = user.subscription?.plan !== plan
+  const slugMismatch = plan === 'pro' && user.page?.slug !== profile.slug
+  const pageNotPublished = plan === 'pro' && !user.page?.published
   const hasAbout =
     Boolean(String(user.page?.about?.body || '').trim()) ||
     (user.page?.about?.people || []).some((person) => person.name || person.photo)
-  if (user.page?.slug !== profile.slug || imagesIncomplete) {
+
+  if (
+    force ||
+    planMismatch ||
+    slugMismatch ||
+    pageNotPublished ||
+    imagesIncomplete ||
+    !user.onboarding?.completedAt
+  ) {
     await fillCompleteDemoAccount(user, profile)
-  } else if (!hasAbout && profile.about) {
+  } else if (plan === 'pro' && !hasAbout && profile.about) {
     const current = User.pickPage(user.page?.toObject?.() || user.page || {})
     user.page = User.pickPage({ ...current, about: profile.about })
     await user.save()
   }
 
-  await ensureDemoServices(user, profile)
-  await seedDemoWorkspace(user, profile)
-  await seedDemoJournal(user, profile)
+  const [contactCount, serviceCount] = await Promise.all([
+    Contact.countDocuments({ user: user._id }),
+    Service.countDocuments({ user: user._id }),
+  ])
+  const needsWorkspace = force || contactCount === 0 || serviceCount === 0
+
+  if (needsWorkspace) {
+    await clearDemoWorkspace(user._id)
+    await ensureDemoServices(user, profile)
+    await seedDemoWorkspace(user, profile, { force: false })
+    await seedDemoJournal(user, profile, { force: true })
+  } else {
+    await ensureDemoServices(user, profile)
+    await seedDemoWorkspace(user, profile)
+    await seedDemoJournal(user, profile)
+  }
+
+  return User.findById(user._id)
 }
 
-async function ensureDemoAccounts() {
-  await removeRetiredAccounts()
+/** Crée/aligne les 2 comptes visiteurs et supprime tout autre membre (le président est conservé). */
+async function ensureDemoAccounts({ force = false } = {}) {
+  await purgeOtherMembers()
   for (const profile of PROFILES) {
-    await ensureDemoAccount(profile)
+    await ensureDemoAccount(profile, { force })
   }
+  await ensureBillingTestAccount()
 }
 
-/** Garantit le compte utilisé pour l’essai 5 minutes (même sans DEMO_SEED). */
-async function ensurePreviewAccount() {
-  const email = String(process.env.PREVIEW_EMAIL || 'ines@nolio.test').toLowerCase()
-  const existing = await User.findOne({ email, role: 'member' }).select('_id subscription.status')
-  if (existing && ['active', 'trialing'].includes(existing.subscription?.status)) {
-    return existing
-  }
-  const profile = PROFILES.find((item) => item.email === email) || PROFILES[0]
-  await ensureDemoAccount(profile)
-  return User.findOne({ email: profile.email, role: 'member' })
+/** Compte utilisé pour l’essai 5 minutes / les aperçus landing (Pro par défaut). */
+async function ensurePreviewAccount(plan = 'pro') {
+  const wanted = plan === 'essentiel' ? 'essentiel' : 'pro'
+  const profile =
+    PROFILES.find((item) => item.plan === wanted) ||
+    PROFILES.find((item) => item.plan === 'pro') ||
+    PROFILES[0]
+  const user = await ensureDemoAccount(profile)
+  // Si l’espace a été vidé, le recreate tout de suite
+  const contacts = await Contact.countDocuments({ user: user._id })
+  if (contacts === 0) return ensureDemoAccount(profile, { force: true })
+  return user
 }
 
 module.exports = {
   ensureDemoAccounts,
   ensurePreviewAccount,
-  DEMO_EMAILS: [...PROFILES.map((item) => item.email), ...RETIRED_EMAILS],
+  ensureBillingTestAccount,
+  DEMO_EMAILS: [...PROFILES.map((item) => item.email), ...RETIRED_EMAILS, BILLING_TEST_EMAIL],
   DEMO_PASSWORD: PASSWORD,
+  BILLING_TEST_EMAIL,
+  BILLING_TEST_PASSWORD,
+  DEMO_PRO_EMAIL: PROFILES.find((item) => item.plan === 'pro')?.email || 'ines@nolio.test',
+  DEMO_ESSENTIEL_EMAIL:
+    PROFILES.find((item) => item.plan === 'essentiel')?.email || 'essentiel@nolio.test',
+  DEMO_PRO_SLUG: 'maison-brume',
 }

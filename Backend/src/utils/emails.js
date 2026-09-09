@@ -321,7 +321,7 @@ function fillTemplate(template, vars) {
   return String(template || '').replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] != null ? String(vars[key]) : ''))
 }
 
-async function sendBookingEmails({ owner, contact, appointment, pageTitle }) {
+async function sendBookingEmails({ owner, contact, appointment, pageTitle, guestConfirm }) {
   const { dateLabel, timeLabel } = bookingWhen(appointment.startAt)
   const company =
     owner.subscription?.company || owner.onboarding?.company || owner.business?.tradeName || owner.name || 'Nolyo'
@@ -337,16 +337,19 @@ async function sendBookingEmails({ owner, contact, appointment, pageTitle }) {
   }
 
   const notif = owner.notifications || {}
-  const customSubject =
-    fillTemplate(notif.clientBookingEmailSubject, vars) || `Confirmation — ${serviceName} le ${dateLabel}`
-  const customBody =
-    fillTemplate(notif.clientBookingEmailBody, vars) ||
-    `Bonjour ${guestFirst},
+  const defaultGuestSubject = `Confirmation — ${serviceName} le ${dateLabel}`
+  const defaultGuestBody = `Bonjour ${guestFirst},
 
 Votre rendez-vous « ${serviceName} » est confirmé le ${dateLabel} à ${timeLabel}.
 
 À bientôt,
 ${company}`
+  const customSubject =
+    fillTemplate(guestConfirm?.subject || notif.clientBookingEmailSubject, vars) || defaultGuestSubject
+  const customBody =
+    fillTemplate(guestConfirm?.body || notif.clientBookingEmailBody, vars) ||
+    guestConfirm?.fallbackBody ||
+    defaultGuestBody
 
   const tasks = []
 
@@ -378,7 +381,7 @@ Ouvrez votre agenda Nolyo pour le détail.`,
   if (contact.email) {
     const htmlBody = customBody
       .split(/\n+/)
-      .map((line) => `<p style="line-height:1.6;margin:0 0 12px;">${line}</p>`)
+      .map((line) => `<p style="line-height:1.6;margin:0 0 12px;">${line || '&nbsp;'}</p>`)
       .join('')
     tasks.push(
       sendMail({

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, mediaUrl } from '../api/client'
 import HomeVideo from '../components/HomeVideo'
 import LiveAppFrame from '../components/LiveAppFrame'
 import TestimonialsCarousel, { reviewStats } from '../components/TestimonialsCarousel'
@@ -8,7 +8,7 @@ import TryPreviewButton from '../components/TryPreviewButton'
 import { formatPrice, plans, trialNote } from '../data/plans'
 
 const DEMO_DASHBOARD = '/apercu/dashboard'
-const DEMO_PAGE = '/p/maison-brume'
+const DEMO_PAGE_FALLBACK = '/p/maison-brume'
 
 const essentiel = plans.find((p) => p.id === 'essentiel')
 const pro = plans.find((p) => p.id === 'pro')
@@ -190,6 +190,8 @@ function Home() {
   const [faqOpen, setFaqOpen] = useState(0)
   const [stats, setStats] = useState({ members: null, faces: [] })
   const [avisStats, setAvisStats] = useState({ rating: reviewStats.rating, count: reviewStats.count })
+  const [demoPage, setDemoPage] = useState(DEMO_PAGE_FALLBACK)
+  const [demoLabel, setDemoLabel] = useState('Maison Brume')
 
   useEffect(() => {
     if (!location.hash) return
@@ -197,6 +199,20 @@ function Home() {
     el?.scrollIntoView({ behavior: 'smooth' })
   }, [location.hash])
 
+  useEffect(() => {
+    api('/api/public/landing-demo')
+      .then((data) => {
+        const slug = data.pageSlug || data.user?.page?.slug || 'maison-brume'
+        setDemoPage(`/p/${slug}`)
+        const company =
+          data.user?.subscription?.company || data.user?.onboarding?.company || data.user?.name
+        if (company) setDemoLabel(company)
+      })
+      .catch(() => {
+        setDemoPage(DEMO_PAGE_FALLBACK)
+        setDemoLabel('Maison Brume')
+      })
+  }, [])
   useEffect(() => {
     api('/api/public/stats')
       .then((data) =>
@@ -258,7 +274,7 @@ function Home() {
           <div className="min-w-0">
             <LiveAppFrame
               src={DEMO_DASHBOARD}
-              title="nolyo.fr/apercu — Maison Brume"
+              title={`nolyo.fr/dashboard — ${demoLabel}`}
               aspectClass="aspect-[16/12] sm:aspect-[16/11]"
               scale={0.68}
             />
@@ -274,7 +290,7 @@ function Home() {
                     face.avatar ? (
                       <img
                         key={`${face.name}-${face.avatar}`}
-                        src={face.avatar}
+                        src={mediaUrl(face.avatar)}
                         alt=""
                         title={face.name}
                         className="h-10 w-10 rounded-full object-cover ring-2 ring-moss"
@@ -397,7 +413,7 @@ function Home() {
             <div className="min-w-0">
               <LiveAppFrame
                 src={DEMO_DASHBOARD}
-                title="Tableau de bord Nolyo — Maison Brume"
+                title={`Tableau de bord Nolyo — ${demoLabel}`}
                 aspectClass="aspect-[16/12]"
                 scale={0.7}
               />
@@ -542,8 +558,8 @@ function Home() {
 
           <div className="mt-12 grid items-center gap-10 lg:grid-cols-2">
             <LiveAppFrame
-              src={DEMO_PAGE}
-              title="nolyo.fr/p/maison-brume"
+              src={demoPage}
+              title={`nolyo.fr${demoPage}`}
               aspectClass="aspect-[4/5] sm:aspect-[16/12]"
               scale={0.62}
             />
@@ -554,12 +570,15 @@ function Home() {
                   <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{item.text}</p>
                 </article>
               ))}
+              <p className="text-sm text-ink-soft">
+                Exemple réel : la page publique du compte démo <span className="font-medium text-ink">{demoLabel}</span>.
+              </p>
               <div className="flex flex-wrap gap-3">
                 <TryPreviewButton plan="pro" variant="header">
                   Découvrir Nolio Pro
                 </TryPreviewButton>
                 <Link
-                  to={DEMO_PAGE}
+                  to={demoPage}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-ink ring-1 ring-ink/12 transition hover:bg-ink/5"

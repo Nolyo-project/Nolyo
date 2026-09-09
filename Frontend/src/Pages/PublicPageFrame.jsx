@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { mediaUrl } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { homeForUser } from '../auth/homeForUser'
 import { publicPageStyle } from '../data/pageTheme'
@@ -24,7 +25,7 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
     return <p className="px-5 py-24 text-center text-ink-soft">Chargement…</p>
   }
 
-  const cover = page.banner || (page.photos || [])[0] || ''
+  const cover = mediaUrl(page.banner || (page.photos || [])[0] || '')
   const initial = (page.title || page.name || 'N').slice(0, 1).toUpperCase()
   const isOwner = Boolean(user?.page?.slug) && user.page.slug === String(slug || '').toLowerCase()
   const themeStyle = publicPageStyle(page.theme)
@@ -91,7 +92,7 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
           <div className="relative z-10 -mt-16 sm:-mt-20 lg:-mt-24">
             {page.avatar ? (
               <img
-                src={page.avatar}
+                src={mediaUrl(page.avatar)}
                 alt=""
                 className="h-32 w-32 rounded-full object-cover shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[6px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 lg:h-44 lg:w-44"
               />

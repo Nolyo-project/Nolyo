@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, mediaUrl } from '../api/client'
 import { copyForTrade } from '../data/trades'
 import SeoHead from '../components/SeoHead'
 import { PublicPageAside, publicPageChrome, publicPageMainClass } from './PublicPageAside'
@@ -19,7 +19,7 @@ function PersonCard({ person }) {
       >
         <div className="absolute inset-0 overflow-hidden rounded-[1.35rem] bg-moss shadow-[0_18px_36px_-24px_rgba(36,48,38,0.5)] [backface-visibility:hidden]">
           {person.photo ? (
-            <img src={person.photo} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={mediaUrl(person.photo)} alt="" className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div className="absolute inset-0 grid place-items-center font-display text-3xl text-cream/70">
               {(person.name || '?').slice(0, 1).toUpperCase()}
@@ -93,7 +93,7 @@ function PublicAbout() {
   const seoDescription =
     about.body?.replace(/\s+/g, ' ').trim().slice(0, 160) ||
     `À propos de ${page?.title || 'ce professionnel'} — ${page?.tradeLabel || copy.label} sur Nolyo.`
-  const seoImage = page?.banner || page?.avatar || ''
+  const seoImage = mediaUrl(page?.banner || page?.avatar || '')
 
   return (
     <PublicPageFrame slug={slug} page={page} error={error} current="about">
@@ -101,7 +101,7 @@ function PublicAbout() {
         <SeoHead
           title={`À propos — ${page.title} | Nolyo`}
           description={seoDescription}
-          image={seoImage.startsWith('http') ? seoImage : seoImage ? `${window.location.origin}${seoImage}` : undefined}
+          image={seoImage || undefined}
           url={pageUrl}
         />
       ) : null}

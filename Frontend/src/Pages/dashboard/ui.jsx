@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { mediaUrl } from '../../api/client'
 
 export function PageShell({ children, className = '' }) {
   return <main className={`w-full px-5 py-8 lg:px-10 lg:py-10 ${className}`.trim()}>{children}</main>
@@ -215,7 +216,7 @@ export function initials(name) {
 
 export function Avatar({ user, className = 'h-10 w-10', light = false }) {
   if (user?.avatar) {
-    return <img src={user.avatar} alt="" className={`shrink-0 rounded-full object-cover ${className}`} />
+    return <img src={mediaUrl(user.avatar)} alt="" className={`shrink-0 rounded-full object-cover ${className}`} />
   }
   return (
     <span

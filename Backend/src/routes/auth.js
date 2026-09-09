@@ -52,7 +52,6 @@ function withPreviewPlan(userJson) {
   }
 }
 
-const PREVIEW_EMAIL = String(process.env.PREVIEW_EMAIL || 'ines@nolio.test').toLowerCase()
 const previewAttempts = new Map()
 
 function tooManyPreviews(ip) {
@@ -186,19 +185,12 @@ router.post('/preview', async (req, res) => {
   const { hasWorkspaceAccess } = require('../utils/billing')
   const { ensurePreviewAccount } = require('../seed/demoMember')
 
-  let user = await User.findOne({ email: PREVIEW_EMAIL, role: 'member' })
-  if (!user || !hasWorkspaceAccess(user)) {
-    try {
-      user = await ensurePreviewAccount()
-    } catch (err) {
-      console.error('ensurePreviewAccount', err)
-    }
-  }
+  const previewPlan = req.body?.plan === 'essentiel' ? 'essentiel' : 'pro'
+  let user = await ensurePreviewAccount(previewPlan)
   if (!user || !hasWorkspaceAccess(user)) {
     return res.status(503).json({ error: 'La prévisualisation n’est pas disponible pour le moment.' })
   }
 
-  const previewPlan = req.body?.plan === 'essentiel' ? 'essentiel' : 'pro'
   const token = signToken(user, { expiresIn: '5m', preview: true, previewPlan })
   const extras = {
     preview: true,

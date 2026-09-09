@@ -11,7 +11,7 @@ import TrialBillingPrompt from './TrialBillingPrompt'
 import { copyForUser } from '../../data/trades'
 import { hasModule, workspaceLabel } from '../../data/workspace'
 
-function navGroups(copy) {
+export function navGroups(copy) {
   return [
     {
       label: copy.navGroup,

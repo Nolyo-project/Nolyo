@@ -15,6 +15,7 @@ function FounderBooking() {
   const [error, setError] = useState('')
   const [days, setDays] = useState([])
   const [date, setDate] = useState('')
+  const [dayOffset, setDayOffset] = useState(0)
   const [slot, setSlot] = useState(null)
   const [guest, setGuest] = useState(emptyGuest)
   const [pending, setPending] = useState(false)
@@ -44,6 +45,7 @@ function FounderBooking() {
         if (cancelled) return
         const nextDays = data.days || []
         setDays(nextDays)
+        setDayOffset(0)
         setDate((current) => (nextDays.some((item) => item.date === current) ? current : nextDays[0]?.date || ''))
         setSlot(null)
       })
@@ -69,6 +71,12 @@ function FounderBooking() {
       }),
     [days],
   )
+
+  const DAY_WINDOW = 7
+  const maxDayOffset = Math.max(0, dayLabels.length - DAY_WINDOW)
+  const visibleDays = dayLabels.slice(dayOffset, dayOffset + DAY_WINDOW)
+  const canShiftLeft = dayOffset > 0
+  const canShiftRight = dayOffset < maxDayOffset
 
   function updateGuest(event) {
     setGuest((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -215,35 +223,58 @@ function FounderBooking() {
           <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">1 · Le créneau</p>
           <h2 className="mt-1 font-display text-3xl tracking-tight">Date et horaire</h2>
           {days.length === 0 ? (
-            <p className="mt-5 text-sm text-ink-soft">Aucun créneau libre sur les trois prochaines semaines.</p>
+            <p className="mt-5 text-sm text-ink-soft">Aucun créneau libre sur les prochaines semaines.</p>
           ) : (
             <>
-              <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
-                {dayLabels.map((item) => {
-                  const active = item.date === date
-                  return (
-                    <button
-                      key={item.date}
-                      type="button"
-                      onClick={() => {
-                        setDate(item.date)
-                        setSlot(null)
-                      }}
-                      className={`min-w-[4.25rem] rounded-2xl px-3 py-3 text-center ${
-                        active ? 'bg-moss text-cream' : 'bg-paper ring-1 ring-ink/8'
-                      }`}
-                    >
-                      <span className={`block text-[11px] uppercase ${active ? 'text-cream/70' : 'text-ink-soft'}`}>
-                        {item.weekday}
-                      </span>
-                      <span className="mt-0.5 block text-sm font-semibold">{item.day}</span>
-                      <span className={`block text-[11px] ${active ? 'text-cream/70' : 'text-ink-soft'}`}>
-                        {item.month}
-                      </span>
-                    </button>
-                  )
-                })}
+              <div className="mt-6 flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Semaine précédente"
+                  disabled={!canShiftLeft}
+                  onClick={() => setDayOffset((current) => Math.max(0, current - DAY_WINDOW))}
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-copper disabled:opacity-30"
+                >
+                  ‹
+                </button>
+                <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+                  {visibleDays.map((item) => {
+                    const active = item.date === date
+                    return (
+                      <button
+                        key={item.date}
+                        type="button"
+                        onClick={() => {
+                          setDate(item.date)
+                          setSlot(null)
+                        }}
+                        className={`min-w-[4.25rem] flex-1 rounded-2xl px-3 py-3 text-center ${
+                          active ? 'bg-moss text-cream' : 'bg-paper ring-1 ring-ink/8'
+                        }`}
+                      >
+                        <span className={`block text-[11px] uppercase ${active ? 'text-cream/70' : 'text-ink-soft'}`}>
+                          {item.weekday}
+                        </span>
+                        <span className="mt-0.5 block text-sm font-semibold">{item.day}</span>
+                        <span className={`block text-[11px] ${active ? 'text-cream/70' : 'text-ink-soft'}`}>
+                          {item.month}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Semaine suivante"
+                  disabled={!canShiftRight}
+                  onClick={() => setDayOffset((current) => Math.min(maxDayOffset, current + DAY_WINDOW))}
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-copper disabled:opacity-30"
+                >
+                  ›
+                </button>
               </div>
+              {canShiftRight || canShiftLeft ? (
+                <p className="mt-2 text-xs text-ink-soft">Flèches pour voir d’autres dates (jusqu’à ~8 semaines).</p>
+              ) : null}
               <div className="mt-5 flex flex-wrap gap-2">
                 {(selectedDay?.slots || []).map((item) => {
                   const active = slot?.startAt === item.startAt
@@ -261,6 +292,9 @@ function FounderBooking() {
                   )
                 })}
               </div>
+              {selectedDay && (selectedDay.slots || []).length === 0 ? (
+                <p className="mt-4 text-sm text-ink-soft">Aucun horaire libre ce jour-là — essayez une autre date.</p>
+              ) : null}
             </>
           )}
         </section>
