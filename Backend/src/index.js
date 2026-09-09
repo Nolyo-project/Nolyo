@@ -45,6 +45,21 @@ if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET is missing from environment variables')
 }
 
+{
+  const whsec = String(process.env.STRIPE_WEBHOOK_SECRET || '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.warn('Stripe: STRIPE_SECRET_KEY manquant')
+  } else if (!whsec) {
+    console.warn('Stripe: STRIPE_WEBHOOK_SECRET manquant (les webhooks renverront 400)')
+  } else if (!whsec.startsWith('whsec_')) {
+    console.warn('Stripe: STRIPE_WEBHOOK_SECRET ne commence pas par whsec_ (mauvaise valeur ?)')
+  } else {
+    console.info(`Stripe webhook secret OK (longueur ${whsec.length})`)
+  }
+}
+
 const origins = [
   process.env.CLIENT_ORIGIN,
   process.env.ADMIN_ORIGIN,

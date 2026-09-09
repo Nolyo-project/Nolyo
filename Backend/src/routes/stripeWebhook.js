@@ -40,7 +40,13 @@ async function handleStripeWebhook(req, res) {
   try {
     event = stripe.webhooks.constructEvent(payload, signature, secret)
   } catch (err) {
-    console.error('Stripe webhook signature', err.message)
+    console.error('Stripe webhook signature', err.message, {
+      bodyIsBuffer: Buffer.isBuffer(req.body),
+      bodyBytes: Buffer.isBuffer(payload) ? payload.length : 0,
+      secretLen: secret.length,
+      secretLooksValid: secret.startsWith('whsec_'),
+      hasSignature: Boolean(signature),
+    })
     return res.status(400).json({ error: 'Signature Stripe invalide.' })
   }
 
