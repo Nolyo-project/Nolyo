@@ -15,9 +15,30 @@ async function handleStripeWebhook(req, res) {
   if (!stripeEnabled()) return res.status(404).json({ error: 'Stripe n’est pas configuré.' })
   const stripe = getStripe()
   const signature = req.headers['stripe-signature']
+  const secret = String(process.env.STRIPE_WEBHOOK_SECRET || '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+
+  if (!secret) {
+    console.error('Stripe webhook: STRIPE_WEBHOOK_SECRET manquant')
+    return res.status(500).json({ error: 'Webhook Stripe mal configuré.' })
+  }
+  if (!signature) {
+    console.error('Stripe webhook: en-tête stripe-signature absent')
+    return res.status(400).json({ error: 'Signature Stripe absente.' })
+  }
+
+  // constructEvent exige le payload exact reçu (Buffer), pas un objet JSON déjà parsé
+  let payload = req.body
+  if (!Buffer.isBuffer(payload)) {
+    console.error('Stripe webhook: body non brut', typeof payload)
+    if (typeof payload === 'string') payload = Buffer.from(payload, 'utf8')
+    else payload = Buffer.from(JSON.stringify(payload ?? {}), 'utf8')
+  }
+
   let event
   try {
-    event = stripe.webhooks.constructEvent(req.body, signature, process.env.STRIPE_WEBHOOK_SECRET)
+    event = stripe.webhooks.constructEvent(payload, signature, secret)
   } catch (err) {
     console.error('Stripe webhook signature', err.message)
     return res.status(400).json({ error: 'Signature Stripe invalide.' })

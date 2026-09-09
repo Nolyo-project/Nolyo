@@ -75,7 +75,13 @@ app.use(
     origin: corsOrigin,
   }),
 )
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook)
+
+// Stripe exige le body brut (Buffer). Ne pas passer par express.json() avant.
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: '*/*' }),
+  handleStripeWebhook,
+)
 app.use(express.json())
 app.use('/uploads', express.static(UPLOAD_ROOT))
 
