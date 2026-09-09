@@ -1,0 +1,10 @@
+# Si Root Directory = Backend dans Railway, ce fichier s’applique.
+# Build Railpack standard (package.json du Backend).
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

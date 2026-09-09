@@ -1,13 +1,12 @@
 {
   "name": "nolyo",
   "private": true,
-  "description": "Monorepo Nolyo — Railway déploie le Backend",
+  "description": "Monorepo Nolyo — Railway déploie le Backend (Root Directory = Backend)",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "install:backend": "npm install --omit=dev --prefix Backend",
-    "start": "npm start --prefix Backend",
-    "postinstall": "npm run install:backend"
+    "start": "npm start --prefix Backend"
   }
 }

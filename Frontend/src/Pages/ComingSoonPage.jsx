@@ -21,7 +21,13 @@ function formatWindow(startsAt, endsAt) {
 export default function ComingSoonPage({ status }) {
   const maintenance = status?.mode === 'maintenance'
   const windowLabel = formatWindow(status?.startsAt, status?.endsAt)
-  const title = status?.title || (maintenance ? 'Maintenance en cours' : 'Nolyo arrive bientôt')
+  const rawTitle = String(status?.title || '').trim()
+  const title =
+    !rawTitle || rawTitle === 'Arrive bientôt'
+      ? maintenance
+        ? 'Maintenance en cours'
+        : 'Nolyo arrive bientôt'
+      : rawTitle
   const message =
     status?.message ||
     (maintenance

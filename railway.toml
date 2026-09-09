@@ -1,9 +1,9 @@
 # Déploiement Railway = Backend uniquement
-# Préférable : dans Railway → Settings → Root Directory = "Backend"
-# Ce fichier sert si le service pointe encore sur la racine du repo.
+# IMPORTANT : Settings → Root Directory = "Backend"
+# (évite les échecs Railpack sur le monorepo à la racine)
 
 [build]
-builder = "RAILPACK"
+builder = "NIXPACKS"
 buildCommand = "npm install --omit=dev --prefix Backend"
 
 [deploy]

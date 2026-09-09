@@ -20,10 +20,13 @@ siteSettingsSchema.statics.MODES = MODES
 
 siteSettingsSchema.methods.toPublicJSON = function toPublicJSON() {
   const active = isGateActive(this)
+  const rawTitle = String(this.title || '').trim()
+  const title =
+    !rawTitle || rawTitle === 'Arrive bientôt' ? defaultTitle(this.mode) : rawTitle
   return {
     mode: this.mode,
     active,
-    title: this.title || defaultTitle(this.mode),
+    title,
     message: this.message || defaultMessage(this.mode),
     startsAt: this.startsAt || null,
     endsAt: this.endsAt || null,
