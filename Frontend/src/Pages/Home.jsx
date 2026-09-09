@@ -5,7 +5,7 @@ import HomeVideo from '../components/HomeVideo'
 import LiveAppFrame from '../components/LiveAppFrame'
 import TestimonialsCarousel, { reviewStats } from '../components/TestimonialsCarousel'
 import TryPreviewButton from '../components/TryPreviewButton'
-import { formatPrice, plans, trialNote } from '../data/plans'
+import { plans, trialNote } from '../data/plans'
 
 const DEMO_DASHBOARD = '/apercu/dashboard'
 const DEMO_PAGE_FALLBACK = '/p/maison-brume'
@@ -61,25 +61,27 @@ const steps = [
 ]
 
 const essentielFeatures = [
-  'Tableau de bord',
-  'Clients',
-  'Prospects',
-  'Rendez-vous',
-  'Tâches',
-  'Notes',
-  'Chiffre d’affaires',
-  'Relances',
+  'Tableau de bord privé',
+  'Fiches clients & historique',
+  'Prospects et suivi',
+  'Agenda et rendez-vous',
+  'Notes et tâches',
+  'Chiffre d’affaires, mois par mois',
+  'Relances clients',
+  'Paiement sécurisé Stripe',
 ]
 
 const proFeatures = [
-  'Tout Essentiel',
-  'Page professionnelle',
-  'Réservation en ligne',
-  'Demandes de devis',
-  'Congés (fermeture réservation)',
-  'QR Code',
-  'Avis clients',
-  'Statistiques',
+  'Tout Nolyo Essentiel',
+  'Page professionnelle personnalisée',
+  'Réservations en ligne 24h/24',
+  'Vos clients réservent sans créer de compte',
+  'Demandes de devis en ligne',
+  'Ajout au calendrier (Google & Apple)',
+  'Congés : fermeture auto de la réservation',
+  'QR Code vers votre page',
+  'Avis clients modérés',
+  'Tableau de bord & statistiques',
   'Dépenses et cotisations',
 ]
 
@@ -466,64 +468,85 @@ function Home() {
             <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
               Deux formules. Une seule idée : vous simplifier la vie.
             </h2>
+            <p className="mt-4 text-base text-ink-soft">
+              Premier mois offert. Ensuite, engagement de 6 mois — 7 mois au total.
+            </p>
           </div>
 
           <div className="mt-12 grid gap-5 lg:grid-cols-2">
-            <article className="flex flex-col rounded-[1.5rem] bg-cream p-7 ring-1 ring-ink/8 sm:p-8">
-              <p className="text-[11px] font-semibold tracking-[0.18em] text-moss-mid uppercase">Nolio Essentiel</p>
-              <p className="mt-4 font-display text-4xl tracking-tight">
-                {formatPrice(essentiel?.price || 9.99)}
-                <span className="ml-1 text-base font-sans text-ink-soft">/ mois</span>
+            <article className="flex flex-col rounded-[1.6rem] bg-cream p-7 ring-1 ring-ink/10 sm:p-8">
+              <span className="w-fit rounded-full bg-ink px-3 py-1 text-[11px] font-semibold text-cream">
+                Gestion privée
+              </span>
+              <p className="mt-4 text-sm font-semibold tracking-[0.18em] text-moss-mid uppercase">Essentiel</p>
+              <p className="mt-3 font-display text-5xl font-semibold tracking-tight">
+                {new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+                  essentiel?.price || 9.99,
+                )}
+                <span className="ml-1.5 text-lg font-sans font-medium text-ink-soft">€ / mois</span>
               </p>
-              <p className="mt-2 text-sm text-ink-soft">Pour gérer votre activité au quotidien.</p>
-              <ul className="mt-6 flex-1 space-y-2.5 text-sm text-ink-soft">
+              <p className="mt-2 text-sm text-ink-soft">1er mois offert · Engagement 6 mois · 0 % de commission</p>
+              <ul className="mt-7 flex-1 divide-y divide-ink/8">
                 {essentielFeatures.map((f) => (
-                  <li key={f} className="flex gap-2">
-                    <span className="text-moss">—</span>
+                  <li key={f} className="flex items-start gap-3 py-3 text-sm text-ink">
+                    <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-moss/10 text-moss" aria-hidden>
+                      ✓
+                    </span>
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <TryPreviewButton plan="essentiel" variant="header" className="w-full justify-center sm:w-auto">
-                  Découvrir Essentiel
+              <p className="mt-6 text-center text-xs text-ink-soft">
+                Essai 5 min gratuit · Sans carte bancaire
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <TryPreviewButton plan="essentiel" variant="header" className="w-full justify-center !rounded-2xl !py-3.5">
+                  Tester gratuitement →
                 </TryPreviewButton>
                 <Link
                   to="/abonnement?plan=essentiel"
-                  className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-ink ring-1 ring-ink/12 transition hover:bg-ink/5"
+                  className="inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold text-ink ring-1 ring-ink/12 transition hover:bg-ink/5"
                 >
                   Demander Essentiel
                 </Link>
               </div>
             </article>
 
-            <article className="flex flex-col rounded-[1.5rem] bg-cream p-7 ring-2 ring-copper/35 sm:p-8">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Nolio Pro</p>
-                <span className="rounded-full bg-moss px-2.5 py-1 text-[10px] font-semibold tracking-wide text-cream uppercase">
-                  Recommandé
-                </span>
-              </div>
-              <p className="mt-4 font-display text-4xl tracking-tight">
-                {formatPrice(pro?.price || 19.99)}
-                <span className="ml-1 text-base font-sans text-ink-soft">/ mois</span>
+            <article className="relative flex flex-col rounded-[1.6rem] bg-moss p-7 text-cream shadow-xl shadow-moss/20 ring-1 ring-moss sm:p-8">
+              <span className="w-fit rounded-full bg-cream px-3 py-1 text-[11px] font-semibold text-ink">
+                Tout inclus
+              </span>
+              <p className="mt-4 text-sm font-semibold tracking-[0.18em] text-copper uppercase">Pro</p>
+              <p className="mt-3 font-display text-5xl font-semibold tracking-tight">
+                {new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+                  pro?.price || 19.99,
+                )}
+                <span className="ml-1.5 text-lg font-sans font-medium text-cream/65">€ / mois</span>
               </p>
-              <p className="mt-2 text-sm text-ink-soft">Pour gérer votre activité et être visible en ligne.</p>
-              <ul className="mt-6 flex-1 space-y-2.5 text-sm text-ink-soft">
+              <p className="mt-2 text-sm text-cream/70">1er mois offert · Engagement 6 mois · 0 % de commission</p>
+              <ul className="mt-7 flex-1 divide-y divide-cream/12">
                 {proFeatures.map((f) => (
-                  <li key={f} className="flex gap-2">
-                    <span className="text-copper">—</span>
+                  <li key={f} className="flex items-start gap-3 py-3 text-sm text-cream/92">
+                    <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cream/12 text-cream" aria-hidden>
+                      ✓
+                    </span>
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <TryPreviewButton plan="pro" className="w-full justify-center sm:w-auto">
-                  Découvrir Pro
+              <p className="mt-6 text-center text-xs text-cream/65">
+                Essai 5 min gratuit · Sans carte bancaire
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <TryPreviewButton
+                  plan="pro"
+                  className="w-full justify-center !rounded-2xl !bg-cream !py-3.5 !text-ink !shadow-none hover:!bg-paper"
+                >
+                  Tester gratuitement →
                 </TryPreviewButton>
                 <Link
                   to="/abonnement?plan=pro"
-                  className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-ink ring-1 ring-copper/35 transition hover:bg-copper/5"
+                  className="inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold text-cream ring-1 ring-cream/25 transition hover:bg-cream/10"
                 >
                   Demander Pro
                 </Link>
@@ -532,12 +555,11 @@ function Home() {
           </div>
 
           <div className="mt-8 rounded-[1.35rem] bg-paper-2/80 px-6 py-5 ring-1 ring-ink/6">
-            <p className="text-sm font-medium text-ink">🎁 Premier mois offert</p>
+            <p className="text-sm font-medium text-ink">Premier mois offert</p>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft sm:text-base">
               Après le mois offert, l’abonnement est souscrit pour 6 mois. Soit 7 mois au total, dont le premier mois
-              offert.
+              offert. {trialNote}
             </p>
-            <p className="mt-2 text-sm text-ink-soft">{trialNote}</p>
           </div>
         </div>
       </section>
