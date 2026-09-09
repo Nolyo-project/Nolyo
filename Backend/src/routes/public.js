@@ -136,10 +136,14 @@ function tooManyBooks(ip) {
 }
 
 router.get('/stats', async (_req, res) => {
+  const demoEmails = DEMO_EMAILS.map((email) => String(email).toLowerCase())
   const memberFilter = {
     role: 'member',
-    email: { $nin: DEMO_EMAILS },
     'subscription.status': { $in: ['active', 'trialing'] },
+    $and: [
+      { email: { $nin: demoEmails } },
+      { email: { $not: /@nolio\.test$/i } },
+    ],
   }
   const [members, faces] = await Promise.all([
     User.countDocuments(memberFilter),

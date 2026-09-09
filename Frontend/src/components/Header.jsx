@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { homeForUser } from '../auth/homeForUser'
+import { endPreviewToSubscribe } from '../auth/previewSession'
 import { useAuth } from '../context/AuthContext'
 import Logo from './Logo'
 import TryPreviewButton from './TryPreviewButton'
@@ -19,7 +20,7 @@ function Header() {
   const { user, logout, loading, isPresident } = useAuth()
   const spaceLabel = isPresident ? 'Dashboard président' : user?.preview ? 'Continuer l’essai' : 'Tableau de bord'
   const spaceTo = user ? homeForUser(user) : '/login'
-  const leaveLabel = user?.preview ? 'Quitter l’essai' : 'Déconnexion'
+  const leaveLabel = user?.preview ? 'Demander un abonnement' : 'Déconnexion'
 
   return (
     <header className="sticky top-0 z-50 border-b border-ink/8 bg-paper/80 backdrop-blur-xl">
@@ -46,7 +47,7 @@ function Header() {
               </Link>
               <button
                 type="button"
-                onClick={() => logout(user?.preview ? 'home' : undefined)}
+                onClick={() => (user?.preview ? endPreviewToSubscribe(logout, user) : logout())}
                 className="rounded-full border border-ink/10 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-paper-2"
               >
                 {leaveLabel}
@@ -114,7 +115,8 @@ function Header() {
                   className="mt-2 rounded-xl border border-ink/10 px-3 py-2.5 text-left text-sm font-semibold"
                   onClick={() => {
                     setOpen(false)
-                    logout(user?.preview ? 'home' : undefined)
+                    if (user?.preview) endPreviewToSubscribe(logout, user)
+                    else logout()
                   }}
                 >
                   {leaveLabel}

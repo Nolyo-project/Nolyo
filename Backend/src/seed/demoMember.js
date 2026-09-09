@@ -929,11 +929,73 @@ async function seedDemoJournal(user, profile, { force = false } = {}) {
 const BILLING_TEST_EMAIL = 'florentin.essai@nolio.test'
 const BILLING_TEST_PASSWORD = process.env.BILLING_TEST_PASSWORD || 'NolioEssai2026!'
 
+async function provisionBillingTestInvoice(user) {
+  const { stripeEnabled, getStripe, latestOpenInvoice } = require('../utils/stripe')
+  const { getPlan } = require('../config/plans')
+  if (!stripeEnabled()) return user
+
+  const stripe = getStripe()
+  const plan = getPlan(user.subscription?.plan || 'essentiel')
+  if (!stripe || !plan) return user
+
+  let customerId = user.subscription.stripeCustomerId
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email: user.email,
+      name: user.name,
+      metadata: { noly_user: String(user._id), noly_billing_test: '1' },
+    })
+    customerId = customer.id
+    user.subscription.stripeCustomerId = customerId
+  }
+
+  let open = await latestOpenInvoice(user)
+  if (!open || !(open.amount_due > 0)) {
+    const draft = await stripe.invoices.create({
+      customer: customerId,
+      collection_method: 'send_invoice',
+      days_until_due: 3,
+      metadata: { noly_user: String(user._id), noly_billing_test: '1' },
+      auto_advance: false,
+    })
+    await stripe.invoiceItems.create({
+      customer: customerId,
+      invoice: draft.id,
+      currency: 'eur',
+      amount: Math.round(plan.price * 100),
+      description: `${plan.name} — mois en cours`,
+    })
+    open = await stripe.invoices.finalizeInvoice(draft.id)
+  }
+
+  user.subscription.collectionMethod = 'send_invoice'
+  user.subscription.billingChoice = 'invoice'
+  user.subscription.status = 'past_due'
+  await user.save()
+  return user
+}
+
 async function ensureBillingTestAccount({ force = false } = {}) {
-  const trialEndsAt = daysFromNow(1)
-  const activatedAt = daysFromNow(-29)
+  const trialEndsAt = daysFromNow(0)
+  const activatedAt = daysFromNow(-30)
   let user = await User.findOne({ email: BILLING_TEST_EMAIL })
   const passwordHash = await User.hashPassword(BILLING_TEST_PASSWORD)
+
+  const dayJSubscription = {
+    plan: 'essentiel',
+    status: 'past_due',
+    company: 'Test fin d’essai',
+    teamSize: '1',
+    activatedAt,
+    trialEndsAt,
+    nextInvoiceAt: trialEndsAt,
+    hasPaymentMethod: false,
+    billingChoice: 'invoice',
+    billingChoiceAt: new Date(),
+    billingPromptSeenAt: new Date(),
+    commitmentChoice: '',
+    collectionMethod: 'send_invoice',
+  }
 
   if (!user) {
     user = await User.create({
@@ -947,28 +1009,23 @@ async function ensureBillingTestAccount({ force = false } = {}) {
         workMode: 'mix',
         company: 'Test fin d’essai',
       },
-      subscription: {
-        plan: 'essentiel',
-        status: 'trialing',
-        company: 'Test fin d’essai',
-        teamSize: '1',
-        activatedAt,
-        trialEndsAt,
-        hasPaymentMethod: false,
-        billingChoice: '',
-        commitmentChoice: '',
-      },
+      subscription: dayJSubscription,
     })
+    try {
+      user = await provisionBillingTestInvoice(user)
+    } catch (err) {
+      console.error('Billing test Stripe', err.message)
+    }
     console.log(
-      `Compte test fin d’essai prêt : ${BILLING_TEST_EMAIL} / ${BILLING_TEST_PASSWORD} (essai jusqu’au ${trialEndsAt.toISOString().slice(0, 10)})`,
+      `Compte test jour J prêt : ${BILLING_TEST_EMAIL} / ${BILLING_TEST_PASSWORD} (paiement manuel, past_due)`,
     )
     return user
   }
 
   user.passwordHash = passwordHash
   const sub = user.subscription || {}
-  const midPaymentTest = Boolean(sub.stripeSubscriptionId || sub.billingChoice || sub.hasPaymentMethod)
-  if (force || !midPaymentTest) {
+  const keepAsIs = sub.status === 'active' && Boolean(sub.hasPaymentMethod || sub.paidAt)
+  if (force || !keepAsIs) {
     user.name = 'Florentin Essai'
     user.onboarding = {
       ...(user.onboarding?.toObject?.() || user.onboarding || {}),
@@ -979,27 +1036,21 @@ async function ensureBillingTestAccount({ force = false } = {}) {
     }
     user.subscription = {
       ...(sub.toObject?.() || sub),
-      plan: 'essentiel',
-      status: 'trialing',
-      company: 'Test fin d’essai',
-      teamSize: '1',
-      activatedAt,
-      trialEndsAt,
-      hasPaymentMethod: false,
-      billingChoice: '',
-      billingChoiceAt: undefined,
-      commitmentChoice: '',
-      commitmentChoiceAt: undefined,
-      stripeCustomerId: '',
+      ...dayJSubscription,
+      stripeCustomerId: sub.stripeCustomerId || '',
       stripeSubscriptionId: '',
       stripePriceId: '',
-      collectionMethod: '',
     }
-    console.log(
-      `Compte test fin d’essai réinitialisé : ${BILLING_TEST_EMAIL} (essai jusqu’au ${trialEndsAt.toISOString().slice(0, 10)})`,
-    )
+    await user.save()
+    try {
+      user = await provisionBillingTestInvoice(user)
+    } catch (err) {
+      console.error('Billing test Stripe', err.message)
+    }
+    console.log(`Compte test jour J réinitialisé : ${BILLING_TEST_EMAIL} (paiement manuel)`)
+  } else {
+    await user.save()
   }
-  await user.save()
   return user
 }
 

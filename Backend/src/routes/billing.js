@@ -103,21 +103,24 @@ router.get('/overview', async (req, res) => {
 router.post('/checkout', async (req, res) => {
   if (req.user.role === 'president') return res.status(400).json({ error: 'Indisponible.' })
   if (!stripeEnabled()) return res.status(503).json({ error: 'Paiement indisponible pour le moment.' })
-  if (!needsPayment(req.user)) {
-    return res.json({ alreadyPaid: true, user: req.user.toSafeJSON() })
+
+  let user = await User.findById(req.user._id)
+  if (!needsPayment(user)) {
+    return res.json({ alreadyPaid: true, user: user.toSafeJSON() })
   }
   try {
-    const result = await createUnlockCheckout(req.user)
+    const result = await createUnlockCheckout(user)
     if (result.alreadyPaid) {
-      const user = await syncMemberBilling(req.user)
+      user = await User.findById(req.user._id)
       if (needsPayment(user)) {
         user.subscription.status = 'active'
         user.subscription.paidAt = new Date()
         await user.save()
       }
+      user = await User.findById(req.user._id)
       return res.json({ alreadyPaid: true, user: user.toSafeJSON() })
     }
-    res.json({ url: result.url })
+    res.json({ url: result.url, sessionId: result.sessionId || '' })
   } catch (err) {
     console.error('billing checkout', err.message)
     res.status(502).json({ error: err.message || 'Impossible d’ouvrir le paiement Stripe.' })

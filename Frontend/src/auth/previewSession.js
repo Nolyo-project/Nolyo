@@ -39,3 +39,15 @@ export function consumePreviewPlan() {
   sessionStorage.removeItem(PREVIEW_PLAN)
   return plan
 }
+
+/** Fin d’essai démo → demande d’abonnement (redirection dure). */
+export function endPreviewToSubscribe(logout, user) {
+  const plan =
+    user?.previewPlan === 'essentiel' || user?.subscription?.plan === 'essentiel'
+      ? 'essentiel'
+      : peekPreviewPlan() === 'essentiel'
+        ? 'essentiel'
+        : 'pro'
+  logout('subscribe')
+  window.location.replace(`/abonnement?plan=${plan}&essai=termine`)
+}

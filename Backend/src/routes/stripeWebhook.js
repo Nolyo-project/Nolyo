@@ -73,7 +73,7 @@ async function handleStripeWebhook(req, res) {
 
     if (event.type === 'invoice.paid') {
       const invoice = event.data.object
-      if ((invoice.amount_paid || 0) > 0) {
+      if ((invoice.amount_paid || 0) > 0 || invoice.paid) {
         const user = await findUserForStripe({
           customerId: String(invoice.customer),
           userId: invoice.metadata?.noly_user,
@@ -84,20 +84,23 @@ async function handleStripeWebhook(req, res) {
           await markSubscriptionActive(user, { sendMail: wasLocked })
         }
         await recordFounderIncome(invoice)
-        await attachDefaultPaymentMethod(invoice).catch((err) => console.error('PM attach', err.message))
+        // Ne force pas le prélèvement auto si le membre a choisi le paiement manuel
+        if (user?.subscription?.billingChoice !== 'invoice') {
+          await attachDefaultPaymentMethod(invoice).catch((err) => console.error('PM attach', err.message))
+        }
       }
     }
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object
       const purpose = session.metadata?.purpose
-      if (purpose === 'unlock' || purpose === 'save_card') {
+      if (purpose === 'unlock' || purpose === 'save_card' || session.mode === 'payment') {
         const user =
           (await findUserForStripe({
             customerId: String(session.customer || ''),
             userId: session.metadata?.noly_user || session.client_reference_id,
           })) || (session.client_reference_id ? await User.findById(session.client_reference_id) : null)
-        if (user) {
+        if (user && (purpose === 'unlock' || purpose === 'save_card' || session.metadata?.stripe_invoice_id)) {
           await applyUnlockFromCheckoutSession(user, session.id)
         }
       }

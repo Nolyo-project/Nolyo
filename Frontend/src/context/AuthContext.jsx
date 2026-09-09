@@ -63,7 +63,11 @@ export function AuthProvider({ children }) {
       .catch(() => {
         if (!cancelled) {
           if (hasPreviewSession()) {
+            const plan = peekPreviewPlan()
             markPreviewExit('subscribe')
+            persist(null, null)
+            window.location.replace(`/abonnement?plan=${plan}&essai=termine`)
+            return
           }
           persist(null, null)
         }

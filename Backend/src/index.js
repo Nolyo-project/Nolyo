@@ -60,6 +60,10 @@ function corsOrigin(origin, callback) {
   if (/^https:\/\/(www\.)?nolyo\.fr$/.test(origin) || origin === 'https://admin.nolyo.fr') {
     return callback(null, true)
   }
+  // Previews / domaines Vercel en attendant les DNS custom
+  if (/^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i.test(origin)) {
+    return callback(null, true)
+  }
   return callback(new Error('Origine non autorisée.'))
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
+import { endPreviewToSubscribe } from '../../auth/previewSession'
 import { isProPlan, planLabels } from '../../data/plans'
 import Logo from '../../components/Logo'
 import { formatDay, trialDaysLeft } from './format'
@@ -245,7 +246,7 @@ function DashboardLayout() {
   const copy = copyForUser(user)
   const spaceName = workspaceLabel(user)
   const planName = planLabels[user.subscription?.plan] || 'Nolyo'
-  const leaveLabel = isPreview ? 'Quitter l’essai' : 'Déconnexion'
+  const leaveLabel = isPreview ? 'Demander un abonnement' : 'Déconnexion'
   const activeBadge = badgeRouteKey(pathname)
 
   useEffect(() => {
@@ -326,7 +327,7 @@ function DashboardLayout() {
             </Link>
             <button
               type="button"
-              onClick={() => logout(isPreview ? 'home' : undefined)}
+              onClick={() => (isPreview ? endPreviewToSubscribe(logout, user) : logout())}
               className="text-xs text-cream/50 transition hover:text-cream"
             >
               {leaveLabel}
@@ -392,7 +393,7 @@ function DashboardLayout() {
               <button
                 type="button"
                 className="text-sm text-cream/60"
-                onClick={() => logout(isPreview ? 'home' : undefined)}
+                onClick={() => (isPreview ? endPreviewToSubscribe(logout, user) : logout())}
               >
                 {leaveLabel}
               </button>

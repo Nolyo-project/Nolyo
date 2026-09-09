@@ -219,18 +219,26 @@ async function recordFounderIncome(invoice) {
   const company =
     member?.subscription?.company || invoice.customer_name || invoice.customer_email || 'Abonnement Nolyo'
   const plan = member?.subscription?.plan || invoice.metadata?.noly_plan || 'Abonnement'
-  return Transaction.create({
-    user: founder._id,
-    kind: 'income',
-    label: company,
-    amount,
-    date: invoice.status_transitions?.paid_at
-      ? new Date(invoice.status_transitions.paid_at * 1000)
-      : new Date(),
-    category: plan === 'pro' ? 'Nolyo Pro' : plan === 'essentiel' ? 'Nolyo Essentiel' : 'Abonnement',
-    method: 'stripe',
-    stripeInvoiceId: invoice.id,
-  })
+  try {
+    return await Transaction.create({
+      user: founder._id,
+      kind: 'income',
+      label: company,
+      amount,
+      date: invoice.status_transitions?.paid_at
+        ? new Date(invoice.status_transitions.paid_at * 1000)
+        : new Date(),
+      category: plan === 'pro' ? 'Nolyo Pro' : plan === 'essentiel' ? 'Nolyo Essentiel' : 'Abonnement',
+      method: 'stripe',
+      stripeInvoiceId: invoice.id,
+    })
+  } catch (err) {
+    // Course webhook / confirm : une seule écriture grâce à l’index unique
+    if (err?.code === 11000) {
+      return Transaction.findOne({ stripeInvoiceId: invoice.id })
+    }
+    throw err
+  }
 }
 
 async function latestOpenInvoice(user) {
@@ -632,51 +640,144 @@ async function createCardSetupCheckout(user, { purpose = 'save_card', successPat
   return { url: session.url, sessionId: session.id }
 }
 
-async function createUnlockCheckout(user) {
+async function expireOpenUnlockSessions(customerId) {
+  const stripe = getStripe()
+  if (!stripe || !customerId) return
+  try {
+    const sessions = await stripe.checkout.sessions.list({ customer: customerId, limit: 12 })
+    await Promise.all(
+      sessions.data
+        .filter((item) => item.status === 'open' && item.metadata?.purpose === 'unlock')
+        .map((item) => stripe.checkout.sessions.expire(item.id).catch(() => null)),
+    )
+  } catch (err) {
+    console.error('expire unlock sessions', err.message)
+  }
+}
+
+async function ensureOpenInvoiceForUser(user) {
   const stripe = getStripe()
   if (!stripe) throw new Error('Stripe n’est pas configuré.')
   const customerId = user.subscription?.stripeCustomerId
   if (!customerId) throw new Error('Aucun compte de facturation Stripe.')
 
-  const invoice = await latestOpenInvoice(user)
-  const hasPm = await customerHasPaymentMethod(customerId)
+  let invoice = await latestOpenInvoice(user)
+  if (invoice && (invoice.amount_due || 0) > 0) return invoice
 
-  // Carte déjà enregistrée : un seul prélèvement sur la facture Stripe ouverte
-  if (hasPm && invoice && invoice.status === 'open') {
-    try {
-      const paid = await stripe.invoices.pay(invoice.id)
-      if (paid.status === 'paid') {
-        await recordFounderIncome(paid).catch(() => null)
-        await markSubscriptionActive(user, { sendMail: true })
-        return { alreadyPaid: true }
-      }
-    } catch (err) {
-      console.error('auto pay open invoice', err.message)
-      // fallback: setup / update card
-    }
-  }
+  const plan = getPlan(user.subscription?.plan || 'essentiel')
+  if (!plan) throw new Error('Formule introuvable.')
 
-  if (!invoice || !(invoice.amount_due > 0)) {
-    // Pas de facture ouverte : enregistrer la carte pour les prochains prélèvements
-    return createCardSetupCheckout(user, {
-      purpose: 'unlock',
-      successPath: '/facture?paid=1',
-    })
-  }
-
-  // Une seule charge : on enregistre la carte puis on paye la facture Stripe existante (pas un 2e Checkout payment)
-  return createCardSetupCheckout(user, {
-    purpose: 'unlock',
-    successPath: '/facture?paid=1',
+  const draft = await stripe.invoices.create({
+    customer: customerId,
+    collection_method: 'send_invoice',
+    days_until_due: 3,
+    metadata: {
+      noly_user: String(user._id),
+      noly_plan: plan.id,
+    },
+    auto_advance: false,
   })
+  await stripe.invoiceItems.create({
+    customer: customerId,
+    invoice: draft.id,
+    currency: 'eur',
+    amount: Math.round(plan.price * 100),
+    description: `${plan.name} — mois en cours`,
+  })
+  return stripe.invoices.finalizeInvoice(draft.id)
+}
+
+async function createUnlockCheckout(user) {
+  const stripe = getStripe()
+  if (!stripe) throw new Error('Stripe n’est pas configuré.')
+
+  user = await User.findById(user._id)
+  if (!user) throw new Error('Compte introuvable.')
+
+  if (!needsLocalUnlock(user) && user.subscription?.status === 'active') {
+    return { alreadyPaid: true }
+  }
+
+  const customerId = user.subscription?.stripeCustomerId
+  if (!customerId) throw new Error('Aucun compte de facturation Stripe.')
+
+  // Déjà payé côté Stripe (facture réglée, plus rien d’ouvert)
+  const synced = await syncMemberBilling(user)
+  if (!needsLocalUnlock(synced) && synced.subscription?.status === 'active') {
+    return { alreadyPaid: true }
+  }
+  user = synced
+
+  let invoice = await ensureOpenInvoiceForUser(user)
+  invoice = await stripe.invoices.retrieve(invoice.id)
+
+  if (invoice.status === 'paid') {
+    await recordFounderIncome(invoice).catch(() => null)
+    await markSubscriptionActive(user, { sendMail: true })
+    return { alreadyPaid: true }
+  }
+
+  if (invoice.status !== 'open' || !(invoice.amount_due > 0)) {
+    throw new Error('Aucune facture à régler pour le moment.')
+  }
+
+  const invoiceMode =
+    user.subscription?.billingChoice === 'invoice' || user.subscription?.collectionMethod === 'send_invoice'
+  const plan = getPlan(user.subscription?.plan)
+  const origin = clientOrigin()
+
+  // Une seule session Checkout ouverte à la fois (évite 2 paiements d’affilée)
+  await expireOpenUnlockSessions(customerId)
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    customer: customerId,
+    client_reference_id: String(user._id),
+    line_items: [
+      {
+        price_data: {
+          currency: invoice.currency || 'eur',
+          unit_amount: invoice.amount_due,
+          product_data: {
+            name: plan?.name || 'Abonnement Nolyo',
+            description: `Règlement ${invoice.number || 'facture Nolyo'}`,
+          },
+        },
+        quantity: 1,
+      },
+    ],
+    ...(invoiceMode
+      ? {}
+      : {
+          payment_intent_data: {
+            setup_future_usage: 'off_session',
+          },
+        }),
+    success_url: `${origin}/facture?paid=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/facture`,
+    metadata: {
+      noly_user: String(user._id),
+      noly_plan: user.subscription?.plan || '',
+      stripe_invoice_id: invoice.id,
+      purpose: 'unlock',
+      billing_choice: invoiceMode ? 'invoice' : 'auto',
+    },
+  })
+
+  return { url: session.url, sessionId: session.id }
 }
 
 async function markSubscriptionActive(user, { paidAt = new Date(), sendMail = false } = {}) {
   if (!user.subscription) user.subscription = {}
   user.subscription.status = 'active'
   user.subscription.paidAt = paidAt
-  if (!user.subscription.nextInvoiceAt && user.subscription.currentPeriodEnd) {
-    user.subscription.nextInvoiceAt = user.subscription.currentPeriodEnd
+  const next = new Date(paidAt)
+  next.setMonth(next.getMonth() + 1)
+  if (!user.subscription.nextInvoiceAt || new Date(user.subscription.nextInvoiceAt) <= paidAt) {
+    user.subscription.nextInvoiceAt = next
+  }
+  if (!user.subscription.currentPeriodEnd || new Date(user.subscription.currentPeriodEnd) <= paidAt) {
+    user.subscription.currentPeriodEnd = next
   }
   await user.save()
   if (sendMail) {
@@ -690,9 +791,42 @@ async function markSubscriptionActive(user, { paidAt = new Date(), sendMail = fa
   return user
 }
 
+async function settleUnlockInvoice(user, invoiceId, amountHint = 0) {
+  const stripe = getStripe()
+  if (!stripe || !invoiceId) return null
+
+  let invoice = await stripe.invoices.retrieve(invoiceId)
+  if (invoice.status === 'open') {
+    try {
+      invoice = await stripe.invoices.pay(invoiceId, { paid_out_of_band: true })
+    } catch (err) {
+      // Déjà réglée en parallèle (webhook / autre onglet)
+      invoice = await stripe.invoices.retrieve(invoiceId)
+      if (invoice.status !== 'paid') throw err
+    }
+  }
+
+  const amountPaid = invoice.amount_paid || invoice.amount_due || amountHint || 0
+  await recordFounderIncome({
+    ...invoice,
+    amount_paid: amountPaid,
+    status: 'paid',
+    metadata: {
+      ...(invoice.metadata || {}),
+      noly_user: String(user._id),
+      noly_plan: user.subscription?.plan || invoice.metadata?.noly_plan || '',
+    },
+  }).catch((err) => console.error('founder income', err.message))
+
+  return invoice
+}
+
 async function applyUnlockFromCheckoutSession(user, sessionId) {
   const stripe = getStripe()
   if (!stripe) throw new Error('Stripe n’est pas configuré.')
+  user = await User.findById(user._id)
+  if (!user) throw new Error('Compte introuvable.')
+
   const session = await stripe.checkout.sessions.retrieve(sessionId, {
     expand: ['setup_intent', 'payment_intent'],
   })
@@ -701,6 +835,13 @@ async function applyUnlockFromCheckoutSession(user, sessionId) {
   }
   if (session.client_reference_id && String(session.client_reference_id) !== String(user._id)) {
     throw new Error('Session de paiement invalide.')
+  }
+
+  // Idempotent : déjà débloqué après un paiement confirmé
+  if (user.subscription?.status === 'active' && session.payment_status === 'paid') {
+    const invoiceId = session.metadata?.stripe_invoice_id
+    if (invoiceId) await settleUnlockInvoice(user, invoiceId, session.amount_total || 0)
+    return { user, paid: true, session }
   }
 
   // Setup : enregistrement carte → 1 seul paiement de la facture ouverte
@@ -714,22 +855,34 @@ async function applyUnlockFromCheckoutSession(user, sessionId) {
         : setupIntent.payment_method?.id
     if (!pmId) return { user, paid: false, session }
 
-    await enableAutoCharge(user, pmId)
+    const keepInvoice =
+      session.metadata?.billing_choice === 'invoice' || user.subscription?.billingChoice === 'invoice'
 
-    if (session.metadata?.billing_choice === 'auto' || session.metadata?.purpose === 'save_card' || session.metadata?.purpose === 'unlock') {
-      user.subscription.billingChoice = 'auto'
-      user.subscription.billingChoiceAt = new Date()
-      user.subscription.billingPromptSeenAt = new Date()
+    if (!keepInvoice) {
+      await enableAutoCharge(user, pmId)
+      if (
+        session.metadata?.billing_choice === 'auto' ||
+        session.metadata?.purpose === 'save_card' ||
+        session.metadata?.purpose === 'unlock'
+      ) {
+        user.subscription.billingChoice = 'auto'
+        user.subscription.billingChoiceAt = new Date()
+        user.subscription.billingPromptSeenAt = new Date()
+      }
     }
 
     const invoiceId = session.metadata?.stripe_invoice_id || (await latestOpenInvoice(user))?.id
     if (invoiceId) {
-      const invoice = await stripe.invoices.retrieve(invoiceId)
-      if (invoice.status === 'open') {
-        const paid = await stripe.invoices.pay(invoiceId, { payment_method: pmId })
-        await recordFounderIncome(paid).catch(() => null)
-      } else if (invoice.status === 'paid') {
-        await recordFounderIncome(invoice).catch(() => null)
+      if (keepInvoice) {
+        await settleUnlockInvoice(user, invoiceId)
+      } else {
+        const invoice = await stripe.invoices.retrieve(invoiceId)
+        if (invoice.status === 'open') {
+          const paid = await stripe.invoices.pay(invoiceId, { payment_method: pmId })
+          await recordFounderIncome(paid).catch(() => null)
+        } else if (invoice.status === 'paid') {
+          await recordFounderIncome(invoice).catch(() => null)
+        }
       }
     }
 
@@ -752,33 +905,41 @@ async function applyUnlockFromCheckoutSession(user, sessionId) {
     return { user, paid: true, session }
   }
 
-  // Ancien mode payment (éviter double débit) : activer seulement si déjà payé, sans repayer
+  // Checkout payment : Stripe a encaissé → on clôture la facture sans 2e débit
   if (session.payment_status !== 'paid' && session.status !== 'complete') {
     return { user, paid: false, session }
   }
+
   const invoiceId = session.metadata?.stripe_invoice_id
   if (invoiceId) {
     try {
-      const invoice = await stripe.invoices.retrieve(invoiceId)
-      if (invoice.status === 'open') {
-        // Le Checkout a déjà encaissé : on marque la facture abonnement sans 2e charge
-        await stripe.invoices.pay(invoiceId, { paid_out_of_band: true })
-      }
-      if (invoice.status === 'paid' || invoice.status === 'open') {
-        await recordFounderIncome({
-          ...invoice,
-          amount_paid: invoice.amount_paid || invoice.amount_due || session.amount_total || 0,
-          status: 'paid',
-        }).catch(() => null)
-      }
+      await settleUnlockInvoice(user, invoiceId, session.amount_total || 0)
     } catch (err) {
       console.error('mark invoice paid', err.message)
     }
+  } else {
+    // Pas de facture liée : enregistrer quand même le revenu Checkout une seule fois
+    await recordFounderIncome({
+      id: `cs_${session.id}`,
+      amount_paid: session.amount_total || 0,
+      customer: session.customer,
+      metadata: {
+        noly_user: String(user._id),
+        noly_plan: user.subscription?.plan || '',
+      },
+      status_transitions: { paid_at: Math.floor(Date.now() / 1000) },
+    }).catch(() => null)
   }
 
+  const keepInvoice =
+    session.metadata?.billing_choice === 'invoice' || user.subscription?.billingChoice === 'invoice'
   const pmFromPayment =
     typeof session.payment_intent === 'object' ? session.payment_intent?.payment_method : null
-  if (pmFromPayment) await enableAutoCharge(user, pmFromPayment)
+  if (pmFromPayment && !keepInvoice) {
+    await enableAutoCharge(user, pmFromPayment)
+    user.subscription.billingChoice = 'auto'
+    user.subscription.billingChoiceAt = new Date()
+  }
 
   if (user.subscription?.stripeSubscriptionId) {
     try {

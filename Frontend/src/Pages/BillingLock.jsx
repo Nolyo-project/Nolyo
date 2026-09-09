@@ -7,6 +7,10 @@ import { useAuth } from '../context/AuthContext'
 import { formatDay } from './dashboard/format'
 import { primaryBtn } from './dashboard/ui'
 
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
 function BillingLock() {
   const { user, updateUser, refreshUser } = useAuth()
   const navigate = useNavigate()
@@ -33,18 +37,23 @@ function BillingLock() {
 
     ;(async () => {
       try {
-        const data = await api('/api/billing/confirm', {
-          method: 'POST',
-          body: sessionId ? { sessionId } : {},
-        })
-        if (cancelled) return
-        if (data.user) updateUser(data.user)
-        else if (refreshUser) await refreshUser()
-        if (data.paid || data.access) {
-          navigate('/dashboard', { replace: true })
-          return
+        let data = null
+        // Webhook Stripe peut arriver avec un léger décalage : on retente
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          data = await api('/api/billing/confirm', {
+            method: 'POST',
+            body: sessionId ? { sessionId } : {},
+          })
+          if (cancelled) return
+          if (data.user) updateUser(data.user)
+          if (data.paid || data.access) {
+            navigate('/dashboard', { replace: true })
+            return
+          }
+          await sleep(1200)
         }
-        setError('Paiement pas encore confirmé. Patientez quelques secondes puis réessayez.')
+        if (refreshUser) await refreshUser()
+        setError('Paiement reçu par Stripe, confirmation en cours. Réessayez « J’ai payé » dans un instant.')
       } catch (err) {
         if (!cancelled) setError(err.message)
       } finally {
@@ -63,6 +72,8 @@ function BillingLock() {
   }
 
   const sub = info?.subscription || user.subscription || {}
+  const invoiceMode =
+    sub.billingChoice === 'invoice' || sub.collectionMethod === 'send_invoice'
 
   async function startCheckout() {
     setError('')
@@ -109,12 +120,14 @@ function BillingLock() {
       <div className="w-full max-w-lg rounded-[1.6rem] bg-cream p-6 shadow-2xl ring-1 ring-ink/8 sm:p-8">
         <p className="text-xs font-semibold tracking-[0.22em] text-copper uppercase">Accès bloqué</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          {confirming ? 'Confirmation du paiement…' : 'Un paiement, et c’est rouvert.'}
+          {confirming ? 'Confirmation du paiement…' : 'Jour J — réglez votre mois.'}
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-soft">
           {confirming
-            ? 'Retour depuis Stripe : on vérifie le règlement et on rouvre votre tableau de bord.'
-            : 'Sans règlement, le tableau de bord reste verrouillé. Cliquez sur Payer : Stripe sécurise la carte, prélève la facture due, puis chaque mois automatiquement. Pas de double paiement.'}
+            ? 'Retour depuis Stripe : on vérifie le règlement avec Stripe, on enregistre le paiement, puis on rouvre votre tableau de bord.'
+            : invoiceMode
+              ? 'Vous avez choisi de payer chaque mois vous-même. Le mois offert est terminé : un seul paiement Stripe ouvre à nouveau l’espace. Impossible de payer deux fois la même facture.'
+              : 'Sans règlement, le tableau de bord reste verrouillé. Stripe encaisse une seule fois la facture due, puis vous revient ici automatiquement.'}
           {!confirming && sub.trialEndsAt ? ` Fin de l’essai : ${formatDay(sub.trialEndsAt)}.` : ''}
         </p>
 
@@ -123,6 +136,9 @@ function BillingLock() {
             <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">À régler</p>
             <p className="mt-2 font-display text-3xl">{sub.planName || 'Nolyo'}</p>
             {sub.amount ? <p className="mt-1 text-ink-soft">{formatPrice(sub.amount)} / mois</p> : null}
+            {invoiceMode ? (
+              <p className="mt-2 text-xs text-ink-soft">Mode : paiement manuel chaque mois</p>
+            ) : null}
           </div>
         ) : null}
 
@@ -135,12 +151,18 @@ function BillingLock() {
             onClick={startCheckout}
             className={`${primaryBtn} flex w-full justify-center`}
           >
-            {paying ? 'Redirection…' : confirming ? 'Vérification…' : 'Payer et déverrouiller'}
+            {paying
+              ? 'Redirection Stripe…'
+              : confirming
+                ? 'Vérification…'
+                : invoiceMode
+                  ? 'Payer ma facture'
+                  : 'Payer et déverrouiller'}
           </button>
           <button
             type="button"
             className="w-full text-sm text-ink-soft underline"
-            disabled={confirming}
+            disabled={confirming || paying}
             onClick={refreshAfterPay}
           >
             J’ai payé — actualiser
