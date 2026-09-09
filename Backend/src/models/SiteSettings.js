@@ -40,9 +40,7 @@ siteSettingsSchema.methods.toAdminJSON = function toAdminJSON() {
 
 function defaultTitle(mode) {
   if (mode === 'maintenance') return 'Maintenance en cours'
-  // Default title in model
-  if (mode === 'coming_soon') return 'Arrive bientôt'
-
+  if (mode === 'coming_soon') return 'Nolyo arrive bientôt'
   return ''
 }
 
@@ -84,7 +82,8 @@ async function getSiteSettings() {
       title: '',
       message: '',
     })
-  } else if (doc.title === 'Nolyo arrive bientôt') {
+  } else if (doc.title === 'Arrive bientôt') {
+    // Ancien titre court → laisser le défaut « Nolyo arrive bientôt »
     doc.title = ''
     await doc.save()
   }
