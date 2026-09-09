@@ -189,8 +189,30 @@ function FinancesView() {
             <p className="mt-2 font-display text-3xl">{formatMoney(totals.cotisationEstimate)}</p>
             <p className="mt-2 text-sm text-ink-soft">
               {(totals.cotisationRate * 100).toFixed(1).replace('.', ',')} % du CA
-              <span className="mt-1 block text-xs">
-                Services · VL {(totals.versementLiberatoireRate * 100).toFixed(1).replace('.', ',')} % · hors ACRE
+              <span className="mt-1 block text-xs leading-relaxed">
+                {totals.activityLabel || 'BNC · activité libérale'}
+                <br />
+                Cotisations {(totals.socialRate * 100).toFixed(1).replace('.', ',')} %
+                {totals.socialEstimate != null ? ` · ${formatMoney(totals.socialEstimate)}` : ''}
+                <br />
+                Versement libératoire {(totals.versementLiberatoireRate * 100).toFixed(1).replace('.', ',')} %
+                {totals.versementLiberatoireEstimate != null
+                  ? ` · ${formatMoney(totals.versementLiberatoireEstimate)}`
+                  : ''}
+                {totals.cfpRate > 0 ? (
+                  <>
+                    <br />
+                    CFP {(totals.cfpRate * 100).toFixed(1).replace('.', ',')} %
+                    {totals.cfpEstimate != null ? ` · ${formatMoney(totals.cfpEstimate)}` : ''}
+                  </>
+                ) : (
+                  <>
+                    <br />
+                    CFP : 0 €
+                  </>
+                )}
+                <br />
+                Hors ACRE
               </span>
             </p>
           </Surface>

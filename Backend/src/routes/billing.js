@@ -47,6 +47,8 @@ function billingPayload(user, extras = {}) {
       commitmentEndsAt,
       paidAt: sub.paidAt || null,
       activatedAt: sub.activatedAt || null,
+      upgradedToProAt: sub.upgradedToProAt || null,
+      upgradeCharged: Boolean(sub.upgradeCharged),
       hasPaymentMethod: Boolean(sub.hasPaymentMethod),
       collectionMethod: sub.collectionMethod || '',
       billingChoice: sub.billingChoice || '',
@@ -178,13 +180,17 @@ router.post('/upgrade', async (req, res) => {
     const result = await changeMemberPlan(req.user, 'pro')
     const user = await User.findById(result.user._id)
     const hostedInvoiceUrl = await latestHostedInvoiceUrl(user)
+    const message = result.inTrial
+      ? 'Vous êtes passé à Nolyo Pro pendant le mois offert. À la prochaine facture : tarif Pro.'
+      : result.upgradeCharged
+        ? 'Vous êtes passé à Nolyo Pro. La différence du mois en cours a été prélevée. Prochaines factures au tarif Pro.'
+        : 'Vous êtes passé à Nolyo Pro. Les prochaines factures seront au tarif Pro.'
     res.json({
       ok: true,
       upgraded: Boolean(result.changed),
       user: user.toSafeJSON(),
       hostedInvoiceUrl: hostedInvoiceUrl || '',
-      message:
-        'Vous êtes passé à Nolyo Pro. Clients, agenda et notes sont inchangés — la page pro et le QR sont débloqués.',
+      message,
     })
   } catch (err) {
     console.error('billing upgrade', err.message)
@@ -203,8 +209,12 @@ router.post('/choice', async (req, res) => {
   try {
     const wantedPlan = String(req.body?.plan || '').trim()
     if (wantedPlan === 'essentiel' || wantedPlan === 'pro') {
-      await changeMemberPlan(req.user, wantedPlan)
-      req.user = await User.findById(req.user._id)
+      try {
+        await changeMemberPlan(req.user, wantedPlan)
+        req.user = await User.findById(req.user._id)
+      } catch (err) {
+        return res.status(400).json({ error: err.message || 'Changement de formule impossible.' })
+      }
     }
 
     if (choice === 'auto') {

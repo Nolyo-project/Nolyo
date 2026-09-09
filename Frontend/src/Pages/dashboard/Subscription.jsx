@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
+import { useToast } from '../../context/ToastContext'
 import { formatPrice, planLabels, plans } from '../../data/plans'
 import { billingLabel } from '../../data/billing'
 import { formatDay } from './format'
@@ -17,6 +18,7 @@ const proPlan = plans.find((item) => item.id === 'pro')
 
 function Subscription() {
   const { user, updateUser } = useAuth()
+  const { toast, confirm } = useToast()
   const [params, setParams] = useSearchParams()
   const [info, setInfo] = useState(null)
   const [error, setError] = useState('')
@@ -46,9 +48,17 @@ function Subscription() {
         if (cancelled) return
         if (data.user) updateUser(data.user)
         setOk('Carte enregistrée. Le prélèvement automatique est prêt.')
+        toast({
+          tone: 'success',
+          title: 'Carte enregistrée',
+          description: 'Le prélèvement automatique est prêt.',
+        })
         await load()
       } catch (err) {
-        if (!cancelled) setError(err.message)
+        if (!cancelled) {
+          setError(err.message)
+          toast({ tone: 'error', title: 'Carte', description: err.message })
+        }
       } finally {
         if (!cancelled) {
           setBusy('')
@@ -62,13 +72,13 @@ function Subscription() {
     return () => {
       cancelled = true
     }
-  }, [params, setParams, updateUser])
+  }, [params, setParams, updateUser, toast])
 
   const sub = info?.subscription || user?.subscription || {}
   const card = info?.card
   const month = info?.monthPayment
   const planName = sub.planName || planLabels[sub.plan] || 'Nolyo'
-  const canUpgrade = sub.plan === 'essentiel'
+  const canUpgrade = sub.plan === 'essentiel' && !sub.upgradedToProAt
 
   async function addCard() {
     setError('')
@@ -77,15 +87,26 @@ function Subscription() {
     try {
       const data = await api('/api/billing/setup-card', { method: 'POST', body: { fromPage: true } })
       if (data.url) window.location.assign(data.url)
-      else setError('Lien Stripe introuvable.')
+      else {
+        setError('Lien Stripe introuvable.')
+        toast({ tone: 'error', title: 'Carte', description: 'Lien Stripe introuvable.' })
+      }
     } catch (err) {
       setError(err.message)
+      toast({ tone: 'error', title: 'Carte', description: err.message })
       setBusy('')
     }
   }
 
   async function removeCard() {
-    if (!window.confirm('Retirer la carte enregistrée ? Les prélèvements automatiques s’arrêteront.')) return
+    const approved = await confirm({
+      title: 'Retirer la carte ?',
+      description: 'Les prélèvements automatiques s’arrêteront. Vous pourrez en ajouter une autre plus tard.',
+      confirmLabel: 'Retirer la carte',
+      cancelLabel: 'Garder la carte',
+      tone: 'danger',
+    })
+    if (!approved) return
     setError('')
     setOk('')
     setBusy('remove')
@@ -93,35 +114,56 @@ function Subscription() {
       const data = await api('/api/billing/remove-card', { method: 'POST' })
       if (data.user) updateUser(data.user)
       setOk('Carte retirée.')
+      toast({ tone: 'success', title: 'Carte retirée', description: 'Les prélèvements automatiques sont arrêtés.' })
       await load()
     } catch (err) {
       setError(err.message)
+      toast({ tone: 'error', title: 'Carte', description: err.message })
     } finally {
       setBusy('')
     }
   }
 
   async function upgradeToPro() {
-    if (
-      !window.confirm(
-        'Passer à Nolyo Pro (19,99 € / mois) ? Clients, agenda, notes et revenus restent tels quels. Seule la différence de formule est facturée.',
-      )
-    ) {
-      return
-    }
+    const approved = await confirm({
+      kicker: 'Nolyo Pro',
+      title: 'Passer à Nolyo Pro ?',
+      description: `Formule à ${proPlan ? formatPrice(proPlan.price) : '19,99 €'} / mois. Vos clients, agenda et notes sont conservés.`,
+      bullets: [
+        'Pendant le mois offert : sans surcoût',
+        'En abonnement payant : la différence du mois en cours est prélevée',
+        'Ensuite toujours le tarif Pro — pas de retour à Essentiel',
+      ],
+      confirmLabel: 'Passer à Pro',
+      cancelLabel: 'Rester sur Essentiel',
+      tone: 'pro',
+    })
+    if (!approved) return
     setError('')
     setOk('')
     setBusy('upgrade')
     try {
       const data = await api('/api/billing/upgrade', { method: 'POST', body: { plan: 'pro' } })
       if (data.user) updateUser(data.user)
-      setOk(data.message || 'Vous êtes passé à Nolyo Pro. Vos données sont conservées.')
-      if (data.hostedInvoiceUrl && !data.user?.subscription?.hasPaymentMethod) {
-        window.open(data.hostedInvoiceUrl, '_blank', 'noopener,noreferrer')
-      }
+      const message = data.message || 'Vous êtes passé à Nolyo Pro. Vos données sont conservées.'
+      setOk(message)
+      toast({
+        tone: 'pro',
+        title: 'Bienvenue sur Nolyo Pro',
+        description: message,
+        duration: 6500,
+        action:
+          data.hostedInvoiceUrl && !data.user?.subscription?.hasPaymentMethod
+            ? {
+                label: 'Ouvrir la facture',
+                onClick: () => window.open(data.hostedInvoiceUrl, '_blank', 'noopener,noreferrer'),
+              }
+            : undefined,
+      })
       await load()
     } catch (err) {
       setError(err.message)
+      toast({ tone: 'error', title: 'Upgrade', description: err.message })
     } finally {
       setBusy('')
     }
@@ -157,17 +199,20 @@ function Subscription() {
               <dt className="text-ink-soft">Prochaine facture</dt>
               <dd className="font-medium">{formatDay(sub.nextInvoiceAt || sub.currentPeriodEnd) || '—'}</dd>
             </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-ink-soft">Dernier paiement</dt>
-              <dd className="font-medium">{formatDay(sub.paidAt) || '—'}</dd>
-            </div>
+            {sub.paidAt ? (
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-soft">Dernier paiement</dt>
+                <dd className="font-medium">{formatDay(sub.paidAt)}</dd>
+              </div>
+            ) : null}
           </dl>
           {canUpgrade ? (
             <div className="mt-6 rounded-2xl bg-paper px-4 py-4 ring-1 ring-ink/8">
               <p className="font-medium">Passer à Nolyo Pro</p>
               <p className="mt-1 text-sm text-ink-soft">
-                {proPlan ? `${formatPrice(proPlan.price)} / mois` : '19,99 € / mois'} — page pro, réservation,
-                QR et stats. Clients, agenda et notes restent intacts.
+                {proPlan ? `${formatPrice(proPlan.price)} / mois` : '19,99 € / mois'} — page pro, réservation, QR et
+                stats. Clients et agenda restent. Pendant le mois offert : gratuit. Ensuite : différence du mois en
+                cours, puis tarif Pro. Irréversible (pas de retour à Essentiel).
               </p>
               <button
                 type="button"

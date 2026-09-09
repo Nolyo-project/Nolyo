@@ -12,6 +12,7 @@ import RequestsView from './president/RequestsView'
 import SettingsView from './president/SettingsView'
 import TestimonialsView from './president/TestimonialsView'
 import AnalyticsView from './president/AnalyticsView'
+import MaintenanceView from './president/MaintenanceView'
 import {
   Empty,
   Stat,
@@ -245,6 +246,7 @@ function PresidentDashboard() {
     members: 'Membres',
     finances: 'Chiffre d’affaires',
     testimonials: 'Avis',
+    maintenance: 'Site / maintenance',
     settings: 'Paramètres',
     deletions: 'Suppressions',
   }
@@ -257,6 +259,7 @@ function PresidentDashboard() {
     ['members', 'Membres'],
     ['finances', 'Chiffre d’affaires'],
     ['testimonials', 'Avis'],
+    ['maintenance', 'Site / maintenance'],
     ['deletions', 'Suppressions'],
   ]
 
@@ -328,7 +331,7 @@ function PresidentDashboard() {
               <a href={publicSiteHref('/rdv')} className="rounded-full border border-ink/10 bg-cream px-4 py-2 text-sm font-medium">
                 Page publique · /rdv
               </a>
-            ) : view === 'settings' || view === 'finances' || view === 'analytics' ? null : (
+            ) : view === 'settings' || view === 'finances' || view === 'analytics' || view === 'maintenance' ? null : (
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -627,6 +630,8 @@ function PresidentDashboard() {
           {view === 'finances' ? <FinancesView /> : null}
 
           {view === 'analytics' ? <AnalyticsView /> : null}
+
+          {view === 'maintenance' ? <MaintenanceView /> : null}
 
           {view === 'testimonials' ? <TestimonialsView /> : null}
 

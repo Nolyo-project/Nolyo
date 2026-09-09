@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/client'
+import { useAuth } from '../../context/AuthContext'
+import { useToast } from '../../context/ToastContext'
+import { isProPlan } from '../../data/plans'
 import { fieldClass, formatLongDate } from './format'
 import { EmptyState, Modal, PageHeader, PageShell, Surface, ghostBtn, primaryBtn, quietBtn } from './ui'
+import { UpgradeWall } from './UpgradeWall'
 
 const KIND_OPTIONS = [
   { id: 'vacation', label: 'Vacances' },
@@ -29,6 +33,26 @@ function rangeLabel(startDate, endDate) {
 }
 
 function Absences() {
+  const { user } = useAuth()
+  if (!isProPlan(user)) {
+    return (
+      <UpgradeWall
+        title="Fermez la réservation en un clic"
+        description="Les congés font partie de Nolyo Pro : vos clients voient que vous êtes absent, et la réservation en ligne se ferme automatiquement ces jours-là."
+        icon="absence"
+        highlights={[
+          'Banderole sur votre page publique',
+          'Créneaux bloqués sur la réservation en ligne',
+          'Jours grisés dans votre agenda',
+        ]}
+      />
+    )
+  }
+  return <AbsencesContent />
+}
+
+function AbsencesContent() {
+  const { toast, confirm } = useToast()
   const [absences, setAbsences] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [open, setOpen] = useState(false)
@@ -112,6 +136,7 @@ function Absences() {
         setTab('upcoming')
       }
       closeForm()
+      window.dispatchEvent(new Event('nolio-workspace-changed'))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -120,17 +145,30 @@ function Absences() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Supprimer cette absence ? Les créneaux redeviendront réservables.')) return
-    await api(`/api/workspace/absences/${id}`, { method: 'DELETE' })
-    setAbsences((current) => current.filter((item) => item._id !== id))
+    const approved = await confirm({
+      title: 'Supprimer cette absence ?',
+      description: 'Les créneaux redeviendront réservables sur votre page et dans l’agenda.',
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      tone: 'danger',
+    })
+    if (!approved) return
+    try {
+      await api(`/api/workspace/absences/${id}`, { method: 'DELETE' })
+      setAbsences((current) => current.filter((item) => item._id !== id))
+      window.dispatchEvent(new Event('nolio-workspace-changed'))
+      toast({ tone: 'success', title: 'Absence supprimée', description: 'La réservation est rouverte ces jours-là.' })
+    } catch (err) {
+      toast({ tone: 'error', title: 'Suppression', description: err.message })
+    }
   }
 
   return (
     <PageShell>
       <PageHeader
-        kicker="Agenda"
+        kicker="Vitrine"
         title="Congés"
-        description="Bloquez des jours (vacances, arrêt, etc.). Sur ces dates, la réservation en ligne est fermée. Si l’absence couvre aujourd’hui, une banderole s’affiche sur votre page publique (sans le motif)."
+        description="Bloquez des jours (vacances, arrêt, etc.). Sur ces dates, la réservation en ligne est fermée, votre agenda les grise, et une banderole s’affiche sur votre page publique (sans le motif)."
         actions={
           <button type="button" onClick={openCreate} className={primaryBtn}>
             Ajouter une absence
@@ -165,6 +203,8 @@ function Absences() {
           Passées ({past.length})
         </button>
       </div>
+
+      {error && !open ? <p className="mt-6 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
 
       {visible.length === 0 ? (
         <div className="mt-8">

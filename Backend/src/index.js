@@ -105,6 +105,8 @@ app.use((err, _req, res, _next) => {
 async function start() {
   await connectDb()
   await ensurePresident()
+  const SiteSettings = require('./models/SiteSettings')
+  await SiteSettings.getSiteSettings()
   if (process.env.DEMO_SEED === '1' || process.env.DEMO_SEED === 'true') {
     await ensureDemoAccounts()
   } else {

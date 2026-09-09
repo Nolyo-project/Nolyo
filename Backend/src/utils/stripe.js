@@ -88,6 +88,7 @@ async function startMemberSubscription(user, request) {
     end.setMonth(end.getMonth() + 6)
     user.subscription.commitmentEndsAt = end
   }
+  ensurePlanHistoryStart(user, request.plan, user.subscription.activatedAt, 'inscription')
 
   if (!stripe) {
     user.subscription.status = 'trialing'
@@ -155,7 +156,10 @@ function applySubscriptionSnapshot(user, subscription) {
   if (priceId) user.subscription.stripePriceId = priceId
   const metaPlan = subscription.metadata?.noly_plan
   if (metaPlan === 'essentiel' || metaPlan === 'pro') {
-    user.subscription.plan = metaPlan
+    // Jamais de régression Pro → Essentiel via webhook Stripe
+    if (!(user.subscription.plan === 'pro' && metaPlan === 'essentiel')) {
+      user.subscription.plan = metaPlan
+    }
   }
   if (subscription.collection_method) {
     user.subscription.collectionMethod = subscription.collection_method
@@ -430,6 +434,28 @@ async function switchToInvoiceBilling(user) {
   return user
 }
 
+function ensurePlanHistoryStart(user, plan, at = new Date(), note = 'inscription') {
+  if (!user.subscription) user.subscription = {}
+  if (!Array.isArray(user.subscription.planHistory)) user.subscription.planHistory = []
+  if (user.subscription.planHistory.length) return
+  user.subscription.planHistory.push({
+    plan,
+    from: at,
+    to: null,
+    note,
+  })
+}
+
+function pushPlanHistory(user, plan, at = new Date(), note = '') {
+  if (!user.subscription) user.subscription = {}
+  if (!Array.isArray(user.subscription.planHistory)) user.subscription.planHistory = []
+  const hist = user.subscription.planHistory
+  const last = hist[hist.length - 1]
+  if (last && !last.to) last.to = at
+  if (last && last.plan === plan && !last.to) return
+  hist.push({ plan, from: at, to: null, note })
+}
+
 async function changeMemberPlan(user, planId) {
   if (planId !== 'essentiel' && planId !== 'pro') {
     throw new Error('Formule invalide.')
@@ -443,6 +469,21 @@ async function changeMemberPlan(user, planId) {
     return { user, changed: false }
   }
 
+  // Pas de retour Pro → Essentiel
+  if (previous === 'pro' && planId === 'essentiel') {
+    throw new Error('Le passage de Nolyo Pro à Essentiel n’est pas possible.')
+  }
+
+  // Une seule montée Essentiel → Pro
+  if (previous === 'essentiel' && planId === 'pro' && user.subscription.upgradedToProAt) {
+    throw new Error('Vous êtes déjà passé à Nolyo Pro. Ce changement ne peut se faire qu’une fois.')
+  }
+
+  const status = user.subscription.status || 'none'
+  const inTrial = status === 'trialing'
+  const now = new Date()
+  let upgradeCharged = false
+
   const stripe = getStripe()
   const subId = user.subscription.stripeSubscriptionId
   if (stripe && subId) {
@@ -450,11 +491,12 @@ async function changeMemberPlan(user, planId) {
     const itemId = sub.items?.data?.[0]?.id
     const price = await priceIdForPlan(planId)
     if (itemId) {
+      const isPaidUpgrade = previous === 'essentiel' && planId === 'pro' && !inTrial
       await stripe.subscriptions.update(subId, {
         items: [{ id: itemId, price }],
-        // Différence facturée tout de suite (upgrade Essentiel → Pro)
-        proration_behavior: previous && planId === 'pro' ? 'always_invoice' : 'none',
-        payment_behavior: 'pending_if_incomplete',
+        // Mois offert : pas de prorata. Abonnement payant : différence facturée tout de suite.
+        proration_behavior: isPaidUpgrade ? 'always_invoice' : 'none',
+        payment_behavior: isPaidUpgrade ? 'pending_if_incomplete' : 'allow_incomplete',
         metadata: {
           ...(sub.metadata || {}),
           noly_plan: planId,
@@ -462,20 +504,45 @@ async function changeMemberPlan(user, planId) {
         },
       })
 
-      if (previous && planId === 'pro') {
-        try {
-          const open = await latestOpenInvoice(user)
-          if (open?.id && open.status === 'open' && (open.amount_due || 0) > 0) {
-            const hasPm = await customerHasPaymentMethod(user.subscription.stripeCustomerId)
-            if (hasPm) {
-              const paid = await stripe.invoices.pay(open.id).catch(() => null)
-              if (paid?.status === 'paid') {
-                await recordFounderIncome(paid).catch(() => null)
-              }
-            }
+      if (isPaidUpgrade) {
+        const open = await latestOpenInvoice(user)
+        if (open?.id && (open.amount_due || 0) > 0) {
+          const hasPm = await customerHasPaymentMethod(user.subscription.stripeCustomerId)
+          if (!hasPm) {
+            const oldPrice = await priceIdForPlan('essentiel')
+            await stripe.subscriptions
+              .update(subId, {
+                items: [{ id: itemId, price: oldPrice }],
+                proration_behavior: 'none',
+                metadata: { ...(sub.metadata || {}), noly_plan: 'essentiel', noly_user: String(user._id) },
+              })
+              .catch(() => null)
+            throw new Error(
+              'Ajoutez une carte pour payer la différence Essentiel → Pro sur le mois en cours, puis réessayez.',
+            )
           }
-        } catch (err) {
-          console.error('upgrade proration pay', err.message)
+          try {
+            const paid = await stripe.invoices.pay(open.id)
+            if (paid?.status !== 'paid') {
+              throw new Error('unpaid')
+            }
+            upgradeCharged = true
+            await recordFounderIncome(paid).catch(() => null)
+          } catch (err) {
+            const oldPrice = await priceIdForPlan('essentiel')
+            await stripe.subscriptions
+              .update(subId, {
+                items: [{ id: itemId, price: oldPrice }],
+                proration_behavior: 'none',
+                metadata: { ...(sub.metadata || {}), noly_plan: 'essentiel', noly_user: String(user._id) },
+              })
+              .catch(() => null)
+            throw new Error(
+              err?.message && err.message !== 'unpaid'
+                ? err.message
+                : 'Le paiement de la différence a échoué. Vous restez sur Essentiel.',
+            )
+          }
         }
       }
     }
@@ -483,6 +550,21 @@ async function changeMemberPlan(user, planId) {
   }
 
   user.subscription.plan = planId
+
+  if (previous === 'essentiel' && planId === 'pro') {
+    user.subscription.upgradedToProAt = now
+    user.subscription.upgradeCharged = Boolean(upgradeCharged)
+    pushPlanHistory(
+      user,
+      'pro',
+      now,
+      inTrial ? 'upgrade_essai' : upgradeCharged ? 'upgrade_paye' : 'upgrade_prochaine_facture',
+    )
+  } else if (!previous) {
+    ensurePlanHistoryStart(user, planId, now, 'inscription')
+  } else {
+    pushPlanHistory(user, planId, now, 'changement')
+  }
 
   // Même compte : clients, agenda, notes… restent. On active juste les modules Pro.
   const { pickWorkspace } = require('../data/workspace')
@@ -514,7 +596,14 @@ async function changeMemberPlan(user, planId) {
   }
 
   await user.save()
-  return { user, changed: true, previous, plan: planId }
+  return {
+    user,
+    changed: true,
+    previous,
+    plan: planId,
+    inTrial,
+    upgradeCharged,
+  }
 }
 
 async function createCardSetupCheckout(user, { purpose = 'save_card', successPath = '/dashboard/parametres?carte=1' } = {}) {

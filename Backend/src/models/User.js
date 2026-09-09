@@ -48,6 +48,17 @@ const subscriptionSchema = new mongoose.Schema(
     },
     commitmentChoiceAt: Date,
     commitmentPromptSeenAt: Date,
+    /** Passage Essentiel → Pro (une seule fois). Pas de retour en arrière. */
+    upgradedToProAt: Date,
+    upgradeCharged: { type: Boolean, default: false },
+    planHistory: [
+      {
+        plan: { type: String, enum: ['essentiel', 'pro'], required: true },
+        from: { type: Date, required: true },
+        to: { type: Date, default: null },
+        note: { type: String, trim: true, default: '', maxlength: 80 },
+      },
+    ],
   },
   { _id: false },
 )
@@ -464,6 +475,9 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
       billingMode: this.subscription?.billingMode,
       stripeCustomerId: this.subscription?.stripeCustomerId,
       stripeSubscriptionId: this.subscription?.stripeSubscriptionId,
+      upgradedToProAt: this.subscription?.upgradedToProAt,
+      upgradeCharged: Boolean(this.subscription?.upgradeCharged),
+      planHistory: this.subscription?.planHistory || [],
     },
     business: pickBusiness(this.business?.toObject?.() || this.business),
     depositPlan: pickDepositPlan(this.depositPlan),

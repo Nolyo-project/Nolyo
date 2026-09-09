@@ -13,7 +13,7 @@ const plans = [
     features: [
       'Tableau de bord privé',
       'Clients et prospects',
-      'Agenda et congés',
+      'Agenda',
       'Notes et tâches',
       'Revenus, mois par mois',
       'Relances clients',
@@ -36,6 +36,7 @@ const plans = [
       'Tout Nolyo Essentiel',
       'Page professionnelle (accueil & à propos)',
       'Réservation et devis en ligne',
+      'Congés (fermeture de la réservation)',
       'Photos, couleurs, équipe',
       'QR Code vers votre page',
       'Avis clients modérés',

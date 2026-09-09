@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
+import { isProPlan } from '../../data/plans'
 import { copyForUser } from '../../data/trades'
 import { hasModule } from '../../data/workspace'
 import {
@@ -16,6 +17,7 @@ import {
   isSlotInFuture,
   slotDateTime,
   startOfWeek,
+  toDateInput,
   useNow,
 } from './format'
 import { Modal, PageHeader, PageShell, Surface, ghostBtn, primaryBtn } from './ui'
@@ -47,10 +49,17 @@ function agendaCardTitle(item) {
   return person || item.title
 }
 
-function canPlaceAppointment(start, durationMinutes, appointments, excludeId, workDays, now) {
+function dayIsAbsent(day, absences) {
+  if (!absences?.length) return false
+  const ymd = toDateInput(day)
+  return absences.some((item) => item.startDate <= ymd && item.endDate >= ymd)
+}
+
+function canPlaceAppointment(start, durationMinutes, appointments, excludeId, workDays, now, absences) {
   if (!start || Number.isNaN(start.getTime())) return false
   if (!isSlotInFuture(start, now)) return false
   if (!workDays.includes(start.getDay())) return false
+  if (dayIsAbsent(start, absences)) return false
   const end = start.getTime() + durationMinutes * 60000
   return !appointments.some((item) => {
     if (String(item._id) === String(excludeId) || item.status !== 'planned') return false
@@ -80,6 +89,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek())
   const [appointments, setAppointments] = useState([])
   const [contacts, setContacts] = useState([])
+  const [absences, setAbsences] = useState([])
   const [error, setError] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settings, setSettings] = useState(schedule)
@@ -97,6 +107,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
   const ghostRef = useRef(null)
   const suppressClickRef = useRef(false)
   const isFounder = variant === 'founder'
+  const isPro = !isFounder && isProPlan(user)
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
   const slots = useMemo(
@@ -112,6 +123,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
     const visible = drag?.id ? appointments.filter((item) => item._id !== drag.id) : appointments
     days.forEach((day) => {
       const open = workDays.includes(day.getDay())
+      const away = dayIsAbsent(day, absences)
       slots.forEach((slot) => {
         const start = slotDateTime(day, slot.startMinutes)
         const key = start.toISOString()
@@ -127,7 +139,13 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
           if (appointment.status === 'planned' && isSlotInFuture(new Date(appointment.startAt), now)) {
             takenIds.add(String(appointment._id))
           }
-        } else if (!isSlotInFuture(start, now)) {
+          return
+        }
+        if (away) {
+          map.set(key, { status: 'absence' })
+          return
+        }
+        if (!isSlotInFuture(start, now)) {
           map.set(key, { status: 'past' })
         } else {
           map.set(key, { status: 'free' })
@@ -136,17 +154,28 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
       })
     })
     return { map, free, taken: takenIds.size }
-  }, [appointments, days, drag?.id, now, schedule.durationMinutes, slots, workDays])
+  }, [absences, appointments, days, drag?.id, now, schedule.durationMinutes, slots, workDays])
 
   async function loadWeek(start) {
     const from = start.toISOString()
     const to = addDays(start, 7).toISOString()
-    const [rdv, carnet] = await Promise.all([
+    const requests = [
       api(`${base}/appointments?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
       api(`${base}/contacts`),
-    ])
+    ]
+    if (isPro) requests.push(api('/api/workspace/absences').catch(() => ({ absences: [] })))
+    const [rdv, carnet, away] = await Promise.all(requests)
     setAppointments(rdv.appointments || [])
     setContacts(carnet.contacts || [])
+    if (isPro) {
+      const fromYmd = toDateInput(start)
+      const toYmd = toDateInput(addDays(start, 6))
+      setAbsences(
+        (away?.absences || []).filter((item) => item.startDate <= toYmd && item.endDate >= fromYmd),
+      )
+    } else {
+      setAbsences([])
+    }
   }
 
   async function loadOutcomes() {
@@ -168,7 +197,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
     }
     window.addEventListener('nolio-workspace-changed', refresh)
     return () => window.removeEventListener('nolio-workspace-changed', refresh)
-  }, [weekStart])
+  }, [weekStart, isPro])
 
   useEffect(() => {
     if (!isFounder || rdvTab === 'agenda') return
@@ -248,6 +277,11 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
       return
     }
     if (!booking) return
+    if (dayIsAbsent(booking, absences)) {
+      setError('Ce jour est en congés.')
+      setBooking(null)
+      return
+    }
     if (!isSlotInFuture(booking)) {
       setError('Ce créneau est déjà passé.')
       setBooking(null)
@@ -322,7 +356,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
     return {
       iso,
       start,
-      valid: canPlaceAppointment(start, duration, appointments, item._id, workDays, now),
+      valid: canPlaceAppointment(start, duration, appointments, item._id, workDays, now, absences),
     }
   }
 
@@ -681,16 +715,21 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
               <div className="grid place-items-center text-xs text-ink-soft">Horaire</div>
               {days.map((day) => {
                 const open = workDays.includes(day.getDay())
+                const away = dayIsAbsent(day, absences)
                 const isToday = new Date().toDateString() === day.toDateString()
                 return (
                   <div key={`head-${day.toISOString()}`} className="text-center">
                     <p className={`text-xs uppercase ${isToday ? 'font-semibold text-copper' : 'text-ink-soft'}`}>
                       {day.toLocaleDateString('fr-FR', { weekday: 'short' })}
                     </p>
-                    <p className={`text-sm ${isToday ? 'font-semibold' : ''}`}>
+                    <p className={`text-sm ${isToday ? 'font-semibold' : ''} ${away ? 'text-ink-soft' : ''}`}>
                       {day.toLocaleDateString('fr-FR', { day: 'numeric' })}
                     </p>
-                    {!open ? <p className="text-[11px] text-ink-soft">Fermé</p> : null}
+                    {!open ? (
+                      <p className="text-[11px] text-ink-soft">Fermé</p>
+                    ) : away ? (
+                      <p className="text-[11px] font-medium text-ink-soft">Congés</p>
+                    ) : null}
                   </div>
                 )
               })}
@@ -718,6 +757,19 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
                   if (!cell || cell.status === 'closed') {
                     return [
                       <div key={iso} style={style} className="min-h-14 rounded-xl bg-ink/5" />,
+                    ]
+                  }
+
+                  if (cell.status === 'absence') {
+                    return [
+                      <div
+                        key={iso}
+                        style={style}
+                        className="grid min-h-14 place-items-center rounded-xl bg-ink/[0.07] text-[11px] text-ink-soft/80"
+                        title="Jour de congés — réservation fermée"
+                      >
+                        Congés
+                      </div>,
                     ]
                   }
 

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ToastProvider } from './context/ToastContext'
 import AuthLayout from './components/layouts/AuthLayout'
 import PublicLayout from './components/layouts/PublicLayout'
 import { GuestOnly, ProtectedRoute } from './components/ProtectedRoute'
@@ -26,14 +27,19 @@ import PublicProfile from './Pages/PublicProfile'
 import PublicAbout from './Pages/PublicAbout'
 import PublicBooking from './Pages/PublicBooking'
 import FounderBooking from './Pages/FounderBooking'
+import DemoDashboard from './Pages/DemoDashboard'
 import Register from './Pages/Register'
 import Onboarding from './Pages/Onboarding'
 import Subscribe from './Pages/Subscribe'
 import BillingLock from './Pages/BillingLock'
+import Cgv from './Pages/legal/Cgv'
+import MentionsLegales from './Pages/legal/MentionsLegales'
+import PolitiqueConfidentialite from './Pages/legal/PolitiqueConfidentialite'
 import PreviewExpiryWatcher from './components/PreviewExpiryWatcher'
 import AnalyticsBeacon from './components/AnalyticsBeacon'
 import { canVisitModule } from './data/workspace'
 import { isAdminHost, siteOrigin } from './config/site'
+import SiteStatusGate from './components/SiteStatusGate'
 import PageLoader from './components/PageLoader'
 
 function ModuleRoute({ id, children }) {
@@ -84,10 +90,14 @@ function AdminApp() {
 
 function PublicApp() {
   return (
+    <SiteStatusGate>
     <Routes>
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/rdv" element={<FounderBooking />} />
+            <Route path="/mentions-legales" element={<MentionsLegales />} />
+            <Route path="/cgv" element={<Cgv />} />
+            <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
           </Route>
 
           <Route element={<AuthLayout />}>
@@ -180,14 +190,7 @@ function PublicApp() {
                 </ModuleRoute>
               }
             />
-            <Route
-              path="conges"
-              element={
-                <ModuleRoute id="appointments">
-                  <Absences />
-                </ModuleRoute>
-              }
-            />
+            <Route path="conges" element={<Absences />} />
             <Route
               path="finances"
               element={
@@ -237,9 +240,11 @@ function PublicApp() {
           <Route path="/p/:slug" element={<PublicProfile />} />
           <Route path="/p/:slug/a-propos" element={<PublicAbout />} />
           <Route path="/p/:slug/reserver" element={<PublicBooking />} />
+          <Route path="/apercu/dashboard" element={<DemoDashboard />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </SiteStatusGate>
   )
 }
 
@@ -247,15 +252,17 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <PreviewExpiryWatcher />
-        <AnalyticsBeacon />
-        {isAdminHost() ? (
-          <AdminGate>
-            <AdminApp />
-          </AdminGate>
-        ) : (
-          <PublicApp />
-        )}
+        <ToastProvider>
+          <PreviewExpiryWatcher />
+          <AnalyticsBeacon />
+          {isAdminHost() ? (
+            <AdminGate>
+              <AdminApp />
+            </AdminGate>
+          ) : (
+            <PublicApp />
+          )}
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   )

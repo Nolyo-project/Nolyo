@@ -36,7 +36,11 @@ function StarPick({ value, onChange }) {
   )
 }
 
-function TestimonialsCarousel({ onStats }) {
+function TestimonialsCarousel({
+  onStats,
+  title = 'Ils utilisent déjà Nolyo',
+  description = 'Les avis viennent des personnes qui utilisent vraiment Nolyo — pas de textes inventés.',
+}) {
   const scrollerRef = useRef(null)
   const [quotes, setQuotes] = useState([])
   const [index, setIndex] = useState(0)
@@ -138,13 +142,8 @@ function TestimonialsCarousel({ onStats }) {
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="max-w-2xl">
             <p className="text-xs font-semibold tracking-[0.22em] text-cream/55 uppercase">Avis</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              Ils ont retrouvé le fil.
-            </h2>
-            <p className="mt-3 max-w-lg text-cream/70">
-              Indépendants, studios, cabinets : ceux qui ont ouvert un espace Nolyo racontent le quotidien, pas un
-              argumentaire.
-            </p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h2>
+            <p className="mt-3 max-w-lg text-cream/70">{description}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -199,7 +198,7 @@ function TestimonialsCarousel({ onStats }) {
 
         {quotes.length === 0 ? (
           <div className="mt-12 rounded-[1.7rem] bg-cream/10 px-6 py-12 text-center">
-            <p className="text-cream/75">Les premiers avis publiés apparaîtront ici.</p>
+            <p className="text-cream/75">Les premiers témoignages arriveront prochainement.</p>
             <button
               type="button"
               onClick={() => setOpen(true)}

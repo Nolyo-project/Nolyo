@@ -1,91 +1,165 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '../api/client'
+import HomeVideo from '../components/HomeVideo'
+import LiveAppFrame from '../components/LiveAppFrame'
 import TestimonialsCarousel, { reviewStats } from '../components/TestimonialsCarousel'
 import TryPreviewButton from '../components/TryPreviewButton'
-import { formatPrice, paymentNote, plans } from '../data/plans'
+import { formatPrice, plans, trialNote } from '../data/plans'
 
-const dashboardPoints = [
-  { title: 'Le fil du jour', text: 'Rendez-vous, relances, ce qui rentre ce mois-ci.' },
-  { title: 'Vos clients', text: 'Clients et prospects : une fiche, des notes, une prochaine action.' },
-  { title: 'L’agenda', text: 'Créneaux, congés, rendez-vous — tout au même endroit.' },
-  { title: 'Ce qui rentre', text: 'La trésorerie, un mois à la fois.' },
-]
+const DEMO_DASHBOARD = '/apercu/dashboard'
+const DEMO_PAGE = '/p/maison-brume'
 
-const pagePoints = [
-  { title: 'Votre vitrine', text: 'Accueil, à propos, photos, couleurs, l’équipe.' },
-  { title: 'On réserve chez vous', text: 'Un visiteur choisit un créneau. Ça arrive dans votre agenda.' },
-  { title: 'À partager', text: 'Un QR Code, un lien. Comptoir, carte de visite, stories.' },
-]
+const essentiel = plans.find((p) => p.id === 'essentiel')
+const pro = plans.find((p) => p.id === 'pro')
 
-const trustPoints = [
+const constatCards = [
   {
-    title: 'Paiements Stripe',
-    text: 'Vos abonnements passent par Stripe : carte sécurisée, normes bancaires.',
+    title: 'Vos clients',
+    text: 'Retrouvez vos clients, prospects et informations importantes dans un seul espace.',
   },
   {
-    title: 'Au choix chaque mois',
-    text: 'Prélèvement automatique, ou paiement manuel — vous choisissez comment régler.',
+    title: 'Vos rendez-vous',
+    text: 'Gérez votre agenda et gardez les informations liées à chaque rendez-vous.',
   },
   {
-    title: '1er mois offert',
-    text: 'Puis 6 mois d’engagement. Transparent, sans surprise sur la durée.',
+    title: 'Votre activité',
+    text: 'Suivez votre chiffre d’affaires et gardez une vision claire de votre activité.',
   },
   {
-    title: 'Essai 5 minutes',
-    text: 'Testez Essentiel ou Pro tout de suite, sans créer de compte.',
+    title: 'Votre présence en ligne',
+    text: 'Avec Nolyo Pro, présentez votre activité et permettez à vos clients de réserver en ligne.',
   },
 ]
 
-const subscribeSteps = [
+const whyModules = [
+  'Clients',
+  'Agenda',
+  'Relances',
+  'Devis',
+  'Chiffre d’affaires',
+  'Statistiques',
+  'Page professionnelle',
+]
+
+const steps = [
   {
     n: '01',
-    title: 'Vous essayez',
-    text: 'Cinq minutes sur Essentiel ou Pro, sans compte ni carte. Vous ouvrez le vrai tableau de bord, cliquez partout, voyez si ça vous correspond.',
+    title: 'Testez',
+    text: 'Découvrez Nolyo pendant 5 minutes, sans créer de compte et sans carte bancaire.',
   },
   {
     n: '02',
-    title: 'Vous demandez',
-    text: 'À la fin de l’essai — ou quand vous êtes prêt — vous envoyez une demande. On vous recontacte, on vous envoie un devis. Le premier mois est offert.',
+    title: 'Choisissez',
+    text: 'Essentiel pour gérer votre activité, ou Pro pour gérer, présenter et développer votre activité.',
   },
   {
     n: '03',
-    title: 'Vous démarrez',
-    text: 'Dès le devis signé, vous recevez un code unique. Vous créez votre compte, vous configurez votre activité, et votre espace Nolyo est prêt.',
+    title: 'Développez',
+    text: 'Configurez votre espace et commencez à centraliser votre activité.',
   },
 ]
 
-const compareRows = [
-  { label: 'Tableau de bord', essentiel: true, pro: true },
-  { label: 'Clients, prospects, notes', essentiel: true, pro: true },
-  { label: 'Agenda et congés', essentiel: true, pro: true },
-  { label: 'Relances', essentiel: true, pro: true },
-  { label: 'Revenus, mois par mois', essentiel: true, pro: true },
-  { label: 'Paiement Stripe (auto ou manuel)', essentiel: true, pro: true },
-  { label: 'Page professionnelle', essentiel: false, pro: true },
-  { label: 'Réservation et devis en ligne', essentiel: false, pro: true },
-  { label: 'QR Code', essentiel: false, pro: true },
-  { label: 'Avis clients', essentiel: false, pro: true },
-  { label: 'Statistiques', essentiel: false, pro: true },
-  { label: 'Dépenses et cotisations', essentiel: false, pro: true },
+const essentielFeatures = [
+  'Tableau de bord',
+  'Clients',
+  'Prospects',
+  'Rendez-vous',
+  'Tâches',
+  'Notes',
+  'Chiffre d’affaires',
+  'Relances',
 ]
 
-const previewStats = [
-  { label: 'Ce mois', value: '1 240 €', hint: 'encaissé' },
-  { label: 'Aujourd’hui', value: '3', hint: 'rendez-vous' },
-  { label: 'Clients', value: '18', hint: 'au carnet' },
-  { label: 'À relancer', value: '2', hint: 'en attente', dark: true },
+const proFeatures = [
+  'Tout Essentiel',
+  'Page professionnelle',
+  'Réservation en ligne',
+  'Demandes de devis',
+  'Congés (fermeture réservation)',
+  'QR Code',
+  'Avis clients',
+  'Statistiques',
+  'Dépenses et cotisations',
 ]
 
-function Mark({ on }) {
-  return on ? (
-    <span className="grid h-6 w-6 place-items-center rounded-full bg-moss text-[11px] font-semibold text-cream">
-      ✓
-    </span>
-  ) : (
-    <span className="grid h-6 w-6 place-items-center rounded-full bg-ink/8 text-[11px] font-semibold text-ink/30">
-      —
-    </span>
+const proFocus = [
+  {
+    title: 'Présentez-vous',
+    text: 'Votre activité, vos prestations et votre univers.',
+  },
+  {
+    title: 'Soyez trouvé',
+    text: 'Partagez facilement votre page avec un lien ou un QR Code.',
+  },
+  {
+    title: 'Soyez réservé',
+    text: 'Vos clients choisissent directement un créneau disponible.',
+  },
+]
+
+const audiences = [
+  {
+    title: 'Beauté & bien-être',
+    text: 'Coiffeurs, esthéticiennes, praticiens, masseurs…',
+  },
+  {
+    title: 'Freelances',
+    text: 'Développeurs, graphistes, consultants…',
+  },
+  {
+    title: 'Prestataires',
+    text: 'Artisans, photographes, services à domicile…',
+  },
+  {
+    title: 'Indépendants',
+    text: 'Toute personne qui souhaite mieux gérer son activité.',
+  },
+]
+
+const faqItems = [
+  {
+    q: 'Nolio est-il gratuit ?',
+    a: 'Le premier mois est offert. Ensuite, vous choisissez votre formule (Essentiel ou Pro) avec un engagement de 6 mois — soit 7 mois au total.',
+  },
+  {
+    q: 'Puis-je tester Nolio sans créer de compte ?',
+    a: 'Oui. Vous pouvez découvrir l’interface pendant 5 minutes, sans créer de compte ni renseigner votre carte bancaire.',
+  },
+  {
+    q: 'Quelle est la différence entre Essentiel et Pro ?',
+    a: 'Essentiel sert à gérer votre activité en privé (clients, agenda, notes, chiffre d’affaires, relances). Pro ajoute la page professionnelle, la réservation et les devis en ligne, le QR Code, les avis, les statistiques, les congés et le suivi des dépenses.',
+  },
+  {
+    q: 'Puis-je changer de formule ?',
+    a: 'Vous pouvez passer une fois d’Essentiel à Pro depuis votre espace (pendant le mois offert sans surcoût ; ensuite la différence du mois en cours peut être prélevée). Le retour de Pro vers Essentiel n’est pas prévu.',
+  },
+  {
+    q: 'Comment fonctionne la réservation en ligne ?',
+    a: 'Avec Nolyo Pro, vos visiteurs ouvrent votre page publique, choisissent une prestation et un créneau disponible. Le rendez-vous arrive dans votre agenda. Les jours de congés que vous définissez ferment automatiquement la réservation.',
+  },
+  {
+    q: 'Nolio est-il adapté à mon activité ?',
+    a: 'Nolio est pensé pour les indépendants et petites structures qui veulent centraliser clients, rendez-vous et suivi d’activité — avec une vitrine en ligne si vous choisissez Pro.',
+  },
+]
+
+function FaqItem({ item, open, onToggle }) {
+  return (
+    <div className="border-b border-ink/8 last:border-0">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-4 py-5 text-left"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span className="font-medium text-ink">{item.q}</span>
+        <span className={`shrink-0 text-ink-soft transition ${open ? 'rotate-180' : ''}`} aria-hidden>
+          ⌄
+        </span>
+      </button>
+      {open ? <p className="pb-5 text-sm leading-relaxed text-ink-soft">{item.a}</p> : null}
+    </div>
   )
 }
 
@@ -113,6 +187,7 @@ function formatMembers(count) {
 
 function Home() {
   const location = useLocation()
+  const [faqOpen, setFaqOpen] = useState(0)
   const [stats, setStats] = useState({ members: null, faces: [] })
   const [avisStats, setAvisStats] = useState({ rating: reviewStats.rating, count: reviewStats.count })
 
@@ -142,66 +217,55 @@ function Home() {
 
   return (
     <main className="bg-paper">
-      <section id="accueil" className="dash-sidebar relative overflow-hidden text-cream">
-        <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-5 pt-16 pb-10 sm:px-8 lg:grid-cols-2 lg:pt-24 lg:pb-12">
+      {/* 1. Hero */}
+      <section
+        id="accueil"
+        className="dash-sidebar relative flex min-h-[calc(100svh-4.75rem)] flex-col overflow-hidden text-cream"
+      >
+        <div className="relative mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-2 lg:gap-14 lg:py-12">
           <div>
             <p className="inline-flex rounded-full bg-copper px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-cream uppercase">
-              1er mois offert
+              L’outil pensé pour les indépendants
             </p>
-            <h1 className="mt-6 font-display text-5xl leading-[1.06] font-semibold tracking-tight sm:text-6xl lg:text-7xl">
-              Gérer.
+            <h1 className="mt-6 font-display text-5xl leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-7xl">
+              Gérez.
               <br />
-              Présenter.
+              Développez.
               <br />
-              <span className="italic text-copper">Développer.</span>
+              <span className="italic text-copper">Rayonnez.</span>
             </h1>
             <p className="mt-6 max-w-md text-lg leading-relaxed text-cream/75">
-              L’outil des indépendants : agenda, clients, relances. En Pro, une page pour être trouvé et réserver en
-              ligne.
+              Nolio réunit vos clients, rendez-vous, devis, chiffre d’affaires et votre présence en ligne au même
+              endroit.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <TryPreviewButton plan="pro">Essayer Pro · 5 min</TryPreviewButton>
-              <TryPreviewButton plan="essentiel" variant="ghost">
-                Essayer Essentiel · 5 min
-              </TryPreviewButton>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <Link
+                to="/#video"
+                className="inline-flex items-center justify-center rounded-full bg-copper px-6 py-3 text-sm font-semibold text-cream shadow-lg shadow-ink/20 transition hover:bg-copper-dark"
+              >
+                Découvrir Nolio
+              </Link>
+              <Link
+                to="/#fonctionnement"
+                className="inline-flex items-center justify-center rounded-full border border-cream/25 px-6 py-3 text-sm font-semibold text-cream transition hover:border-cream/45 hover:bg-cream/5"
+              >
+                Voir comment ça marche
+              </Link>
             </div>
-            <p className="mt-4 text-sm text-cream/50">Sans compte. Sans carte. Vous choisissez la formule à tester.</p>
+            <p className="mt-5 text-sm text-cream/80">🎁 Premier mois offert</p>
+            <p className="mt-1 text-sm text-cream/50">Testez Nolio avant de vous engager.</p>
           </div>
-
-          <div className="rounded-[1.5rem] bg-cream p-5 text-ink shadow-2xl shadow-ink/25 ring-1 ring-ink/6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Tableau de bord</p>
-                <p className="mt-0.5 text-sm font-medium">Maison Brume</p>
-              </div>
-              <span className="rounded-full bg-moss px-3 py-1.5 text-[11px] font-semibold tracking-wide text-cream uppercase">
-                Nolyo Pro
-              </span>
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              {previewStats.map((item) => (
-                <div
-                  key={item.label}
-                  className={`rounded-[1.15rem] p-3.5 ring-1 ${
-                    item.dark ? 'bg-moss text-cream ring-moss' : 'bg-paper ring-ink/6'
-                  }`}
-                >
-                  <p
-                    className={`text-[10px] font-semibold tracking-[0.16em] uppercase ${
-                      item.dark ? 'text-cream/55' : 'text-ink-soft'
-                    }`}
-                  >
-                    {item.label}
-                  </p>
-                  <p className="mt-1.5 font-display text-2xl tracking-tight">{item.value}</p>
-                  <p className={`text-xs ${item.dark ? 'text-cream/70' : 'text-ink-soft'}`}>{item.hint}</p>
-                </div>
-              ))}
-            </div>
+          <div className="min-w-0">
+            <LiveAppFrame
+              src={DEMO_DASHBOARD}
+              title="nolyo.fr/apercu — Maison Brume"
+              aspectClass="aspect-[16/12] sm:aspect-[16/11]"
+              scale={0.68}
+            />
           </div>
         </div>
 
-        <div className="relative mx-auto max-w-6xl px-5 pb-12 sm:px-8 lg:pb-16">
+        <div className="relative mx-auto w-full max-w-6xl px-5 pb-8 sm:px-8 lg:pb-10">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex items-center gap-4 rounded-[1.35rem] bg-cream/12 px-5 py-4 ring-1 ring-cream/12 backdrop-blur-sm">
               {faces.length > 0 ? (
@@ -256,88 +320,118 @@ function Home() {
         </div>
       </section>
 
-      <section id="confiance" className="border-b border-ink/6 bg-cream/40">
-        <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
-          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">En toute confiance</p>
-          <h2 className="mt-3 max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            Payez sereinement. Testez avant de vous engager.
-          </h2>
-          <p className="mt-3 max-w-xl text-sm text-ink-soft">{paymentNote}</p>
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {trustPoints.map((item) => (
-              <article key={item.title}>
-                <p className="font-medium text-ink">{item.title}</p>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{item.text}</p>
+      {/* 2. Vidéo */}
+      <section id="video" className="border-b border-ink/6 bg-cream/50">
+        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Présentation</p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+              Découvrez Nolio en quelques minutes
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-ink-soft">
+              Découvrez comment Nolio vous aide à gérer votre activité simplement, sans multiplier les outils.
+            </p>
+          </div>
+          <div className="mx-auto mt-10 max-w-4xl">
+            <HomeVideo />
+          </div>
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <p className="text-sm font-medium text-ink">Testez Nolio gratuitement</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <TryPreviewButton plan="pro" variant="header">
+                Essayer Pro · 5 min
+              </TryPreviewButton>
+              <TryPreviewButton plan="essentiel" variant="header" className="!bg-moss-mid">
+                Essayer Essentiel · 5 min
+              </TryPreviewButton>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Constat */}
+      <section id="constat" className="border-b border-ink/6">
+        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Le constat</p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+              Votre activité ne devrait pas être éparpillée partout.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-ink-soft">
+              Instagram pour les demandes. WhatsApp pour les clients. Google Agenda pour les rendez-vous. Excel pour
+              suivre votre chiffre d’affaires. Et encore un autre outil pour votre présence en ligne.
+            </p>
+            <p className="mt-5 font-display text-2xl tracking-tight text-moss sm:text-3xl">
+              Nolio rassemble l’essentiel au même endroit.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {constatCards.map((item) => (
+              <article
+                key={item.title}
+                className="rounded-[1.35rem] bg-cream p-5 ring-1 ring-ink/6 transition hover:-translate-y-0.5 hover:ring-ink/12"
+              >
+                <h3 className="font-medium text-ink">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-soft">{item.text}</p>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="produit" className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-        <div className="max-w-2xl">
-          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Le produit</p>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-            Votre espace, et votre vitrine.
-          </h2>
-        </div>
-
-        <div className="mt-12 grid gap-5 lg:grid-cols-2">
-          <article className="rounded-[1.5rem] bg-cream p-7 ring-1 ring-ink/6 sm:p-8">
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Essentiel et Pro</p>
-            <h3 className="mt-2 font-display text-3xl">Le tableau de bord</h3>
-            <p className="mt-3 text-ink-soft">
-              Votre espace privé. Clients, agenda, congés, notes, ce qui rentre — et les relances qui comptent.
+      {/* 4. Pourquoi Nolio */}
+      <section id="pourquoi" className="border-b border-ink/6 bg-moss text-cream">
+        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Pourquoi Nolyo</p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+              Un seul espace pour votre activité.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-cream/75">
+              Nolio est pensé pour éviter de multiplier les outils et vous permettre de retrouver l’essentiel au même
+              endroit.
             </p>
-            <ul className="mt-6 space-y-3">
-              {dashboardPoints.map((item) => (
-                <li key={item.title}>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-sm text-ink-soft">{item.text}</p>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-8">
-              <TryPreviewButton plan="essentiel" variant="header">
-                Tester Essentiel
-              </TryPreviewButton>
-            </div>
-          </article>
+          </div>
 
-          <article className="rounded-[1.5rem] bg-moss p-7 text-cream sm:p-8">
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Nolyo Pro</p>
-            <h3 className="mt-2 font-display text-3xl">La page professionnelle</h3>
-            <p className="mt-3 text-cream/75">
-              Votre devanture. Les gens vous voient, réservent, laissent un avis. Vous, vous restez dans le tableau de
-              bord.
-            </p>
-            <ul className="mt-6 space-y-3">
-              {pagePoints.map((item) => (
-                <li key={item.title}>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-sm text-cream/70">{item.text}</p>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-8">
-              <TryPreviewButton plan="pro">Tester Pro</TryPreviewButton>
+          <div className="mt-12 grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="min-w-0">
+              <LiveAppFrame
+                src={DEMO_DASHBOARD}
+                title="Tableau de bord Nolyo — Maison Brume"
+                aspectClass="aspect-[16/12]"
+                scale={0.7}
+              />
             </div>
-          </article>
+            <div>
+              <div className="flex flex-wrap gap-2.5">
+                {whyModules.map((label) => (
+                  <span
+                    key={label}
+                    className="rounded-full bg-cream/10 px-4 py-2 text-sm text-cream ring-1 ring-cream/15"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-10 font-display text-3xl tracking-tight sm:text-4xl">
+                Moins d’onglets. Moins de bricolage. Plus de clarté.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section id="fonctionnement" className="bg-paper-2/80">
+      {/* 5. Comment ça marche */}
+      <section id="fonctionnement" className="border-b border-ink/6 bg-paper-2/70">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Comment ça marche</p>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-            De l’essai au vrai compte.
-          </h2>
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-soft">
-            Pas d’inscription forcée pour tester. Vous essayez d’abord, vous demandez ensuite, puis vous activez votre
-            espace avec un code. Le premier mois est offert sur Essentiel comme sur Pro.
-          </p>
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Comment ça marche</p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+              Simple à prendre en main. Pensé pour votre quotidien.
+            </h2>
+          </div>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {subscribeSteps.map((step) => (
+            {steps.map((step) => (
               <article key={step.n} className="rounded-[1.5rem] bg-cream p-6 ring-1 ring-ink/6">
                 <p className="font-display text-sm text-copper">{step.n}</p>
                 <h3 className="mt-3 font-display text-2xl">{step.title}</h3>
@@ -348,110 +442,223 @@ function Home() {
         </div>
       </section>
 
-      <section id="offres" className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-        <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Offres</p>
-        <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-          Deux formules. Le premier mois est offert.
-        </h2>
-        <p className="mt-3 max-w-2xl text-sm text-ink-soft">{paymentNote}</p>
-
-        <div className="mt-12 overflow-hidden rounded-[1.5rem] bg-cream ring-1 ring-ink/6">
-          <div className="grid grid-cols-[minmax(0,1.4fr)_7rem_7rem] border-b border-ink/8 px-5 py-4 text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase sm:grid-cols-[minmax(0,1fr)_10rem_10rem] sm:px-8">
-            <span>Inclus</span>
-            <span className="text-center">Essentiel</span>
-            <span className="text-center">Pro</span>
+      {/* 6. Essentiel vs Pro */}
+      <section id="offres" className="border-b border-ink/6">
+        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Tarifs</p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+              Deux formules. Une seule idée : vous simplifier la vie.
+            </h2>
           </div>
-          {compareRows.map((row) => (
-            <div
-              key={row.label}
-              className="grid grid-cols-[minmax(0,1.4fr)_7rem_7rem] items-center border-t border-ink/6 px-5 py-3.5 sm:grid-cols-[minmax(0,1fr)_10rem_10rem] sm:px-8"
-            >
-              <p className="pr-3 text-sm">{row.label}</p>
-              <div className="flex justify-center">
-                <Mark on={row.essentiel} />
-              </div>
-              <div className="flex justify-center">
-                <Mark on={row.pro} />
-              </div>
-            </div>
-          ))}
-        </div>
 
-        <div className="mt-8 grid gap-5 lg:grid-cols-2">
-          {plans.map((item) => (
-            <div
-              key={item.id}
-              className={`flex flex-col rounded-[1.5rem] bg-cream p-7 ring-1 sm:p-8 ${
-                item.featured ? 'ring-copper/35' : 'ring-ink/6'
-              }`}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide uppercase ${
-                    item.featured ? 'bg-moss text-cream' : 'bg-moss/10 text-moss'
-                  }`}
-                >
-                  {item.id === 'pro' ? 'Nolyo Pro' : 'Nolyo Essentiel'}
-                </span>
-                <span className="rounded-full bg-copper px-2.5 py-1 text-[11px] font-semibold text-cream">
-                  1er mois offert
-                </span>
-              </div>
-              <p className="mt-5 font-display text-4xl">
-                {formatPrice(item.price)}
-                <span className="ml-1 text-base text-ink-soft">/ {item.period}</span>
+          <div className="mt-12 grid gap-5 lg:grid-cols-2">
+            <article className="flex flex-col rounded-[1.5rem] bg-cream p-7 ring-1 ring-ink/8 sm:p-8">
+              <p className="text-[11px] font-semibold tracking-[0.18em] text-moss-mid uppercase">Nolio Essentiel</p>
+              <p className="mt-4 font-display text-4xl tracking-tight">
+                {formatPrice(essentiel?.price || 9.99)}
+                <span className="ml-1 text-base font-sans text-ink-soft">/ mois</span>
               </p>
-              <p className="mt-2 text-sm text-ink-soft">{item.audience}</p>
-              <ul className="mt-5 flex-1 space-y-2 text-sm text-ink-soft">
-                {item.features.map((feature) => (
-                  <li key={feature}>— {feature}</li>
+              <p className="mt-2 text-sm text-ink-soft">Pour gérer votre activité au quotidien.</p>
+              <ul className="mt-6 flex-1 space-y-2.5 text-sm text-ink-soft">
+                {essentielFeatures.map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <span className="text-moss">—</span>
+                    <span>{f}</span>
+                  </li>
                 ))}
               </ul>
-              <div className="mt-8 flex flex-wrap gap-2">
-                <TryPreviewButton
-                  plan={item.id}
-                  variant={item.featured ? 'hero' : 'header'}
-                  className={item.featured ? '' : '!bg-moss'}
-                >
-                  Essayer 5 min
+              <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <TryPreviewButton plan="essentiel" variant="header" className="w-full justify-center sm:w-auto">
+                  Découvrir Essentiel
                 </TryPreviewButton>
                 <Link
-                  to={`/abonnement?plan=${item.id}`}
-                  className={`inline-flex items-center rounded-full px-5 py-2.5 text-sm font-semibold ring-1 transition ${
-                    item.featured
-                      ? 'ring-copper/40 text-ink hover:bg-copper/5'
-                      : 'ring-ink/12 text-ink hover:bg-ink/5'
-                  }`}
+                  to="/abonnement?plan=essentiel"
+                  className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-ink ring-1 ring-ink/12 transition hover:bg-ink/5"
                 >
-                  Demander {item.id === 'pro' ? 'Pro' : 'Essentiel'}
+                  Demander Essentiel
                 </Link>
               </div>
-            </div>
-          ))}
+            </article>
+
+            <article className="flex flex-col rounded-[1.5rem] bg-cream p-7 ring-2 ring-copper/35 sm:p-8">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Nolio Pro</p>
+                <span className="rounded-full bg-moss px-2.5 py-1 text-[10px] font-semibold tracking-wide text-cream uppercase">
+                  Recommandé
+                </span>
+              </div>
+              <p className="mt-4 font-display text-4xl tracking-tight">
+                {formatPrice(pro?.price || 19.99)}
+                <span className="ml-1 text-base font-sans text-ink-soft">/ mois</span>
+              </p>
+              <p className="mt-2 text-sm text-ink-soft">Pour gérer votre activité et être visible en ligne.</p>
+              <ul className="mt-6 flex-1 space-y-2.5 text-sm text-ink-soft">
+                {proFeatures.map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <span className="text-copper">—</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <TryPreviewButton plan="pro" className="w-full justify-center sm:w-auto">
+                  Découvrir Pro
+                </TryPreviewButton>
+                <Link
+                  to="/abonnement?plan=pro"
+                  className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-ink ring-1 ring-copper/35 transition hover:bg-copper/5"
+                >
+                  Demander Pro
+                </Link>
+              </div>
+            </article>
+          </div>
+
+          <div className="mt-8 rounded-[1.35rem] bg-paper-2/80 px-6 py-5 ring-1 ring-ink/6">
+            <p className="text-sm font-medium text-ink">🎁 Premier mois offert</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft sm:text-base">
+              Après le mois offert, l’abonnement est souscrit pour 6 mois. Soit 7 mois au total, dont le premier mois
+              offert.
+            </p>
+            <p className="mt-2 text-sm text-ink-soft">{trialNote}</p>
+          </div>
         </div>
       </section>
 
-      <TestimonialsCarousel onStats={setAvisStats} />
-
-      <section id="contact" className="px-5 py-20 sm:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 rounded-[1.5rem] bg-moss px-8 py-12 text-cream sm:px-12 lg:flex-row lg:items-center">
-          <div>
-            <h2 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Essayez 5 minutes.</h2>
-            <p className="mt-3 max-w-lg text-cream/80">
-              Essentiel ou Pro — sans compte. Ensuite, le premier mois est offert. Paiement sécurisé via Stripe.
+      {/* 7. Focus Pro */}
+      <section id="pro" className="border-b border-ink/6 bg-cream/40">
+        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Nolio Pro</p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+              Votre activité mérite plus qu’un simple profil Instagram.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-ink-soft">
+              Avec Nolio Pro, créez votre page professionnelle pour présenter votre activité, vos prestations et
+              permettre à vos clients de vous contacter ou de réserver en ligne.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <TryPreviewButton plan="pro">Essayer Pro</TryPreviewButton>
-            <TryPreviewButton plan="essentiel" variant="ghost">
-              Essayer Essentiel
-            </TryPreviewButton>
+
+          <div className="mt-12 grid items-center gap-10 lg:grid-cols-2">
+            <LiveAppFrame
+              src={DEMO_PAGE}
+              title="nolyo.fr/p/maison-brume"
+              aspectClass="aspect-[4/5] sm:aspect-[16/12]"
+              scale={0.62}
+            />
+            <div className="space-y-6">
+              {proFocus.map((item) => (
+                <article key={item.title}>
+                  <h3 className="font-display text-2xl tracking-tight">{item.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{item.text}</p>
+                </article>
+              ))}
+              <div className="flex flex-wrap gap-3">
+                <TryPreviewButton plan="pro" variant="header">
+                  Découvrir Nolio Pro
+                </TryPreviewButton>
+                <Link
+                  to={DEMO_PAGE}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-ink ring-1 ring-ink/12 transition hover:bg-ink/5"
+                >
+                  Voir la page démo
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 8. Pour qui */}
+      <section id="pour-qui" className="border-b border-ink/6">
+        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Pour qui</p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+              Nolio s’adapte à votre activité.
+            </h2>
+          </div>
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {audiences.map((item) => (
+              <article
+                key={item.title}
+                className="rounded-[1.35rem] bg-cream p-5 ring-1 ring-ink/6 transition hover:-translate-y-0.5"
+              >
+                <h3 className="font-medium">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-soft">{item.text}</p>
+              </article>
+            ))}
+          </div>
+          <p className="mt-10 font-display text-2xl tracking-tight text-moss sm:text-3xl">
+            Vous êtes indépendant ? Nolio est fait pour vous.
+          </p>
+        </div>
+      </section>
+
+      {/* 9. Philosophie */}
+      <section id="philosophie" className="border-b border-ink/6 bg-paper-2">
+        <div className="mx-auto max-w-3xl px-5 py-20 text-center sm:px-8 lg:py-24">
+          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Philosophie</p>
+          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            Moins d’outils. Plus de clarté.
+          </h2>
+          <p className="mt-6 text-base leading-relaxed text-ink-soft sm:text-lg">
+            Nolio est né d’une idée simple : un indépendant ne devrait pas avoir besoin de cinq outils différents pour
+            gérer son activité.
+          </p>
+          <p className="mt-4 text-base leading-relaxed text-ink-soft sm:text-lg">
+            Nous voulons créer un outil simple, accessible et réellement pensé pour les personnes qui travaillent
+            seules.
+          </p>
+        </div>
+      </section>
+
+      {/* 10. Témoignages */}
+      <TestimonialsCarousel onStats={setAvisStats} />
+
+      {/* 11. FAQ */}
+      <section id="faq" className="border-b border-ink/6">
+        <div className="mx-auto max-w-3xl px-5 py-20 sm:px-8 lg:py-24">
+          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">FAQ</p>
+          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">Questions fréquentes</h2>
+          <div className="mt-10 rounded-[1.5rem] bg-cream px-5 ring-1 ring-ink/6 sm:px-7">
+            {faqItems.map((item, index) => (
+              <FaqItem
+                key={item.q}
+                item={item}
+                open={faqOpen === index}
+                onToggle={() => setFaqOpen((current) => (current === index ? -1 : index))}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 12. CTA final */}
+      <section id="commencer" className="px-5 py-20 sm:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 rounded-[1.5rem] bg-moss px-8 py-12 text-cream sm:px-12 lg:flex-row lg:items-center">
+          <div>
+            <h2 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+              Votre activité. Un seul espace.
+            </h2>
+            <p className="mt-3 max-w-lg text-cream/80">
+              Clients, rendez-vous, chiffre d’affaires, relances et présence en ligne : gérez l’essentiel avec Nolio.
+            </p>
+            <p className="mt-4 text-sm text-cream/70">🎁 Premier mois offert</p>
+          </div>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
             <Link
-              to="/abonnement"
-              className="rounded-full bg-cream px-7 py-3.5 text-sm font-semibold text-ink transition hover:bg-paper"
+              to="/#offres"
+              className="inline-flex items-center justify-center rounded-full bg-copper px-7 py-3.5 text-sm font-semibold text-cream transition hover:bg-copper-dark"
             >
-              Faire une demande
+              Découvrir Nolio
             </Link>
+            <TryPreviewButton plan="pro" variant="ghost" className="justify-center">
+              Tester gratuitement
+            </TryPreviewButton>
           </div>
         </div>
       </section>

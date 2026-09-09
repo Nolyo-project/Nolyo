@@ -1282,12 +1282,12 @@ function parseYmd(value) {
   return raw
 }
 
-router.get('/absences', async (req, res) => {
+router.get('/absences', requirePro, async (req, res) => {
   const absences = await Absence.find({ user: req.user._id }).sort({ startDate: 1, endDate: 1 }).limit(120)
   res.json({ absences })
 })
 
-router.post('/absences', async (req, res) => {
+router.post('/absences', requirePro, async (req, res) => {
   const title = String(req.body?.title || '').trim().slice(0, 120)
   const startDate = parseYmd(req.body?.startDate)
   const endDate = parseYmd(req.body?.endDate || req.body?.startDate)
@@ -1311,7 +1311,7 @@ router.post('/absences', async (req, res) => {
   res.status(201).json({ absence })
 })
 
-router.patch('/absences/:id', async (req, res) => {
+router.patch('/absences/:id', requirePro, async (req, res) => {
   const absence = await Absence.findOne({ _id: req.params.id, user: req.user._id })
   if (!absence) return res.status(404).json({ error: 'Absence introuvable.' })
 
@@ -1341,7 +1341,7 @@ router.patch('/absences/:id', async (req, res) => {
   res.json({ absence })
 })
 
-router.delete('/absences/:id', async (req, res) => {
+router.delete('/absences/:id', requirePro, async (req, res) => {
   const absence = await Absence.findOneAndDelete({ _id: req.params.id, user: req.user._id })
   if (!absence) return res.status(404).json({ error: 'Absence introuvable.' })
   res.json({ ok: true })

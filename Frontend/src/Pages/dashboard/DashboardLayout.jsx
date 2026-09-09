@@ -26,7 +26,7 @@ function navGroups(copy) {
       label: 'Agenda',
       links: [
         { to: '/dashboard/rdv', label: copy.appointments, icon: 'calendar', badge: 'rdv', module: 'appointments' },
-        { to: '/dashboard/conges', label: 'Congés', icon: 'absence', module: 'appointments' },
+        { to: '/dashboard/conges', label: 'Congés', icon: 'absence', pro: true },
         { to: '/dashboard/notes', label: 'Notes', icon: 'note', module: 'notes' },
       ],
     },

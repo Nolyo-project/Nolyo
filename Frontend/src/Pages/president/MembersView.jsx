@@ -197,6 +197,15 @@ function MemberPanel({ item, onClose }) {
                     <dt className="text-ink-soft">Dernier paiement</dt>
                     <dd>{formatDay(item.billing?.paidAt)}</dd>
                   </div>
+                  {item.upgradedToProAt ? (
+                    <div>
+                      <dt className="text-ink-soft">Passé à Pro le</dt>
+                      <dd>
+                        {formatDay(item.upgradedToProAt)}
+                        {item.upgradeCharged ? ' · différence payée' : ''}
+                      </dd>
+                    </div>
+                  ) : null}
                   <div>
                     <dt className="text-ink-soft">Période en cours</dt>
                     <dd>{formatDay(item.billing?.currentPeriodEnd)}</dd>
@@ -226,6 +235,42 @@ function MemberPanel({ item, onClose }) {
                     <dd>{item.billing?.stripe ? 'Client enregistré' : 'Pas encore'}</dd>
                   </div>
                 </dl>
+              </section>
+
+              <section>
+                <h3 className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">
+                  Historique des formules
+                </h3>
+                {Array.isArray(item.planHistory) && item.planHistory.length ? (
+                  <ul className="mt-3 space-y-3">
+                    {item.planHistory.map((entry, index) => (
+                      <li
+                        key={`${entry.plan}-${entry.from || index}`}
+                        className="rounded-2xl bg-paper px-4 py-3 ring-1 ring-ink/6"
+                      >
+                        <p className="font-medium">{planName(entry.plan)}</p>
+                        <p className="mt-1 text-sm text-ink-soft">
+                          Du {formatDay(entry.from)}
+                          {entry.to ? ` au ${formatDay(entry.to)}` : ' → en cours'}
+                          {entry.note === 'upgrade_essai'
+                            ? ' · pendant le mois offert'
+                            : entry.note === 'upgrade_paye'
+                              ? ' · différence payée'
+                              : entry.note === 'upgrade_prochaine_facture'
+                                ? ' · prochain mois au tarif Pro'
+                                : entry.note === 'inscription'
+                                  ? ' · à l’inscription'
+                                  : ''}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-sm text-ink-soft">
+                    {planName(item.plan)} depuis {formatDay(item.activatedAt || item.createdAt)}
+                    {item.upgradedToProAt ? ` · Pro depuis ${formatDay(item.upgradedToProAt)}` : ''}
+                  </p>
+                )}
               </section>
             </div>
           ) : (

@@ -6,9 +6,10 @@ import Logo from './Logo'
 import TryPreviewButton from './TryPreviewButton'
 
 const marketingLinks = [
-  { to: '/#produit', label: 'Produit' },
-  { to: '/#offres', label: 'Offres' },
-  { to: '/#confiance', label: 'Paiements' },
+  { to: '/#constat', label: 'Fonctionnalités' },
+  { to: '/#offres', label: 'Tarifs' },
+  { to: '/#pro', label: 'Nolio Pro' },
+  { to: '/#faq', label: 'FAQ' },
   { to: '/rdv', label: 'Rendez-vous' },
   { to: '/inscription', label: 'J’ai un code' },
 ]

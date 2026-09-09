@@ -1037,6 +1037,6 @@ async function ensurePreviewAccount() {
 module.exports = {
   ensureDemoAccounts,
   ensurePreviewAccount,
-  DEMO_EMAILS: PROFILES.map((item) => item.email),
+  DEMO_EMAILS: [...PROFILES.map((item) => item.email), ...RETIRED_EMAILS],
   DEMO_PASSWORD: PASSWORD,
 }

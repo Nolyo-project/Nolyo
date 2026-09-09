@@ -173,6 +173,90 @@ router.get('/stats', async (_req, res) => {
   })
 })
 
+/** Données réelles du compte démo pour l’aperçu dashboard sur la landing. */
+router.get('/landing-demo', async (_req, res) => {
+  try {
+    const { ensurePreviewAccount } = require('../seed/demoMember')
+    const Note = require('../models/Note')
+    const Reminder = require('../models/Reminder')
+    const Transaction = require('../models/Transaction')
+
+    const user = await ensurePreviewAccount()
+    if (!user) return res.status(404).json({ error: 'Compte démo introuvable.' })
+
+    const full = await User.findById(user._id)
+    if (!full) return res.status(404).json({ error: 'Compte démo introuvable.' })
+
+    const userId = full._id
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayEnd = new Date()
+    todayEnd.setHours(23, 59, 59, 999)
+    const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1)
+
+    const [clients, todayAppointments, pendingReminders, monthTx] = await Promise.all([
+      Contact.countDocuments({ user: userId, kind: 'client' }),
+      Appointment.find({
+        user: userId,
+        status: 'planned',
+        startAt: { $gte: todayStart, $lte: todayEnd },
+      })
+        .sort({ startAt: 1 })
+        .populate('contact', 'name phone')
+        .limit(8)
+        .lean(),
+      Reminder.find({ user: userId, done: false })
+        .sort({ dueAt: 1 })
+        .populate('contact', 'name phone')
+        .limit(6)
+        .lean(),
+      Transaction.find({ user: userId, date: { $gte: monthStart } }).lean(),
+    ])
+
+    const monthIncome = monthTx.filter((t) => t.kind === 'income').reduce((sum, t) => sum + t.amount, 0)
+
+    res.json({
+      user: {
+        name: full.name,
+        company: full.subscription?.company || 'Maison Brume',
+        plan: full.subscription?.plan || 'pro',
+        pageSlug: full.page?.slug || 'maison-brume',
+        pagePublished: Boolean(full.page?.published && full.page?.slug),
+      },
+      overview: {
+        clients,
+        monthIncome,
+        pendingReminders: pendingReminders.length,
+        todayAppointments,
+        reminders: pendingReminders,
+      },
+    })
+  } catch (err) {
+    console.error('landing-demo', err.message)
+    res.status(500).json({ error: 'Aperçu indisponible pour le moment.' })
+  }
+})
+
+router.get('/site-status', async (_req, res) => {
+  try {
+    const SiteSettings = require('../models/SiteSettings')
+    const settings = await SiteSettings.getSiteSettings()
+    res.json({ status: settings.toPublicJSON() })
+  } catch (err) {
+    console.error('site-status', err.message)
+    res.json({
+      status: {
+        mode: 'live',
+        active: false,
+        title: '',
+        message: '',
+        startsAt: null,
+        endsAt: null,
+      },
+    })
+  }
+})
+
 const trackAttempts = new Map()
 
 function tooManyTracks(ip) {
@@ -727,6 +811,7 @@ router.get('/robots.txt', (_req, res) => {
 Allow: /
 Allow: /p/
 Disallow: /dashboard
+Disallow: /apercu
 Disallow: /president
 Disallow: /login
 Disallow: /inscription

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
+import { useToast } from '../../context/ToastContext'
 import { ghostBtn, primaryBtn, quietBtn } from './ui'
 
 const STATUS_LABEL = {
@@ -20,6 +21,7 @@ function stars(rating) {
 }
 
 export function PageReviewsEditor() {
+  const { toast, confirm } = useToast()
   const [reviews, setReviews] = useState([])
   const [filter, setFilter] = useState('pending')
   const [page, setPage] = useState(0)
@@ -61,14 +63,23 @@ export function PageReviewsEditor() {
   }
 
   async function remove(id) {
-    if (!window.confirm('Supprimer définitivement cet avis ?')) return
+    const approved = await confirm({
+      title: 'Supprimer cet avis ?',
+      description: 'Cette action est définitive. L’avis ne pourra pas être récupéré.',
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      tone: 'danger',
+    })
+    if (!approved) return
     setError('')
     setBusy(id)
     try {
       await api(`/api/workspace/reviews/${id}`, { method: 'DELETE' })
       setReviews((current) => current.filter((item) => item._id !== id))
+      toast({ tone: 'success', title: 'Avis supprimé' })
     } catch (err) {
       setError(err.message)
+      toast({ tone: 'error', title: 'Suppression', description: err.message })
     } finally {
       setBusy('')
     }

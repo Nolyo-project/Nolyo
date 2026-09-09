@@ -12,7 +12,8 @@ const { sendInviteCode } = require('../utils/emails')
 const { deleteMemberAccount } = require('../utils/deleteAccount')
 const { hasOverlap, isDuplicateKey } = require('../utils/overlap')
 const { listInvoicesForUser, downloadInvoicePdf } = require('../utils/stripe')
-const { COTISATION_RATE, SOCIAL_RATE, VERSEMENT_LIBERATOIRE_RATE, URSSAF_PAY_URL } = require('../config/founderTax')
+const { COTISATION_RATE, SOCIAL_RATE, VERSEMENT_LIBERATOIRE_RATE, CFP_RATE, ACTIVITY_LABEL, URSSAF_PAY_URL } = require('../config/founderTax')
+
 const SiteReview = require('../models/SiteReview')
 const { presidentSiteReview } = require('../utils/siteReviews')
 
@@ -157,7 +158,11 @@ const router = express.Router()
 router.use(requireAuth, requirePresident)
 
 router.get('/requests', async (_req, res) => {
-  const requests = await SubscriptionRequest.find().sort({ createdAt: -1 })
+  const { DEMO_EMAILS } = require('../seed/demoMember')
+  const demoSet = new Set(DEMO_EMAILS.map((email) => String(email).toLowerCase()))
+  const requests = (await SubscriptionRequest.find().sort({ createdAt: -1 })).filter(
+    (item) => !demoSet.has(String(item.email || '').toLowerCase()),
+  )
   const counts = {
     received: 0,
     quote_sent: 0,
@@ -275,7 +280,11 @@ router.post('/requests/:id/clear-issue', async (req, res) => {
 })
 
 router.get('/members', async (_req, res) => {
-  const users = await User.find({ role: 'member' }).sort({ createdAt: -1 })
+  const { DEMO_EMAILS } = require('../seed/demoMember')
+  const users = await User.find({
+    role: 'member',
+    email: { $nin: DEMO_EMAILS },
+  }).sort({ createdAt: -1 })
   const members = users.map((user) => ({
     id: user._id,
     name: user.name,
@@ -303,6 +312,16 @@ router.get('/members', async (_req, res) => {
     city: user.onboarding?.city || '',
     trade: user.onboarding?.tradeLabel || user.onboarding?.trade || '',
     activatedAt: user.subscription?.activatedAt || null,
+    upgradedToProAt: user.subscription?.upgradedToProAt || null,
+    upgradeCharged: Boolean(user.subscription?.upgradeCharged),
+    planHistory: Array.isArray(user.subscription?.planHistory)
+      ? user.subscription.planHistory.map((entry) => ({
+          plan: entry.plan,
+          from: entry.from || null,
+          to: entry.to || null,
+          note: entry.note || '',
+        }))
+      : [],
     createdAt: user.createdAt,
   }))
   res.json({
@@ -594,6 +613,9 @@ router.get('/transactions', async (req, res) => {
   const income = transactions.filter((t) => t.kind === 'income').reduce((sum, t) => sum + t.amount, 0)
   const expense = transactions.filter((t) => t.kind === 'expense').reduce((sum, t) => sum + t.amount, 0)
   const cotisationEstimate = Math.round(income * COTISATION_RATE * 100) / 100
+  const socialEstimate = Math.round(income * SOCIAL_RATE * 100) / 100
+  const versementLiberatoireEstimate = Math.round(income * VERSEMENT_LIBERATOIRE_RATE * 100) / 100
+  const cfpEstimate = Math.round(income * CFP_RATE * 100) / 100
   const afterCotisation = Math.round((income - cotisationEstimate) * 100) / 100
   const today = new Date()
   const reminderDay = today.getDate() >= 5
@@ -606,7 +628,12 @@ router.get('/transactions', async (req, res) => {
       cotisationEstimate,
       cotisationRate: COTISATION_RATE,
       socialRate: SOCIAL_RATE,
+      socialEstimate,
       versementLiberatoireRate: VERSEMENT_LIBERATOIRE_RATE,
+      versementLiberatoireEstimate,
+      cfpRate: CFP_RATE,
+      cfpEstimate,
+      activityLabel: ACTIVITY_LABEL,
       afterCotisation,
       netAfterCotisation: Math.round((afterCotisation - expense) * 100) / 100,
     },
@@ -977,6 +1004,93 @@ router.get('/analytics', async (req, res) => {
       requests: dailyRequests.map((row) => ({ day: row._id, count: row.count })),
     },
   })
+})
+
+router.get('/site-settings', async (_req, res) => {
+  const SiteSettings = require('../models/SiteSettings')
+  const settings = await SiteSettings.getSiteSettings()
+  res.json({ settings: settings.toAdminJSON() })
+})
+
+router.patch('/site-settings', async (req, res) => {
+  const SiteSettings = require('../models/SiteSettings')
+  const { sendMaintenanceNotice } = require('../utils/emails')
+  const { DEMO_EMAILS } = require('../seed/demoMember')
+
+  const settings = await SiteSettings.getSiteSettings()
+  const mode = String(req.body?.mode || '').trim()
+  if (mode && SiteSettings.MODES.includes(mode)) settings.mode = mode
+
+  if (req.body?.title !== undefined) {
+    settings.title = String(req.body.title || '').trim().slice(0, 120)
+  }
+  if (req.body?.message !== undefined) {
+    settings.message = String(req.body.message || '').trim().slice(0, 800)
+  }
+
+  if (req.body?.clearSchedule) {
+    settings.startsAt = null
+    settings.endsAt = null
+  } else {
+    if (req.body?.startsAt !== undefined) {
+      if (!req.body.startsAt) settings.startsAt = null
+      else {
+        const startsAt = parseDate(req.body.startsAt)
+        if (!startsAt) return res.status(400).json({ error: 'Date de début invalide.' })
+        settings.startsAt = startsAt
+      }
+    }
+    if (req.body?.endsAt !== undefined) {
+      if (!req.body.endsAt) settings.endsAt = null
+      else {
+        const endsAt = parseDate(req.body.endsAt)
+        if (!endsAt) return res.status(400).json({ error: 'Date de fin invalide.' })
+        settings.endsAt = endsAt
+      }
+    }
+  }
+
+  if (settings.startsAt && settings.endsAt && settings.endsAt < settings.startsAt) {
+    return res.status(400).json({ error: 'La fin doit être après le début.' })
+  }
+
+  const notify = Boolean(req.body?.notifySubscribers)
+  let notified = 0
+
+  if (notify && settings.mode === 'maintenance') {
+    const fingerprint = [
+      settings.mode,
+      settings.startsAt?.toISOString?.() || '',
+      settings.endsAt?.toISOString?.() || '',
+      settings.message || '',
+    ].join('|')
+
+    if (fingerprint !== settings.lastNotifyFingerprint) {
+      const members = await User.find({
+        role: 'member',
+        email: { $nin: DEMO_EMAILS },
+        'subscription.status': { $in: ['active', 'trialing'] },
+      })
+        .select('name email')
+        .limit(500)
+
+      const results = await Promise.allSettled(
+        members.map((member) =>
+          sendMaintenanceNotice(member, {
+            startsAt: settings.startsAt,
+            endsAt: settings.endsAt,
+            message: settings.message,
+          }),
+        ),
+      )
+      notified = results.filter((item) => item.status === 'fulfilled').length
+      settings.lastNotifiedAt = new Date()
+      settings.lastNotifyFingerprint = fingerprint
+    }
+  }
+
+  await settings.save()
+  res.json({ settings: settings.toAdminJSON(), notified })
 })
 
 module.exports = router

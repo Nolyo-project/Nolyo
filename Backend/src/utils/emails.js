@@ -393,6 +393,52 @@ Ouvrez votre agenda Nolyo pour le détail.`,
   await Promise.allSettled(tasks)
 }
 
+async function sendMaintenanceNotice(user, { startsAt, endsAt, message } = {}) {
+  const name = firstName(user.name)
+  const startLabel = startsAt
+    ? new Date(startsAt).toLocaleString('fr-FR', {
+        timeZone: 'Europe/Paris',
+        dateStyle: 'full',
+        timeStyle: 'short',
+      })
+    : null
+  const endLabel = endsAt
+    ? new Date(endsAt).toLocaleString('fr-FR', {
+        timeZone: 'Europe/Paris',
+        dateStyle: 'full',
+        timeStyle: 'short',
+      })
+    : null
+
+  let windowText = 'Une maintenance est prévue sur Nolyo.'
+  if (startLabel && endLabel) windowText = `Une maintenance est prévue du ${startLabel} au ${endLabel}.`
+  else if (startLabel) windowText = `Une maintenance est prévue à partir du ${startLabel}.`
+  else if (endLabel) windowText = `Une maintenance est en cours jusqu’au ${endLabel}.`
+
+  const extra = String(message || '').trim()
+  const subject = 'Maintenance Nolyo — information importante'
+  const text = `Bonjour ${name},
+
+${windowText}
+${extra ? `\n${extra}\n` : ''}
+Pendant cette période, le site public peut être temporairement indisponible. Votre espace reste accessible via votre connexion habituelle dès que possible.
+
+Merci de votre compréhension.
+
+L’équipe Nolyo`
+  return sendMail({
+    to: user.email,
+    subject,
+    text,
+    html: `<p style="line-height:1.6;margin:0 0 16px;">Bonjour ${name},</p>
+      <p style="line-height:1.6;margin:0 0 16px;">${windowText}</p>
+      ${extra ? `<p style="line-height:1.6;margin:0 0 16px;">${extra}</p>` : ''}
+      <p style="line-height:1.6;margin:0 0 16px;">Pendant cette période, le site public peut être temporairement indisponible. Votre espace reste accessible via votre connexion habituelle dès que possible.</p>
+      <p style="line-height:1.6;margin:0 0 16px;">Merci de votre compréhension.</p>
+      <p style="line-height:1.6;margin:0;">L’équipe Nolyo</p>`,
+  })
+}
+
 module.exports = {
   sendRequestReceived,
   sendInviteCode,
@@ -402,4 +448,5 @@ module.exports = {
   sendPaymentFailed,
   sendPaymentReceived,
   sendBookingEmails,
+  sendMaintenanceNotice,
 }
