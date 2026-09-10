@@ -6,6 +6,7 @@ import { founderHomePath, publicSiteHref } from '../config/site'
 import Appointments from './dashboard/Appointments'
 import { formatTime } from './dashboard/format'
 import { Avatar } from './dashboard/ui'
+import { DashFrame, MenuToggle, MobileDrawer } from '../components/layouts/AppShell'
 import FinancesView from './president/FinancesView'
 import MembersView from './president/MembersView'
 import RequestsView from './president/RequestsView'
@@ -56,7 +57,6 @@ function PresidentDashboard() {
     () => deletions.find((item) => item.id === selectedDeletionId) || null,
     [deletions, selectedDeletionId],
   )
-  const fillPage = view === 'home' || view === 'rdv' || view === 'subscriptions'
 
   const filteredDeletions = useMemo(() => {
     return deletions.filter(
@@ -263,9 +263,9 @@ function PresidentDashboard() {
     ['deletions', 'Suppressions'],
   ]
 
-  return (
-    <div className="h-svh overflow-hidden bg-paper text-ink lg:grid lg:grid-cols-[16.75rem_minmax(0,1fr)]">
-      <aside className="dash-sidebar hidden h-svh flex-col text-cream lg:flex">
+  function renderSidebar() {
+    return (
+      <>
         <div className="px-5 pt-6 pb-4">
           <Logo to={founderHomePath()} inverted />
           <p className="mt-2 text-[11px] font-semibold tracking-[0.18em] text-cream/50 uppercase">Fondateur</p>
@@ -318,58 +318,58 @@ function PresidentDashboard() {
             Déconnexion
           </button>
         </div>
-      </aside>
+      </>
+    )
+  }
 
-      <div className="dash-canvas flex min-h-0 min-w-0 flex-col">
-        <header className="flex shrink-0 flex-col gap-3 border-b border-ink/6 bg-cream/50 px-5 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between lg:px-10">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Bureau Nolyo</p>
-            <h1 className="truncate font-display text-2xl tracking-tight">{titles[view]}</h1>
+  return (
+    <DashFrame
+      lockViewport={false}
+      colsClass="lg:grid-cols-[16.75rem_minmax(0,1fr)]"
+      sidebar={renderSidebar()}
+      drawer={
+        <MobileDrawer open={menuOpen} onClose={() => setMenuOpen(false)} title="Bureau">
+          {renderSidebar()}
+        </MobileDrawer>
+      }
+    >
+      <div className="dash-canvas min-w-0">
+        <header className="sticky top-0 z-30 flex flex-col gap-3 border-b border-ink/6 bg-cream/90 px-4 py-3 backdrop-blur-md sm:px-5 lg:px-10">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Bureau Nolyo</p>
+              <h1 className="truncate font-display text-xl tracking-tight sm:text-2xl">{titles[view]}</h1>
+            </div>
+            <MenuToggle open={menuOpen} onClick={() => setMenuOpen((v) => !v)} />
           </div>
-          <div className="flex items-center gap-2">
-            {view === 'rdv' ? (
-              <a href={publicSiteHref('/rdv')} className="rounded-full border border-ink/10 bg-cream px-4 py-2 text-sm font-medium">
-                Page publique · /rdv
-              </a>
-            ) : view === 'settings' || view === 'finances' || view === 'analytics' || view === 'maintenance' ? null : (
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Rechercher un nom, un e-mail, une société…"
-                className="w-full min-w-0 rounded-full border border-ink/10 bg-cream px-4 py-2 text-sm outline-none focus:border-copper sm:w-80"
-              />
-            )}
-            <button
-              type="button"
-              className="rounded-full border border-ink/10 bg-cream px-3 py-2 text-sm lg:hidden"
-              onClick={() => setMenuOpen((v) => !v)}
+          {view === 'rdv' ? (
+            <a
+              href={publicSiteHref('/rdv')}
+              className="w-fit max-w-full truncate rounded-full border border-ink/10 bg-cream px-4 py-2 text-sm font-medium"
             >
-              Menu
-            </button>
-          </div>
+              Page publique · /rdv
+            </a>
+          ) : view === 'settings' || view === 'finances' || view === 'analytics' || view === 'maintenance' ? null : (
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Rechercher un nom, un e-mail, une société…"
+              className="w-full min-w-0 rounded-full border border-ink/10 bg-cream px-4 py-2 text-sm outline-none focus:border-copper sm:max-w-md"
+            />
+          )}
         </header>
-
-        {menuOpen ? (
-          <div className="dash-sidebar shrink-0 px-3 py-4 lg:hidden">
-            {navItems.concat([['settings', 'Paramètres']]).map(([id, label]) => (
-              <button key={id} type="button" className={navClass(view === id)} onClick={() => go(id)}>
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : null}
 
         <div
           className={
-            fillPage
-              ? 'dash-scroll flex min-h-0 flex-1 flex-col overflow-hidden px-5 py-5 lg:px-10'
-              : 'dash-scroll min-h-0 flex-1 overflow-y-auto px-5 py-8 lg:px-10'
+            view === 'rdv'
+              ? 'min-w-0 pb-[max(1.25rem,env(safe-area-inset-bottom))]'
+              : 'min-w-0 px-4 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-10 lg:py-8'
           }
         >
           {error ? <p className="mb-4 shrink-0 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
 
           {view === 'home' && q ? (
-            <div className="min-h-0 flex-1 space-y-8 overflow-y-auto">
+            <div className="space-y-8">
               <div>
                 <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Recherche</p>
                 <h2 className="mt-1 font-display text-3xl tracking-tight">
@@ -446,11 +446,11 @@ function PresidentDashboard() {
               ) : null}
             </div>
           ) : view === 'home' ? (
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+            <div className="flex flex-col gap-4">
               <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Aujourd’hui</p>
-                  <h2 className="mt-0.5 font-display text-3xl tracking-tight">Bonjour, {firstName}.</h2>
+                  <h2 className="mt-0.5 font-display text-2xl tracking-tight sm:text-3xl">Bonjour, {firstName}.</h2>
                 </div>
                 <p className="text-sm text-ink-soft">
                   {todoCount
@@ -477,8 +477,8 @@ function PresidentDashboard() {
                 <Stat label="Suppressions" value={pendingDeletions} hint="à décider" onClick={() => go('deletions')} />
               </section>
 
-              <section className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.95fr)_17rem]">
-                <article className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-cream p-5 ring-1 ring-ink/6">
+              <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.95fr)_17rem]">
+                <article className="rounded-3xl bg-cream p-5 ring-1 ring-ink/6">
                   <div className="flex shrink-0 items-center justify-between gap-3">
                     <h3 className="font-display text-2xl">La file</h3>
                     <button type="button" className="text-sm font-medium text-copper" onClick={() => go('subscriptions')}>
@@ -488,7 +488,7 @@ function PresidentDashboard() {
                   {inbox.length === 0 && pendingDeletionsList.length === 0 ? (
                     <p className="mt-5 text-sm text-ink-soft">Aucune demande en cours.</p>
                   ) : (
-                    <ul className="mt-3 min-h-0 flex-1 divide-y divide-ink/8 overflow-y-auto">
+                    <ul className="mt-3 divide-y divide-ink/8">
                       {inbox.slice(0, 5).map((item) => (
                         <li key={item.id}>
                           <button
@@ -527,7 +527,7 @@ function PresidentDashboard() {
                   )}
                 </article>
 
-                <article className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-cream p-5 ring-1 ring-ink/6">
+                <article className="rounded-3xl bg-cream p-5 ring-1 ring-ink/6">
                   <div className="flex shrink-0 items-center justify-between gap-3">
                     <h3 className="font-display text-2xl">Rendez-vous</h3>
                     <button type="button" className="text-sm font-medium text-copper" onClick={() => go('rdv')}>
@@ -537,7 +537,7 @@ function PresidentDashboard() {
                   {upcomingRdv.length === 0 ? (
                     <p className="mt-5 text-sm text-ink-soft">Aucun créneau réservé pour les deux prochaines semaines.</p>
                   ) : (
-                    <ul className="mt-3 min-h-0 flex-1 divide-y divide-ink/8 overflow-hidden">
+                    <ul className="mt-3 divide-y divide-ink/8">
                       {upcomingRdv.map((item) => (
                         <li key={item._id} className="py-2.5">
                           <p className="truncate font-medium">{item.contact?.name || item.title}</p>
@@ -555,7 +555,7 @@ function PresidentDashboard() {
                   )}
                 </article>
 
-                <article className="flex min-h-0 flex-col overflow-hidden rounded-3xl bg-moss p-5 text-cream">
+                <article className="rounded-3xl bg-moss p-5 text-cream">
                   <div className="flex shrink-0 items-center justify-between gap-3">
                     <h3 className="font-display text-2xl">Membres</h3>
                     <button type="button" className="text-sm font-medium text-cream/80 hover:text-cream" onClick={() => go('members')}>
@@ -565,7 +565,7 @@ function PresidentDashboard() {
                   {recentMembers.length === 0 ? (
                     <p className="mt-5 text-sm text-cream/70">Personne pour le moment.</p>
                   ) : (
-                    <ul className="mt-4 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+                    <ul className="mt-4 flex flex-col gap-2">
                       {recentMembers.map((item) => (
                         <li key={item.id}>
                           <button
@@ -609,11 +609,7 @@ function PresidentDashboard() {
             />
           ) : null}
 
-          {view === 'rdv' ? (
-            <div className="-mx-5 -my-5 flex min-h-0 flex-1 flex-col overflow-hidden lg:-mx-10">
-              <Appointments variant="founder" compact />
-            </div>
-          ) : null}
+          {view === 'rdv' ? <Appointments variant="founder" compact /> : null}
 
           {view === 'members' ? (
             <MembersView
@@ -733,7 +729,7 @@ function PresidentDashboard() {
           ) : null}
         </div>
       </div>
-    </div>
+    </DashFrame>
   )
 }
 

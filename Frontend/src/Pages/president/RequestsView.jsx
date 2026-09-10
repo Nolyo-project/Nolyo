@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/client'
-import { Avatar } from '../dashboard/ui'
+import { Avatar, Pagination } from '../dashboard/ui'
 import { Empty, Pill, PipelineBar, formatDate, planName, pipeline, statusHint, statusLabels } from './shared'
 import { openQuoteInGmail } from './quoteMail'
 
@@ -17,13 +17,13 @@ function RequestDetail({ item, quoteNote, setQuoteNote, issueNote, setIssueNote,
   }
 
   return (
-    <article className="flex h-full min-h-0 flex-col overflow-y-auto rounded-[1.6rem] bg-cream p-6 ring-1 ring-ink/6 sm:p-8">
+    <article className="flex h-full min-h-0 flex-col overflow-y-auto rounded-none bg-cream p-5 ring-1 ring-ink/6 sm:rounded-[1.6rem] sm:p-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-4">
           <Avatar user={{ name: item.name, company: item.company, avatar: item.avatar }} className="h-14 w-14 text-lg" />
           <div className="min-w-0">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">{statusLabels[item.status]}</p>
-            <h2 className="mt-1 font-display text-3xl tracking-tight">{item.company}</h2>
+            <h2 className="mt-1 font-display text-2xl tracking-tight sm:text-3xl">{item.company}</h2>
             <p className="mt-1 text-ink-soft">
               {item.name} ·{' '}
               <a className="underline decoration-copper/40" href={`mailto:${item.email}`}>
@@ -317,39 +317,10 @@ function RequestsView({
         </ul>
       )}
 
-      {pageCount > 1 ? (
-        <nav className="mt-8 flex items-center justify-center gap-2" aria-label="Pagination">
-          <button
-            type="button"
-            disabled={safePage <= 1}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-            className="rounded-full border border-ink/10 px-3 py-1.5 text-sm disabled:opacity-40"
-          >
-            Précédent
-          </button>
-          {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setPage(n)}
-              className={`h-9 w-9 rounded-full text-sm ${n === safePage ? 'bg-moss text-cream' : 'bg-cream text-ink-soft'}`}
-            >
-              {n}
-            </button>
-          ))}
-          <button
-            type="button"
-            disabled={safePage >= pageCount}
-            onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-            className="rounded-full border border-ink/10 px-3 py-1.5 text-sm disabled:opacity-40"
-          >
-            Suivant
-          </button>
-        </nav>
-      ) : null}
+      <Pagination page={safePage} pageCount={pageCount} onPage={setPage} />
 
       {selected ? (
-        <div className="fixed inset-0 z-40 flex justify-end bg-moss/25 p-3 sm:p-5" onClick={() => setSelectedId(null)}>
+        <div className="fixed inset-0 z-40 flex justify-end bg-moss/25 p-0 sm:p-3 md:p-5" onClick={() => setSelectedId(null)}>
           <div className="h-full w-full max-w-xl" onClick={(event) => event.stopPropagation()}>
             <RequestDetail
               item={selected}

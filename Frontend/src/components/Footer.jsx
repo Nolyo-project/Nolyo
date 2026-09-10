@@ -3,12 +3,12 @@ import Logo from './Logo'
 
 const columns = [
   {
-    title: 'Nolio',
+    title: 'Nolyo',
     links: [
       { to: '/#accueil', label: 'Accueil' },
       { to: '/#constat', label: 'Fonctionnalités' },
       { to: '/#offres', label: 'Tarifs' },
-      { to: '/#pro', label: 'Nolio Pro' },
+      { to: '/#pro', label: 'Nolyo Pro' },
       { to: '/#faq', label: 'FAQ' },
     ],
   },
@@ -39,7 +39,7 @@ function InstagramIcon({ className = 'h-5 w-5' }) {
 function Footer() {
   return (
     <footer className="border-t border-cream/10 bg-moss text-cream">
-      <div className="mx-auto grid max-w-6xl gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:grid-cols-2 sm:px-8 lg:grid-cols-[1.5fr_1fr_1fr_1fr] lg:gap-12">
         <div>
           <Logo to="/" inverted />
           <p className="mt-4 font-display text-xl tracking-tight text-cream/90">Gérez. Développez. Rayonnez.</p>
@@ -67,7 +67,7 @@ function Footer() {
               {column.links.map((link) => (
                 <li key={link.label}>
                   {link.external ? (
-                    <a href={link.to} className="text-sm text-cream/80 transition hover:text-cream">
+                    <a href={link.to} className="wrap-break-word text-sm text-cream/80 transition hover:text-cream">
                       {link.label}
                     </a>
                   ) : (

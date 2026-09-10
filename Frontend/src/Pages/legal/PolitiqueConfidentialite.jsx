@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom'
 
 function PolitiqueConfidentialite() {
   return (
-    <main className="mx-auto max-w-4xl px-5 py-14 sm:px-8">
+    <main className="mx-auto max-w-4xl px-4 py-10 sm:px-8 sm:py-14">
       <p className="text-xs font-semibold tracking-[0.2em] text-copper uppercase">Légal</p>
-      <h1 className="mt-2 font-display text-4xl tracking-tight sm:text-5xl">Politique de confidentialité</h1>
+      <h1 className="mt-2 font-display text-3xl tracking-tight sm:text-5xl">Politique de confidentialité</h1>
       <p className="mt-4 rounded-2xl bg-cream px-4 py-3 text-sm text-ink-soft ring-1 ring-ink/8">
         Dernière mise à jour : 9 septembre 2026.
       </p>

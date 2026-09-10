@@ -106,7 +106,7 @@ export function DepositTracker({ plan, price, onTogglePaid, canToggle = false, l
 
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="text-sm font-medium">Acomptes</p>
         <Link to="/dashboard/parametres" className={quietBtn}>
           Dans Paramètres
@@ -115,7 +115,7 @@ export function DepositTracker({ plan, price, onTogglePaid, canToggle = false, l
       {lockHint ? <p className="mt-1 text-xs text-ink-soft">{lockHint}</p> : null}
       <ul className="mt-3 space-y-2">
         {rows.map((step, index) => (
-          <li key={index} className="flex items-center justify-between gap-3 rounded-2xl bg-cream px-4 py-3">
+          <li key={index} className="flex flex-col gap-2 rounded-2xl bg-cream px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0">
               <p className="truncate font-medium">{step.label}</p>
               <p className="text-sm text-ink-soft">

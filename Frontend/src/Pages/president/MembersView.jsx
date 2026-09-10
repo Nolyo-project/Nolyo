@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, apiDownload } from '../../api/client'
 import { publicSiteHref } from '../../config/site'
 import { formatMoney } from '../dashboard/format'
-import { Avatar } from '../dashboard/ui'
+import { Avatar, Pagination } from '../dashboard/ui'
 import { Empty, Pill, formatDay, planName } from './shared'
 
 const PAGE_SIZE = 9
@@ -70,18 +70,18 @@ function MemberPanel({ item, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-moss/25 p-3 sm:p-5" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex justify-end bg-moss/25 p-0 sm:p-3 md:p-5" onClick={onClose}>
       <article
-        className="flex h-full w-full max-w-lg flex-col overflow-hidden rounded-[1.6rem] bg-cream shadow-2xl ring-1 ring-ink/6"
+        className="flex h-full w-full max-w-lg flex-col overflow-hidden rounded-none bg-cream shadow-2xl ring-1 ring-ink/6 sm:rounded-[1.6rem]"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="shrink-0 border-b border-ink/6 px-6 py-5 sm:px-8">
+        <header className="shrink-0 border-b border-ink/6 px-4 py-4 sm:px-8 sm:py-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-4">
               <Avatar user={item} className="h-16 w-16 text-lg" />
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">{planName(item.plan)}</p>
-                <h2 className="mt-1 font-display text-3xl tracking-tight">{item.company || item.name}</h2>
+                <h2 className="mt-1 font-display text-2xl tracking-tight sm:text-3xl">{item.company || item.name}</h2>
                 <p className="mt-1 text-ink-soft">{item.name}</p>
               </div>
             </div>
@@ -124,7 +124,7 @@ function MemberPanel({ item, onClose }) {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-6">
           {tab === 'fiche' ? (
             <div className="space-y-8">
               <section>
@@ -409,36 +409,7 @@ function MembersView({ members, memberCounts, q, planFilter, setPlanFilter, focu
         </ul>
       )}
 
-      {pageCount > 1 ? (
-        <nav className="mt-8 flex items-center justify-center gap-2" aria-label="Pagination">
-          <button
-            type="button"
-            disabled={safePage <= 1}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-            className="rounded-full border border-ink/10 px-3 py-1.5 text-sm disabled:opacity-40"
-          >
-            Précédent
-          </button>
-          {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setPage(n)}
-              className={`h-9 w-9 rounded-full text-sm ${n === safePage ? 'bg-moss text-cream' : 'bg-cream text-ink-soft'}`}
-            >
-              {n}
-            </button>
-          ))}
-          <button
-            type="button"
-            disabled={safePage >= pageCount}
-            onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-            className="rounded-full border border-ink/10 px-3 py-1.5 text-sm disabled:opacity-40"
-          >
-            Suivant
-          </button>
-        </nav>
-      ) : null}
+      <Pagination page={safePage} pageCount={pageCount} onPage={setPage} />
 
       <MemberPanel item={selected} onClose={() => setSelected(null)} />
     </div>

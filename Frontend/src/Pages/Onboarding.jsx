@@ -191,7 +191,7 @@ function Onboarding() {
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
           {current === 'trade' ? (
             <section className="mt-4">
-              <h1 className="font-display text-4xl tracking-tight sm:text-5xl">Quel est votre métier ?</h1>
+              <h1 className="font-display text-3xl tracking-tight sm:text-5xl">Quel est votre métier ?</h1>
               <p className="mt-3 text-ink-soft">
                 Agenda, acomptes, mots de l’espace : Nolyo se règle sur votre façon de travailler.
                 {preparePage ? ' On prépare aussi votre page professionnelle.' : ''}
@@ -215,7 +215,7 @@ function Onboarding() {
 
           {current === 'identity' ? (
             <section className="mt-4">
-              <h1 className="font-display text-4xl tracking-tight sm:text-5xl">Comment vous présente-t-on ?</h1>
+              <h1 className="font-display text-3xl tracking-tight sm:text-5xl">Comment vous présente-t-on ?</h1>
               <p className="mt-3 text-ink-soft">
                 {preparePage
                   ? 'Ce nom apparaîtra sur votre page et dans votre espace.'
@@ -287,7 +287,7 @@ function Onboarding() {
 
           {current === 'rhythm' ? (
             <section className="mt-4">
-              <h1 className="font-display text-4xl tracking-tight sm:text-5xl">Une semaine type ?</h1>
+              <h1 className="font-display text-3xl tracking-tight sm:text-5xl">Une semaine type ?</h1>
               <p className="mt-3 text-ink-soft">On règle l’agenda et les acomptes en fonction.</p>
               <ul className="mt-8 space-y-3">
                 {WORK_MODES.map((item) => (
@@ -308,7 +308,7 @@ function Onboarding() {
 
           {current === 'page' ? (
             <section className="mt-4">
-              <h1 className="font-display text-4xl tracking-tight sm:text-5xl">Votre page professionnelle</h1>
+              <h1 className="font-display text-3xl tracking-tight sm:text-5xl">Votre page professionnelle</h1>
               <p className="mt-3 text-ink-soft">
                 Un texte de départ, à votre main. Visible ensuite à{' '}
                 <span className="font-medium text-ink">/p/{slug || '…'}</span>
@@ -344,7 +344,7 @@ function Onboarding() {
 
           {current === 'services' ? (
             <section className="mt-4">
-              <h1 className="font-display text-4xl tracking-tight sm:text-5xl">Des prestations pour commencer</h1>
+              <h1 className="font-display text-3xl tracking-tight sm:text-5xl">Des prestations pour commencer</h1>
               <p className="mt-3 text-ink-soft">
                 {preparePage
                   ? 'Elles apparaîtront sur votre page de réservation. Vous pourrez tout modifier ensuite.'
@@ -389,7 +389,7 @@ function Onboarding() {
 
           {current === 'billing' ? (
             <section className="mt-4">
-              <h1 className="font-display text-4xl tracking-tight sm:text-5xl">Votre mois offert, puis la suite</h1>
+              <h1 className="font-display text-3xl tracking-tight sm:text-5xl">Votre mois offert, puis la suite</h1>
               <p className="mt-3 text-ink-soft">
                 Pendant 30 jours, Nolyo est gratuit. Deux jours avant la fin, une fenêtre s’ouvre pour choisir comment
                 continuer — ainsi vous n’êtes pas surpris le jour de la facture.
@@ -426,7 +426,7 @@ function Onboarding() {
             <p className="mt-6 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
           ) : null}
 
-          <div className="mt-auto flex items-center justify-between gap-3 pt-10 pb-4">
+          <div className="sticky bottom-0 mt-auto flex items-center justify-between gap-3 bg-paper/95 pt-6 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
             {step > 0 ? (
               <button
                 type="button"

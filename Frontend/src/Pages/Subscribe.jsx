@@ -95,7 +95,7 @@ function Subscribe() {
     return (
       <div>
         <p className="text-xs font-semibold tracking-[0.22em] text-copper uppercase">Demande reçue</p>
-        <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight">
+        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
           Merci, {form.name.split(' ')[0]}.
         </h1>
         <p className="mt-2 text-sm text-ink-soft">
@@ -123,7 +123,7 @@ function Subscribe() {
       <p className="text-xs font-semibold tracking-[0.22em] text-copper uppercase">
         Demande d’abonnement
       </p>
-      <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight">Envoyez votre demande.</h1>
+      <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Envoyez votre demande.</h1>
       {trialEnded ? (
         <p className="mt-4 rounded-2xl bg-moss px-4 py-3 text-sm text-cream">
           L’essai est terminé. Vous avez testé{' '}

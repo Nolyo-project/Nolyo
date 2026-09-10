@@ -289,7 +289,7 @@ function Reminders() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs tracking-[0.18em] text-ink-soft uppercase">Suivi</p>
-                <h2 className="font-display text-3xl">Nouvelle relance</h2>
+                <h2 className="font-display text-2xl sm:text-3xl">Nouvelle relance</h2>
               </div>
               <button type="button" onClick={closeForm} className="text-sm text-ink-soft underline">
                 Fermer

@@ -200,8 +200,8 @@ export function publicPageChrome(page, slug) {
 }
 
 export function publicPageMainClass(hasAside) {
-  return `min-w-0 pt-10 pb-28 lg:pt-14 ${
-    hasAside ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-16 xl:grid-cols-[minmax(0,1fr)_26rem] xl:gap-20' : ''
+  return `min-w-0 pt-8 pb-36 lg:pt-14 lg:pb-28 ${
+    hasAside ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-12 xl:grid-cols-[minmax(0,1fr)_26rem] xl:gap-20' : ''
   }`
 }
 
@@ -220,7 +220,7 @@ export function PublicPageAside({ page, slug, copy }) {
 
   return (
     <aside className="mt-12 min-w-0 lg:sticky lg:top-8 lg:mt-2">
-      <div className="page-card rounded-[1.8rem] px-7 py-8 shadow-[0_28px_70px_-36px_rgba(36,48,38,0.5)] ring-1 ring-ink/8">
+      <div className="page-card rounded-[1.8rem] px-5 py-6 shadow-[0_28px_70px_-36px_rgba(36,48,38,0.5)] ring-1 ring-ink/8 sm:px-7 sm:py-8">
         <p className="page-accent text-[11px] font-semibold tracking-[0.22em] uppercase">{copy.contactKicker}</p>
         {contacts.length ? (
           <ul className="mt-2 divide-y divide-ink/8">
@@ -275,7 +275,7 @@ export function PublicPageAside({ page, slug, copy }) {
         ) : null}
 
         {bookingPath ? (
-          <div className="mt-8 space-y-2">
+          <div className="mt-8 hidden space-y-2 lg:block">
             {sessionServices.length || !quotePath ? (
               <Link
                 to={quotePath && !sessionServices.length ? quotePath : bookingPath}

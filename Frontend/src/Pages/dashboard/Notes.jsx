@@ -61,6 +61,7 @@ function Notes() {
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState('all')
   const [selectedId, setSelectedId] = useState('')
+  const [mobileDetail, setMobileDetail] = useState(false)
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const [taskSaved, setTaskSaved] = useState('')
@@ -266,7 +267,7 @@ function Notes() {
         </div>
       ) : (
         <div className="mt-8 grid min-w-0 gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
-          <Surface className="max-h-[70vh] overflow-y-auto p-3">
+          <Surface className={`overflow-y-auto p-3 lg:max-h-[70vh] ${mobileDetail ? 'hidden lg:block' : ''}`}>
             {groups.map((group) => (
               <section key={group.id} className="mb-4 last:mb-0">
                 <div className="flex items-center justify-between gap-2 px-2 py-2">
@@ -282,7 +283,10 @@ function Notes() {
                     <li key={note._id}>
                       <button
                         type="button"
-                        onClick={() => setSelectedId(note._id)}
+                        onClick={() => {
+                          setSelectedId(note._id)
+                          setMobileDetail(true)
+                        }}
                         className={`w-full rounded-2xl px-3 py-3 text-left transition ${
                           selected?._id === note._id ? 'bg-moss text-cream' : 'hover:bg-paper'
                         }`}
@@ -300,7 +304,14 @@ function Notes() {
           </Surface>
 
           {selected ? (
-            <Surface className="flex max-h-[70vh] min-h-0 min-w-0 flex-col overflow-hidden p-6 sm:p-8">
+            <Surface className={`min-h-0 min-w-0 flex-col overflow-hidden p-5 sm:p-8 lg:max-h-[70vh] ${mobileDetail ? 'flex' : 'hidden lg:flex'}`}>
+              <button
+                type="button"
+                className="mb-3 self-start text-sm font-medium text-copper lg:hidden"
+                onClick={() => setMobileDetail(false)}
+              >
+                ← Notes
+              </button>
               {selected.contact?.name ? (
                 <span className="w-fit rounded-full bg-moss/10 px-2.5 py-1 text-[11px] font-semibold text-moss">
                   {selected.contact.name}
@@ -310,7 +321,7 @@ function Notes() {
                   Note générale
                 </span>
               )}
-              <h2 className="mt-3 shrink-0 wrap-break-word font-display text-3xl tracking-tight">{selected.title}</h2>
+              <h2 className="mt-3 shrink-0 wrap-break-word font-display text-2xl tracking-tight sm:text-3xl">{selected.title}</h2>
               <p className="mt-1 shrink-0 text-xs text-ink-soft">{formatDateTime(selected.updatedAt || selected.createdAt)}</p>
               <div className="mt-6 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pr-1">
                 <ExpandableNote text={selected.body} />

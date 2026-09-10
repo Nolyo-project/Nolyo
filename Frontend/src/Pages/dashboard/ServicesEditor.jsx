@@ -160,7 +160,7 @@ export function ServicesEditor() {
           {services.map((item) => (
             <li
               key={item._id}
-              className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ${
+              className={`flex flex-col gap-3 rounded-2xl px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
                 isHeadingService(item) ? 'bg-moss/5 ring-1 ring-moss/10' : 'bg-paper'
               }`}
             >

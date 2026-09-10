@@ -143,25 +143,25 @@ function AnalyticsView() {
             <Stat label="Nouveaux avis" value={kpis.reviews} hint="Avis site approuvés" />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <article className="rounded-[1.5rem] bg-cream p-5 ring-1 ring-ink/6">
               <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Vue → essai</p>
-              <p className="mt-2 font-display text-4xl">{pct(rates.viewToPreview)}</p>
+              <p className="mt-2 font-display text-3xl sm:text-4xl">{pct(rates.viewToPreview)}</p>
               <p className="mt-1 text-sm text-ink-soft">Des vues qui lancent un essai</p>
             </article>
             <article className="rounded-[1.5rem] bg-cream p-5 ring-1 ring-ink/6">
               <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Essai → demande</p>
-              <p className="mt-2 font-display text-4xl">{pct(rates.previewToRequest)}</p>
+              <p className="mt-2 font-display text-3xl sm:text-4xl">{pct(rates.previewToRequest)}</p>
               <p className="mt-1 text-sm text-ink-soft">Des essais qui demandent</p>
             </article>
             <article className="rounded-[1.5rem] bg-cream p-5 ring-1 ring-ink/6">
               <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Demande → inscrit</p>
-              <p className="mt-2 font-display text-4xl">{pct(rates.requestToRegistered)}</p>
+              <p className="mt-2 font-display text-3xl sm:text-4xl">{pct(rates.requestToRegistered)}</p>
               <p className="mt-1 text-sm text-ink-soft">Conversion commerciale</p>
             </article>
             <article className="rounded-[1.5rem] bg-moss p-5 text-cream">
               <p className="text-[11px] font-semibold tracking-[0.16em] text-cream/55 uppercase">Délai moyen</p>
-              <p className="mt-2 font-display text-4xl">
+              <p className="mt-2 font-display text-3xl sm:text-4xl">
                 {rates.avgDaysToRegister != null ? `${rates.avgDaysToRegister} j` : '—'}
               </p>
               <p className="mt-1 text-sm text-cream/70">
@@ -171,18 +171,18 @@ function AnalyticsView() {
             </article>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <article className="rounded-[1.5rem] bg-cream p-5 ring-1 ring-ink/6 sm:p-6">
               <h3 className="font-display text-2xl">Essais Essentiel vs Pro</h3>
               <p className="mt-1 text-sm text-ink-soft">Clics « Essayer 5 min » sur le site.</p>
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-paper px-4 py-4 ring-1 ring-ink/6">
                   <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Essentiel</p>
-                  <p className="mt-2 font-display text-4xl">{kpis.previewEssentiel}</p>
+                  <p className="mt-2 font-display text-3xl sm:text-4xl">{kpis.previewEssentiel}</p>
                 </div>
                 <div className="rounded-2xl bg-moss px-4 py-4 text-cream">
                   <p className="text-[11px] font-semibold tracking-[0.16em] text-cream/55 uppercase">Pro</p>
-                  <p className="mt-2 font-display text-4xl">{kpis.previewPro}</p>
+                  <p className="mt-2 font-display text-3xl sm:text-4xl">{kpis.previewPro}</p>
                 </div>
               </div>
             </article>
@@ -207,7 +207,7 @@ function AnalyticsView() {
             </article>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <article className="rounded-[1.5rem] bg-cream p-5 ring-1 ring-ink/6 sm:p-6">
               <h3 className="font-display text-2xl">Sources de trafic</h3>
               <p className="mt-1 mb-5 text-sm text-ink-soft">D’où arrivent les visiteurs (référent / UTM).</p>
@@ -220,7 +220,7 @@ function AnalyticsView() {
             </article>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <article className="rounded-[1.5rem] bg-cream p-5 ring-1 ring-ink/6">
               <h3 className="font-display text-xl">Vues / jour</h3>
               <div className="mt-4">
@@ -241,7 +241,7 @@ function AnalyticsView() {
             </article>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <article className="rounded-[1.5rem] bg-cream p-5 ring-1 ring-ink/6 sm:p-6">
               <h3 className="font-display text-2xl">Membres aujourd’hui</h3>
               <p className="mt-1 text-sm text-ink-soft">{data.members.total} comptes au total (hors démos).</p>
@@ -286,7 +286,7 @@ function AnalyticsView() {
             </article>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <article className="rounded-[1.5rem] bg-cream p-5 ring-1 ring-ink/6 sm:p-6">
               <h3 className="font-display text-2xl">Pipeline global</h3>
               <p className="mt-1 text-sm text-ink-soft">Tous les dossiers, toutes périodes.</p>

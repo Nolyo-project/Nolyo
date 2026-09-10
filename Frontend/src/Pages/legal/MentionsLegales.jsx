@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom'
 
 function MentionsLegales() {
   return (
-    <main className="mx-auto max-w-4xl px-5 py-14 sm:px-8">
+    <main className="mx-auto max-w-4xl px-4 py-10 sm:px-8 sm:py-14">
       <p className="text-xs font-semibold tracking-[0.2em] text-copper uppercase">Légal</p>
-      <h1 className="mt-2 font-display text-4xl tracking-tight sm:text-5xl">Mentions légales</h1>
+      <h1 className="mt-2 font-display text-3xl tracking-tight sm:text-5xl">Mentions légales</h1>
 
       <section className="mt-8 space-y-6 rounded-3xl bg-cream p-6 ring-1 ring-ink/8 sm:p-8">
         <article>

@@ -18,12 +18,12 @@ export function UpgradeWall({
 }) {
   return (
     <PageShell className="grid min-h-[calc(100svh-5.5rem)] place-items-center py-12 lg:min-h-[calc(100svh-4.75rem)]">
-      <Surface className="w-full max-w-lg px-8 py-12 text-center sm:px-12 sm:py-14">
+      <Surface className="w-full max-w-lg px-5 py-10 text-center sm:px-12 sm:py-14">
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-moss text-cream shadow-sm shadow-moss/25 [&_svg]:h-7 [&_svg]:w-7">
           {icons[icon] || icons.lock}
         </span>
         <p className="mt-6 text-[11px] font-semibold tracking-[0.22em] text-copper uppercase">Nolyo Pro</p>
-        <h1 className="mt-2 font-display text-4xl tracking-tight sm:text-5xl">{title}</h1>
+        <h1 className="mt-2 font-display text-3xl tracking-tight sm:text-5xl">{title}</h1>
         <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-ink-soft">{description}</p>
 
         <ul className="mx-auto mt-8 max-w-sm space-y-3 text-left text-sm">

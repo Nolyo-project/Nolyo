@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 export const fieldClass =
-  'mt-1.5 w-full rounded-2xl border border-ink/10 bg-paper px-4 py-3 text-sm outline-none transition focus:border-copper focus:ring-2 focus:ring-copper/15'
+  'mt-1.5 w-full min-w-0 max-w-full rounded-2xl border border-ink/10 bg-paper px-4 py-3 text-sm outline-none transition focus:border-copper focus:ring-2 focus:ring-copper/15'
 
 export function formatMoney(value) {
   return new Intl.NumberFormat('fr-FR', {
@@ -192,6 +192,21 @@ export function useNow(intervalMs = 30000) {
     return () => clearInterval(id)
   }, [intervalMs])
   return now
+}
+
+export function useMediaMin(px) {
+  const query = `(min-width: ${px}px)`
+  const [matches, setMatches] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const sync = () => setMatches(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [query])
+  return matches
 }
 
 export const DEFAULT_DEPOSIT_PLAN = [

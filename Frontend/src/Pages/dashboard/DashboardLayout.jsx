@@ -11,6 +11,7 @@ import FollowUpModal from './FollowUpModal'
 import TrialBillingPrompt from './TrialBillingPrompt'
 import { copyForUser } from '../../data/trades'
 import { hasModule, workspaceLabel } from '../../data/workspace'
+import { DashFrame, MenuToggle, MobileDrawer } from '../../components/layouts/AppShell'
 
 export function navGroups(copy) {
   return [
@@ -108,11 +109,14 @@ function PreviewTag({ expiresAt }) {
   }, [expiresAt])
 
   return (
-    <div className="flex items-center gap-2 whitespace-nowrap">
-      <span className="rounded-full bg-moss px-3 py-1.5 text-[11px] font-semibold tracking-wide text-cream uppercase">
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="hidden rounded-full bg-moss px-3 py-1.5 text-[11px] font-semibold tracking-wide text-cream uppercase sm:inline">
         Nolyo Pro 19,99€
       </span>
-      <span className="text-sm text-ink-soft">{formatClock(left)}</span>
+      <span className="rounded-full bg-moss px-2.5 py-1 text-[10px] font-semibold tracking-wide text-cream uppercase sm:hidden">
+        Pro
+      </span>
+      <span className="text-sm tabular-nums text-ink-soft">{formatClock(left)}</span>
     </div>
   )
 }
@@ -131,10 +135,10 @@ function BillingHint({ subscription }) {
       return (
         <Link
           to="/dashboard/abonnement"
-          className="max-w-[16rem] rounded-2xl border border-ink/10 bg-cream px-3 py-2 text-left text-xs transition hover:border-copper/30 sm:max-w-none sm:px-4"
+          className="max-w-[9.5rem] rounded-2xl border border-ink/10 bg-cream px-3 py-2 text-left text-xs transition hover:border-copper/30 sm:max-w-none sm:px-4"
         >
           <p className="font-medium">Mois offert terminé</p>
-          <p className="mt-0.5 text-ink-soft">
+          <p className="mt-0.5 hidden text-ink-soft sm:block">
             {hasCard ? 'Prélèvement en cours…' : 'Ajoutez une carte pour éviter le blocage.'}
           </p>
         </Link>
@@ -143,14 +147,14 @@ function BillingHint({ subscription }) {
     return (
       <Link
         to="/dashboard/abonnement"
-        className="max-w-[16rem] rounded-2xl bg-cream px-3 py-2 text-left text-xs ring-1 ring-ink/6 transition hover:ring-copper/25 sm:max-w-none sm:px-4"
+          className="max-w-[9.5rem] rounded-2xl bg-cream px-3 py-2 text-left text-xs ring-1 ring-ink/6 transition hover:ring-copper/25 sm:max-w-none sm:px-4"
       >
         <p className="m-0">
           <span className="font-medium">Mois offert</span>
           <span className="text-ink-soft"> · {days} j restant{days > 1 ? 's' : ''}</span>
         </p>
         {nextAt ? (
-          <p className="mt-0.5 text-ink-soft">
+          <p className="mt-0.5 hidden text-ink-soft sm:block">
             Prochaine facture le {formatDay(nextAt)}
             {hasCard ? ' · prélèvement auto' : ''}
           </p>
@@ -163,10 +167,10 @@ function BillingHint({ subscription }) {
     return (
       <Link
         to="/dashboard/abonnement"
-        className="max-w-[16rem] rounded-2xl bg-cream px-3 py-2 text-left text-xs ring-1 ring-ink/6 transition hover:ring-copper/25 sm:max-w-none sm:px-4"
+          className="max-w-[9.5rem] rounded-2xl bg-cream px-3 py-2 text-left text-xs ring-1 ring-ink/6 transition hover:ring-copper/25 sm:max-w-none sm:px-4"
       >
         <p className="font-medium">{auto ? 'Prélèvement automatique' : 'Prochaine facture'}</p>
-        <p className="mt-0.5 text-ink-soft">Le {formatDay(nextAt)}</p>
+        <p className="mt-0.5 hidden text-ink-soft sm:block">Le {formatDay(nextAt)}</p>
       </Link>
     )
   }
@@ -254,6 +258,10 @@ function DashboardLayout() {
   }, [user.id])
 
   useEffect(() => {
+    setMenuOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
     function load() {
       api('/api/workspace/nav-badges')
         .then((data) => setBadges(data.badges || emptyBadges))
@@ -288,9 +296,9 @@ function DashboardLayout() {
     return next
   }, [activeBadge, badges, seen])
 
-  return (
-    <div className="h-svh overflow-hidden bg-paper text-ink lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)]">
-      <aside className="dash-sidebar hidden h-svh flex-col text-cream lg:flex">
+  function renderSidebar() {
+    return (
+      <>
         <div className="flex flex-col items-start gap-2.5 px-5 pt-6 pb-4">
           <Logo to="/dashboard" inverted className="block" />
           {isPreview ? (
@@ -298,15 +306,21 @@ function DashboardLayout() {
               Nolyo Pro 19,99€
             </span>
           ) : (
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-cream/55 uppercase">
-              {planName}
-            </p>
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-cream/55 uppercase">{planName}</p>
           )}
         </div>
-        <NavList user={user} isPro={isPro} badges={visibleBadges} copy={copy} className="flex-1 overflow-y-auto px-3 pb-4" />
+        <NavList
+          user={user}
+          isPro={isPro}
+          badges={visibleBadges}
+          copy={copy}
+          onNavigate={() => setMenuOpen(false)}
+          className="flex-1 overflow-y-auto px-3 pb-4"
+        />
         <div className="border-t border-cream/10 px-4 py-4">
           <NavLink
             to="/dashboard/parametres"
+            onClick={() => setMenuOpen(false)}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-xl px-2 py-2 -mx-1 transition ${
                 isActive ? 'bg-cream/12' : 'hover:bg-cream/8'
@@ -322,7 +336,7 @@ function DashboardLayout() {
             </div>
           </NavLink>
           <div className="mt-3 flex items-center justify-between px-1">
-            <Link to="/" className="text-xs text-cream/50 transition hover:text-cream">
+            <Link to="/" className="text-xs text-cream/50 transition hover:text-cream" onClick={() => setMenuOpen(false)}>
               Site public
             </Link>
             <button
@@ -334,10 +348,21 @@ function DashboardLayout() {
             </button>
           </div>
         </div>
-      </aside>
+      </>
+    )
+  }
 
-      <div className="dash-canvas flex min-h-0 min-w-0 flex-col">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-ink/6 bg-cream/50 px-5 py-3 backdrop-blur-md lg:px-10">
+  return (
+    <DashFrame
+      sidebar={renderSidebar()}
+      drawer={
+        <MobileDrawer open={menuOpen} onClose={() => setMenuOpen(false)} title="Espace">
+          {renderSidebar()}
+        </MobileDrawer>
+      }
+    >
+      <div className="dash-canvas flex min-h-0 min-w-0 flex-col lg:h-full lg:overflow-hidden">
+        <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-ink/6 bg-cream/90 px-4 py-3 backdrop-blur-md sm:px-5 lg:static lg:px-10 lg:bg-cream/50">
           <div className="flex min-w-0 items-center gap-3">
             <div className="lg:hidden">
               <Logo to="/dashboard" />
@@ -347,67 +372,23 @@ function DashboardLayout() {
               <p className="truncate text-sm font-medium">{spaceName}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {isPreview && user.previewExpiresAt ? (
               <PreviewTag expiresAt={user.previewExpiresAt} />
             ) : (
               <BillingHint subscription={user.subscription} />
             )}
-            <button
-              type="button"
-              className="rounded-full border border-ink/10 bg-cream px-3 py-2 text-sm lg:hidden"
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              Menu
-            </button>
+            <MenuToggle open={menuOpen} onClick={() => setMenuOpen((v) => !v)} />
           </div>
         </header>
 
-        {menuOpen ? (
-          <div className="dash-sidebar shrink-0 px-3 py-4 lg:hidden">
-            {isPreview ? (
-              <p className="mb-3 px-3">
-                <span className="inline-flex rounded-full bg-cream/14 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-cream uppercase">
-                  Nolyo Pro 19,99€
-                </span>
-              </p>
-            ) : null}
-            <NavList user={user} isPro={isPro} badges={visibleBadges} copy={copy} onNavigate={() => setMenuOpen(false)} />
-            <NavLink
-              to="/dashboard/parametres"
-              className="mt-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-cream/72 hover:bg-cream/8 hover:text-cream"
-              onClick={() => setMenuOpen(false)}
-            >
-              <span className="shrink-0">
-                <Avatar user={user} light className="h-9 w-9 text-xs" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate font-medium text-cream">{user.name}</span>
-                <span className="block text-xs text-cream/50">Paramètres</span>
-              </span>
-            </NavLink>
-            <div className="mt-4 flex items-center justify-between px-3">
-              <Link to="/" className="text-sm text-cream/60" onClick={() => setMenuOpen(false)}>
-                Site public
-              </Link>
-              <button
-                type="button"
-                className="text-sm text-cream/60"
-                onClick={() => (isPreview ? endPreviewToSubscribe(logout, user) : logout())}
-              >
-                {leaveLabel}
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="dash-scroll min-h-0 flex-1 overflow-y-auto">
+        <div className="dash-scroll min-w-0 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           <Outlet />
         </div>
         <FollowUpModal />
         <TrialBillingPrompt />
       </div>
-    </div>
+    </DashFrame>
   )
 }
 

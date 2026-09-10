@@ -18,6 +18,7 @@ import {
   slotDateTime,
   startOfWeek,
   toDateInput,
+  useMediaMin,
   useNow,
 } from './format'
 import { Modal, PageHeader, PageShell, Surface, ghostBtn, primaryBtn } from './ui'
@@ -82,11 +83,13 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
           prospectsSingular: 'prospect',
         }
       : copyForUser(user)
-  const fill = compact || variant === 'founder'
+  const fill = compact
   const base = apiBase || (variant === 'founder' ? '/api/president' : '/api/workspace')
   const now = useNow()
   const schedule = user?.schedule || defaultSchedule()
   const [weekStart, setWeekStart] = useState(() => startOfWeek())
+  const [focusDay, setFocusDay] = useState(() => new Date())
+  const isWeek = useMediaMin(1024)
   const [appointments, setAppointments] = useState([])
   const [contacts, setContacts] = useState([])
   const [absences, setAbsences] = useState([])
@@ -110,6 +113,12 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
   const isPro = !isFounder && isProPlan(user)
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
+  const visibleDays = useMemo(() => {
+    if (isWeek) return days
+    const key = toDateInput(focusDay)
+    const match = days.find((day) => toDateInput(day) === key)
+    return [match || days[0]]
+  }, [days, focusDay, isWeek])
   const slots = useMemo(
     () => buildDaySlots(schedule.workStart, schedule.workEnd, schedule.durationMinutes),
     [schedule],
@@ -187,6 +196,18 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
       counts: data.counts || {},
     })
   }
+
+  useEffect(() => {
+    const start = weekStart.getTime()
+    const end = addDays(weekStart, 6).getTime()
+    const day = new Date(focusDay)
+    day.setHours(0, 0, 0, 0)
+    if (day.getTime() < start || day.getTime() > end) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      setFocusDay(today.getTime() >= start && today.getTime() <= end ? today : new Date(weekStart))
+    }
+  }, [weekStart])
 
   useEffect(() => {
     loadWeek(weekStart).catch((err) => setError(err.message))
@@ -383,6 +404,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
 
   function onCardPointerDown(event, item) {
     if (event.button !== 0) return
+    if (!window.matchMedia('(min-width: 1024px)').matches) return
     if (item.status !== 'planned') return
     const rect = event.currentTarget.getBoundingClientRect()
     const pointerId = event.pointerId
@@ -499,18 +521,27 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
       : 'ring-2 ring-red-700/40'
   }
 
-  const weekActions = (
-    <>
+  const weekNav = (
+    <div className="flex min-w-0 flex-1 items-center gap-2">
       <button type="button" onClick={() => setWeekStart((current) => addDays(current, -7))} className={ghostBtn}>
-        Semaine précédente
+        <span className="md:hidden">←</span>
+        <span className="hidden md:inline">Semaine précédente</span>
       </button>
-      <p className="min-w-36 text-center text-sm font-medium">{weekLabel(weekStart)}</p>
+      <p className="min-w-0 flex-1 truncate text-center text-sm font-medium">{weekLabel(weekStart)}</p>
       <button type="button" onClick={() => setWeekStart((current) => addDays(current, 7))} className={ghostBtn}>
-        Semaine suivante
+        <span className="md:hidden">→</span>
+        <span className="hidden md:inline">Semaine suivante</span>
       </button>
+    </div>
+  )
+  const weekTools = (
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
       <button
         type="button"
-        onClick={() => setWeekStart(startOfWeek())}
+        onClick={() => {
+          setWeekStart(startOfWeek())
+          setFocusDay(new Date())
+        }}
         className="rounded-full px-3 py-2 text-sm text-ink-soft underline"
       >
         Aujourd’hui
@@ -518,26 +549,30 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
       <button type="button" onClick={() => setSettingsOpen(true)} className={primaryBtn}>
         Horaires
       </button>
-    </>
+    </div>
   )
 
   return (
-    <PageShell className={fill ? 'flex h-full min-h-0 flex-col overflow-hidden !px-5 !py-4 lg:!px-8 lg:!py-4' : ''}>
-      {fill ? (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">{copy.agendaKicker}</p>
-            <h1 className="font-display text-2xl tracking-tight">{copy.appointments}</h1>
-          </div>
-          {rdvTab === 'agenda' ? <div className="flex flex-wrap items-center gap-2">{weekActions}</div> : null}
+    <PageShell className={compact ? '!px-4 !py-4 sm:!px-5 lg:!px-10 lg:!py-6' : ''}>
+      {compact ? (
+        <div className="flex flex-col gap-3">
+          {rdvTab === 'agenda' || !isFounder ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              {weekNav}
+              {weekTools}
+            </div>
+          ) : null}
         </div>
       ) : (
-        <PageHeader
-          kicker={copy.agendaKicker}
-          title={copy.appointments}
-          description={`${occupancy.free} place${occupancy.free > 1 ? 's' : ''} disponible${occupancy.free > 1 ? 's' : ''} cette semaine${occupancy.taken ? ` · ${occupancy.taken} prise${occupancy.taken > 1 ? 's' : ''}` : ''}`}
-          actions={weekActions}
-        />
+        <>
+          <PageHeader
+            kicker={copy.agendaKicker}
+            title={copy.appointments}
+            description={`${occupancy.free} place${occupancy.free > 1 ? 's' : ''} disponible${occupancy.free > 1 ? 's' : ''} cette semaine${occupancy.taken ? ` · ${occupancy.taken} prise${occupancy.taken > 1 ? 's' : ''}` : ''}`}
+            actions={weekTools}
+          />
+          <div className="mt-4 flex min-w-0 items-center gap-2">{weekNav}</div>
+        </>
       )}
 
       {isFounder ? (
@@ -562,7 +597,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
       {error ? <p className="mt-3 shrink-0 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
 
       {isFounder && rdvTab !== 'agenda' ? (
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+        <div className="mt-4">
           {(rdvTab === 'converted' ? outcomes.converted : outcomes.ended).length === 0 ? (
             <div className="rounded-3xl border border-dashed border-ink/12 bg-cream/40 px-6 py-12 text-center text-sm text-ink-soft">
               {rdvTab === 'converted'
@@ -698,22 +733,53 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
 
       {(!isFounder || rdvTab === 'agenda') ? (
         <>
-      <Surface className={fill ? 'mt-4 flex min-h-0 flex-1 flex-col overflow-hidden p-3' : 'mt-6 overflow-x-auto p-4'}>
-        <div className={fill ? 'min-h-0 min-w-[52rem] flex-1 overflow-auto' : 'min-w-[52rem]'}>
+      <Surface className={compact ? 'mt-4 p-2 sm:p-3' : 'mt-6 p-2 sm:p-4'}>
+        {isWeek ? null : (
+          <div className="-mx-0.5 flex gap-1 overflow-x-auto px-0.5 pb-2">
+            {days.map((day) => {
+              const active = toDateInput(day) === toDateInput(focusDay)
+              const isToday = new Date().toDateString() === day.toDateString()
+              const open = workDays.includes(day.getDay())
+              const away = dayIsAbsent(day, absences)
+              return (
+                <button
+                  key={`pick-${day.toISOString()}`}
+                  type="button"
+                  onClick={() => setFocusDay(day)}
+                  className={`w-[3.15rem] shrink-0 rounded-2xl px-1 py-2 text-center sm:w-auto sm:min-w-[3.4rem] sm:flex-1 ${
+                    active ? 'bg-moss text-cream' : 'bg-paper ring-1 ring-ink/8'
+                  }`}
+                >
+                  <p className={`text-[10px] uppercase ${active ? 'text-cream/75' : isToday ? 'font-semibold text-copper' : 'text-ink-soft'}`}>
+                    {day.toLocaleDateString('fr-FR', { weekday: 'short' })}
+                  </p>
+                  <p className="text-sm font-medium">{day.getDate()}</p>
+                  {!open ? (
+                    <p className={`text-[9px] ${active ? 'text-cream/60' : 'text-ink-soft'}`}>Fermé</p>
+                  ) : away ? (
+                    <p className={`text-[9px] ${active ? 'text-cream/60' : 'text-ink-soft'}`}>Congés</p>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        <div className="min-w-0 overflow-x-auto">
           {slots.length === 0 ? (
             <p className="mt-8 rounded-[1.4rem] border border-dashed border-ink/15 px-5 py-12 text-center text-ink-soft">
               Ajustez vos horaires dans Paramètres pour afficher des créneaux.
             </p>
           ) : (
             <div
-              className="mt-3 grid gap-2"
+              className="mt-1 grid gap-1.5 sm:mt-3 sm:gap-2"
               style={{
-                gridTemplateColumns: '4.5rem repeat(7, minmax(0, 1fr))',
-                gridTemplateRows: `auto repeat(${slots.length}, minmax(${fill ? '2.55rem' : '3.5rem'}, auto))`,
+                minWidth: isWeek ? '48rem' : undefined,
+                gridTemplateColumns: `${isWeek ? '4.25rem' : '3.25rem'} repeat(${visibleDays.length}, minmax(0, 1fr))`,
+                gridTemplateRows: `auto repeat(${slots.length}, minmax(${fill ? '2.4rem' : '3.25rem'}, auto))`,
               }}
             >
               <div className="grid place-items-center text-xs text-ink-soft">Horaire</div>
-              {days.map((day) => {
+              {visibleDays.map((day) => {
                 const open = workDays.includes(day.getDay())
                 const away = dayIsAbsent(day, absences)
                 const isToday = new Date().toDateString() === day.toDateString()
@@ -744,7 +810,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
                 </p>
               ))}
 
-              {days.flatMap((day, dayIndex) =>
+              {visibleDays.flatMap((day, dayIndex) =>
                 slots.flatMap((slot, slotIndex) => {
                   const start = slotDateTime(day, slot.startMinutes)
                   const iso = start.toISOString()
@@ -845,7 +911,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
           )}
         </div>
       </Surface>
-      {fill ? null : (
+      {fill || !isWeek ? null : (
         <p className="mt-3 text-xs text-ink-soft">
           Attrapez une carte et glissez-la vers un créneau libre pour déplacer le rendez-vous.
         </p>
@@ -875,7 +941,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
         >
           <form onSubmit={bookSlot}>
             <p className="text-xs tracking-[0.18em] text-ink-soft uppercase">Nouveau rendez-vous</p>
-            <h2 className="font-display text-3xl">Réserver ce créneau</h2>
+            <h2 className="font-display text-2xl sm:text-3xl">Réserver ce créneau</h2>
             <p className="mt-2 text-sm text-ink-soft">
               {booking.toLocaleDateString('fr-FR', {
                 weekday: 'long',
@@ -975,7 +1041,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
         <Modal onClose={() => setSelected(null)} panelClassName="max-w-md">
           <div>
             <p className="text-xs tracking-[0.18em] text-ink-soft uppercase">Rendez-vous</p>
-            <h2 className="font-display text-3xl">{agendaCardTitle(selected)}</h2>
+            <h2 className="font-display text-2xl sm:text-3xl">{agendaCardTitle(selected)}</h2>
             {selected.servicePrice ? (
               <p className="mt-1 text-sm text-ink-soft">{formatMoney(selected.servicePrice)} · à encaisser en fin de soin</p>
             ) : null}

@@ -120,7 +120,7 @@ function FollowUpModal() {
     <Modal onClose={postpone} panelClassName="max-w-md" overlayClassName="z-[60]">
       <div>
         <p className="text-xs tracking-[0.18em] text-ink-soft uppercase">C’est l’heure</p>
-        <h2 className="mt-1 font-display text-3xl">{contact.name}</h2>
+        <h2 className="mt-1 font-display text-2xl wrap-break-word sm:text-3xl">{contact.name}</h2>
         <p className="mt-1 text-sm text-ink-soft">
           {current.serviceName || current.title ? `${current.serviceName || current.title} · ` : ''}
           {formatDateTime(current.startAt)}

@@ -116,8 +116,8 @@ function BillingLock() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-moss/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-[1.6rem] bg-cream p-6 shadow-2xl ring-1 ring-ink/8 sm:p-8">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-moss/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="w-full max-w-lg rounded-t-[1.6rem] bg-cream p-5 shadow-2xl ring-1 ring-ink/8 sm:rounded-[1.6rem] sm:p-8">
         <p className="text-xs font-semibold tracking-[0.22em] text-copper uppercase">Accès bloqué</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
           {confirming ? 'Confirmation du paiement…' : 'Jour J — réglez votre mois.'}
@@ -134,7 +134,7 @@ function BillingLock() {
         {sub.planName || sub.plan ? (
           <div className="mt-6 rounded-3xl bg-paper px-5 py-5 ring-1 ring-ink/8">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">À régler</p>
-            <p className="mt-2 font-display text-3xl">{sub.planName || 'Nolyo'}</p>
+            <p className="mt-2 font-display text-2xl sm:text-3xl">{sub.planName || 'Nolyo'}</p>
             {sub.amount ? <p className="mt-1 text-ink-soft">{formatPrice(sub.amount)} / mois</p> : null}
             {invoiceMode ? (
               <p className="mt-2 text-xs text-ink-soft">Mode : paiement manuel chaque mois</p>

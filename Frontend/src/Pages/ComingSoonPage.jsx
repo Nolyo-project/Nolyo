@@ -40,7 +40,7 @@ export default function ComingSoonPage({ status }) {
         <p className="text-[11px] font-semibold tracking-[0.22em] text-copper uppercase">
           {maintenance ? 'Maintenance' : 'Bientôt'}
         </p>
-        <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
+        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
         <p className="mt-5 max-w-md text-base leading-relaxed text-cream/75">{message}</p>
         {windowLabel ? <p className="mt-4 text-sm text-cream/55">{windowLabel}</p> : null}
 

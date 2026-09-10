@@ -53,7 +53,7 @@ function Register() {
   return (
     <div>
       <p className="text-xs font-semibold tracking-[0.22em] text-copper uppercase">Inscription</p>
-      <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight">Entrez votre code.</h1>
+      <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Entrez votre code.</h1>
       <p className="mt-2 text-sm text-ink-soft">
         L’inscription n’est possible qu’avec le code unique remis par le président, après devis
         signé et paiement.{' '}

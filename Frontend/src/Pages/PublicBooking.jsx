@@ -8,12 +8,12 @@ import { groupServicesByHeading, isQuoteService, publicPageStyle, servicePriceLa
 import { buildIcs, downloadIcs, googleCalendarUrl } from '../data/calendarEvent'
 import Logo from '../components/Logo'
 import SeoHead from '../components/SeoHead'
-import { formatLongDate, formatMoney, formatTime } from './dashboard/format'
+import { formatLongDate, formatMoney, formatTime, useMediaMin } from './dashboard/format'
 import { primaryBtn, quietBtn } from './dashboard/ui'
 
 const emptyGuest = { firstName: '', lastName: '', email: '', phone: '' }
 const pageFieldClass =
-  'page-field mt-1.5 w-full rounded-2xl border border-ink/10 px-4 py-3 text-sm outline-none transition focus:border-[var(--page-accent)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--page-accent)_20%,transparent)]'
+  'page-field mt-1.5 w-full min-w-0 max-w-full rounded-2xl border border-ink/10 px-4 py-3 text-sm outline-none transition focus:border-[var(--page-accent)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--page-accent)_20%,transparent)]'
 
 function PublicBooking() {
   const { slug } = useParams()
@@ -27,6 +27,9 @@ function PublicBooking() {
   const [date, setDate] = useState('')
   const [dayOffset, setDayOffset] = useState(0)
   const [slot, setSlot] = useState(null)
+  const isSm = useMediaMin(640)
+  const isLg = useMediaMin(1024)
+  const DAY_WINDOW = isLg ? 7 : isSm ? 5 : 3
   const [guest, setGuest] = useState(emptyGuest)
   const [pending, setPending] = useState(false)
   const [done, setDone] = useState(null)
@@ -101,11 +104,14 @@ function PublicBooking() {
     [days],
   )
 
-  const DAY_WINDOW = 7
   const maxDayOffset = Math.max(0, dayLabels.length - DAY_WINDOW)
   const visibleDays = dayLabels.slice(dayOffset, dayOffset + DAY_WINDOW)
   const canShiftLeft = dayOffset > 0
   const canShiftRight = dayOffset < maxDayOffset
+
+  useEffect(() => {
+    setDayOffset((current) => Math.min(current, maxDayOffset))
+  }, [maxDayOffset])
 
   function updateGuest(event) {
     setGuest((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -210,7 +216,7 @@ function PublicBooking() {
               <p className="page-accent mt-6 text-[11px] font-semibold tracking-[0.2em] uppercase">
                 {quoteDone ? 'Rendez-vous confirmé' : 'Réservation confirmée'}
               </p>
-              <h1 className="mt-3 font-display text-4xl tracking-tight">
+              <h1 className="mt-3 font-display text-3xl tracking-tight sm:text-4xl">
                 Merci{done.firstName ? `, ${done.firstName}` : ''}.
               </h1>
               <p className="page-muted mx-auto mt-4 max-w-sm text-base leading-relaxed">
@@ -269,7 +275,7 @@ function PublicBooking() {
           },
         }}
       />
-      <div className="mx-auto max-w-3xl px-5 py-8 sm:px-8">
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-8">
         {page.away ? (
           <div
             className="mb-6 rounded-2xl bg-[color-mix(in_srgb,var(--page-accent)_12%,transparent)] px-4 py-3 text-center text-sm font-medium ring-1 ring-ink/8"
@@ -287,9 +293,10 @@ function PublicBooking() {
             {isOwner ? (
               <Link
                 to={homeForUser(user)}
-                className="rounded-full bg-cream px-4 py-2 text-sm font-semibold ring-1 ring-ink/8"
+                className="rounded-full bg-cream px-3 py-2 text-sm font-semibold ring-1 ring-ink/8 sm:px-4"
               >
-                Tableau de bord
+                <span className="sm:hidden">Espace</span>
+                <span className="hidden sm:inline">Tableau de bord</span>
               </Link>
             ) : null}
             <Logo />
@@ -308,7 +315,7 @@ function PublicBooking() {
             <p className="page-accent text-[11px] font-semibold tracking-[0.2em] uppercase">
               {quoteSelected ? copy.quoteCta : copy.bookingCta}
             </p>
-            <h1 className="font-display text-3xl tracking-tight">{page.title}</h1>
+            <h1 className="font-display text-2xl tracking-tight sm:text-3xl">{page.title}</h1>
           </div>
         </div>
 
@@ -322,7 +329,7 @@ function PublicBooking() {
           </div>
         ) : (
         <form onSubmit={submit} className="mt-10 space-y-8">
-            <section className="page-card rounded-[1.6rem] px-6 py-7 ring-1 ring-ink/8 sm:px-8">
+            <section className="page-card rounded-[1.6rem] px-5 py-6 ring-1 ring-ink/8 sm:px-8 sm:py-7">
               <h2 className="font-display text-2xl">Prestation</h2>
               {services.length === 0 ? (
                 <p className="page-muted mt-3 text-sm">Les réservations en ligne ne sont pas encore ouvertes.</p>
@@ -344,14 +351,14 @@ function PublicBooking() {
                           <button
                             type="button"
                             onClick={() => setServiceId(item._id)}
-                            className={`flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left ring-1 transition ${
+                            className={`flex w-full min-w-0 items-start justify-between gap-3 rounded-2xl px-4 py-3.5 text-left ring-1 transition ${
                               active
                                 ? 'page-chip-active ring-[var(--page-accent)]'
                                 : 'page-chip ring-ink/8 hover:ring-[var(--page-accent)]'
                             }`}
                           >
-                            <span>
-                              <span className="block font-medium">{item.name}</span>
+                            <span className="min-w-0">
+                              <span className="block font-medium wrap-break-word">{item.name}</span>
                               <span className={`mt-0.5 block text-xs ${active ? 'opacity-75' : 'page-muted'}`}>
                                 {item.durationMinutes} min
                                 {isQuoteService(item) ? ' · pour cadrer le projet' : ''}
@@ -369,7 +376,7 @@ function PublicBooking() {
             </section>
 
             {service ? (
-              <section className="page-card rounded-[1.6rem] px-6 py-7 ring-1 ring-ink/8 sm:px-8">
+              <section className="page-card rounded-[1.6rem] px-5 py-6 ring-1 ring-ink/8 sm:px-8 sm:py-7">
                 <h2 className="font-display text-2xl">Date et horaire</h2>
                 {quoteSelected ? (
                   <p className="page-muted mt-2 text-sm">
@@ -380,17 +387,17 @@ function PublicBooking() {
                   <p className="page-muted mt-3 text-sm">Aucun créneau libre sur les prochaines semaines.</p>
                 ) : (
                   <>
-                    <div className="mt-4 flex items-center gap-2">
+                    <div className="mt-4 flex items-stretch gap-1.5 sm:items-center sm:gap-2">
                       <button
                         type="button"
                         aria-label="Semaine précédente"
                         disabled={!canShiftLeft}
                         onClick={() => setDayOffset((current) => Math.max(0, current - DAY_WINDOW))}
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-[var(--page-accent)] disabled:opacity-30"
+                        className="grid h-auto min-h-11 w-9 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-[var(--page-accent)] disabled:opacity-30 sm:h-11 sm:w-11"
                       >
                         ‹
                       </button>
-                      <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+                      <div className="flex min-w-0 flex-1 snap-x snap-mandatory gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         {visibleDays.map((item) => {
                           const active = item.date === date
                           return (
@@ -401,7 +408,7 @@ function PublicBooking() {
                                 setDate(item.date)
                                 setSlot(null)
                               }}
-                              className={`min-w-16 flex-1 rounded-2xl px-3 py-3 text-center ${
+                              className={`w-[4.4rem] shrink-0 snap-start rounded-2xl px-2 py-3 text-center sm:w-auto sm:min-w-16 sm:flex-1 sm:px-3 ${
                                 active ? 'page-chip-active' : 'page-chip ring-1 ring-ink/8'
                               }`}
                             >
@@ -421,7 +428,7 @@ function PublicBooking() {
                         aria-label="Semaine suivante"
                         disabled={!canShiftRight}
                         onClick={() => setDayOffset((current) => Math.min(maxDayOffset, current + DAY_WINDOW))}
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-[var(--page-accent)] disabled:opacity-30"
+                        className="grid h-auto min-h-11 w-9 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-[var(--page-accent)] disabled:opacity-30 sm:h-11 sm:w-11"
                       >
                         ›
                       </button>
@@ -454,7 +461,7 @@ function PublicBooking() {
             ) : null}
 
             {slot ? (
-              <section className="page-card rounded-[1.6rem] px-6 py-7 ring-1 ring-ink/8 sm:px-8">
+              <section className="page-card rounded-[1.6rem] px-5 py-6 ring-1 ring-ink/8 sm:px-8 sm:py-7">
                 <h2 className="font-display text-2xl">Vos informations</h2>
                 <p className="page-muted mt-1 text-sm">
                   {service.name} · {formatLongDate(slot.startAt)} à {formatTime(slot.startAt)}

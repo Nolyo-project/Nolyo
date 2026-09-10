@@ -142,7 +142,7 @@ function TestimonialsCarousel({
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="max-w-2xl">
             <p className="text-xs font-semibold tracking-[0.22em] text-cream/55 uppercase">Avis</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h2>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">{title}</h2>
             <p className="mt-3 max-w-lg text-cream/70">{description}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

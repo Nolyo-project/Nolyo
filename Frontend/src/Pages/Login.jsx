@@ -62,7 +62,7 @@ function Login() {
       <p className="text-xs font-semibold tracking-[0.22em] text-copper uppercase">
         {admin ? 'Fondateur' : 'Connexion'}
       </p>
-      <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight">
+      <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
         {admin ? 'Bureau Nolyo.' : 'Bon retour.'}
       </h1>
       {admin ? (

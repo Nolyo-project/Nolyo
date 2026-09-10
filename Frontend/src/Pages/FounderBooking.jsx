@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { buildIcs, downloadIcs, googleCalendarUrl } from '../data/calendarEvent'
-import { formatLongDate, formatTime } from './dashboard/format'
+import { formatLongDate, formatTime, useMediaMin } from './dashboard/format'
 import { Avatar, primaryBtn, quietBtn } from './dashboard/ui'
 
 const emptyGuest = { firstName: '', lastName: '', email: '', phone: '', message: '' }
 const fieldClass =
-  'mt-1.5 w-full rounded-2xl border border-ink/10 bg-cream px-4 py-3 text-sm outline-none transition focus:border-copper focus:ring-2 focus:ring-copper/15'
+  'mt-1.5 w-full min-w-0 max-w-full rounded-2xl border border-ink/10 bg-cream px-4 py-3 text-sm outline-none transition focus:border-copper focus:ring-2 focus:ring-copper/15'
 
 function FounderBooking() {
   const [host, setHost] = useState(null)
@@ -17,6 +17,9 @@ function FounderBooking() {
   const [date, setDate] = useState('')
   const [dayOffset, setDayOffset] = useState(0)
   const [slot, setSlot] = useState(null)
+  const isSm = useMediaMin(640)
+  const isLg = useMediaMin(1024)
+  const DAY_WINDOW = isLg ? 7 : isSm ? 5 : 3
   const [guest, setGuest] = useState(emptyGuest)
   const [pending, setPending] = useState(false)
   const [done, setDone] = useState(null)
@@ -72,11 +75,14 @@ function FounderBooking() {
     [days],
   )
 
-  const DAY_WINDOW = 7
   const maxDayOffset = Math.max(0, dayLabels.length - DAY_WINDOW)
   const visibleDays = dayLabels.slice(dayOffset, dayOffset + DAY_WINDOW)
   const canShiftLeft = dayOffset > 0
   const canShiftRight = dayOffset < maxDayOffset
+
+  useEffect(() => {
+    setDayOffset((current) => Math.min(current, maxDayOffset))
+  }, [maxDayOffset])
 
   function updateGuest(event) {
     setGuest((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -146,7 +152,7 @@ function FounderBooking() {
           <div className="mx-auto max-w-lg text-center">
             <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-cream text-2xl text-moss">✓</span>
             <p className="mt-6 text-[11px] font-semibold tracking-[0.22em] text-cream/55 uppercase">Rendez-vous confirmé</p>
-            <h1 className="mt-3 font-display text-4xl tracking-tight sm:text-5xl">
+            <h1 className="mt-3 font-display text-3xl tracking-tight sm:text-5xl">
               Merci{done.firstName ? `, ${done.firstName}` : ''}.
             </h1>
             <p className="mx-auto mt-4 max-w-sm text-cream/75">
@@ -189,19 +195,19 @@ function FounderBooking() {
   return (
     <main className="bg-paper">
       <section className="bg-moss text-cream">
-        <div className="mx-auto grid max-w-5xl items-center gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[minmax(0,1fr)_16.5rem] lg:py-16">
+        <div className="mx-auto grid max-w-5xl items-center gap-8 px-4 py-10 sm:gap-10 sm:px-8 sm:py-14 lg:grid-cols-[minmax(0,1fr)_16.5rem] lg:py-16">
           <div>
             <p className="text-[11px] font-semibold tracking-[0.22em] text-cream/50 uppercase">
               Nolyo · {service?.durationMinutes || 30} min
             </p>
-            <h1 className="mt-3 font-display text-4xl tracking-tight sm:text-5xl">
+            <h1 className="mt-3 font-display text-3xl tracking-tight sm:text-5xl">
               Échanger {host.firstName ? `avec ${host.firstName}` : ''}.
             </h1>
             <p className="mt-4 max-w-lg text-base leading-relaxed text-cream/75">
               Un créneau pour voir si Nolyo vous convient. Sans engagement, directement dans l’agenda.
             </p>
           </div>
-          <div className="hidden justify-self-end lg:block">
+          <div className="mx-auto hidden w-fit justify-self-end sm:block lg:mx-0">
             <div className="relative">
               <div className="absolute -inset-3 rounded-[2rem] bg-copper/30" />
               <Avatar
@@ -217,26 +223,26 @@ function FounderBooking() {
 
       <form
         onSubmit={submit}
-        className="mx-auto grid max-w-5xl gap-6 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:py-12"
+        className="mx-auto grid max-w-5xl gap-5 px-4 py-8 sm:gap-6 sm:px-8 sm:py-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:py-12"
       >
-        <section className="rounded-[1.8rem] bg-cream px-6 py-7 ring-1 ring-ink/8 sm:px-8">
+        <section className="min-w-0 rounded-[1.8rem] bg-cream px-4 py-6 ring-1 ring-ink/8 sm:px-8 sm:py-7">
           <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">1 · Le créneau</p>
-          <h2 className="mt-1 font-display text-3xl tracking-tight">Date et horaire</h2>
+          <h2 className="mt-1 font-display text-2xl tracking-tight sm:text-3xl">Date et horaire</h2>
           {days.length === 0 ? (
             <p className="mt-5 text-sm text-ink-soft">Aucun créneau libre sur les prochaines semaines.</p>
           ) : (
             <>
-              <div className="mt-6 flex items-center gap-2">
+              <div className="mt-6 flex items-stretch gap-1.5 sm:items-center sm:gap-2">
                 <button
                   type="button"
                   aria-label="Semaine précédente"
                   disabled={!canShiftLeft}
                   onClick={() => setDayOffset((current) => Math.max(0, current - DAY_WINDOW))}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-copper disabled:opacity-30"
+                  className="grid h-auto min-h-11 w-9 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-copper disabled:opacity-30 sm:h-11 sm:w-11"
                 >
                   ‹
                 </button>
-                <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+                <div className="flex min-w-0 flex-1 snap-x snap-mandatory gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {visibleDays.map((item) => {
                     const active = item.date === date
                     return (
@@ -247,7 +253,7 @@ function FounderBooking() {
                           setDate(item.date)
                           setSlot(null)
                         }}
-                        className={`min-w-[4.25rem] flex-1 rounded-2xl px-3 py-3 text-center ${
+                        className={`w-[4.4rem] shrink-0 snap-start rounded-2xl px-2 py-3 text-center sm:w-auto sm:min-w-[4.25rem] sm:flex-1 sm:px-3 ${
                           active ? 'bg-moss text-cream' : 'bg-paper ring-1 ring-ink/8'
                         }`}
                       >
@@ -267,7 +273,7 @@ function FounderBooking() {
                   aria-label="Semaine suivante"
                   disabled={!canShiftRight}
                   onClick={() => setDayOffset((current) => Math.min(maxDayOffset, current + DAY_WINDOW))}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-copper disabled:opacity-30"
+                  className="grid h-auto min-h-11 w-9 shrink-0 place-items-center rounded-full text-lg ring-1 ring-ink/12 transition enabled:hover:ring-copper disabled:opacity-30 sm:h-11 sm:w-11"
                 >
                   ›
                 </button>
@@ -299,9 +305,9 @@ function FounderBooking() {
           )}
         </section>
 
-        <section className="rounded-[1.8rem] bg-cream px-6 py-7 ring-1 ring-ink/8 sm:px-8">
+        <section className="min-w-0 rounded-[1.8rem] bg-cream px-4 py-6 ring-1 ring-ink/8 sm:px-8 sm:py-7">
           <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">2 · Vos coordonnées</p>
-          <h2 className="mt-1 font-display text-3xl tracking-tight">Confirmer</h2>
+          <h2 className="mt-1 font-display text-2xl tracking-tight sm:text-3xl">Confirmer</h2>
           {slot ? (
             <>
               <p className="mt-2 text-sm text-ink-soft">

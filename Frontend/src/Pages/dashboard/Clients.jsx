@@ -27,7 +27,7 @@ import {
 import { DepositTracker } from './DepositPlanEditor'
 import { DealFollow, stageTone } from './DealFollow'
 import { MailMenu } from './MailMenu'
-import { EmptyState, Modal, PageHeader, PageShell, Surface, ghostBtn, icons, primaryBtn, quietBtn } from './ui'
+import { EmptyState, Modal, PageHeader, PageShell, Pagination, Surface, ghostBtn, icons, primaryBtn, quietBtn } from './ui'
 
 const PAGE_SIZE = 9
 
@@ -889,43 +889,12 @@ function Clients({ mode = 'clients' }) {
             })}
           </ul>
 
-          {(pageCount > 1) ? (
-            <nav className="mt-8 flex items-center justify-center gap-2" aria-label="Pagination">
-              <button
-                type="button"
-                disabled={safePage <= 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                className="rounded-full border border-ink/10 px-3 py-1.5 text-sm disabled:opacity-40"
-              >
-                Précédent
-              </button>
-              {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPage(n)}
-                  className={`h-9 w-9 rounded-full text-sm ${
-                    n === safePage ? 'bg-moss text-cream' : 'bg-cream text-ink-soft'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-              <button
-                type="button"
-                disabled={safePage >= pageCount}
-                onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-                className="rounded-full border border-ink/10 px-3 py-1.5 text-sm disabled:opacity-40"
-              >
-                Suivant
-              </button>
-            </nav>
-          ) : null}
+          <Pagination page={safePage} pageCount={pageCount} onPage={setPage} />
         </>
       )}
 
       {open ? (
-        <Modal onClose={closeForm} panelClassName="max-w-5xl p-7 sm:p-10 lg:p-12">
+        <Modal onClose={closeForm} panelClassName="max-w-5xl p-5 sm:p-10 lg:p-12">
           <form noValidate onSubmit={handleSubmit}>
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-start gap-3">
@@ -938,7 +907,7 @@ function Clients({ mode = 'clients' }) {
                   <p className="text-xs tracking-[0.18em] text-ink-soft uppercase">
                     {isProspectSheet ? 'Fiche prospect' : 'Fiche client'}
                   </p>
-                  <h2 className="font-display text-3xl">
+                  <h2 className="font-display text-2xl sm:text-3xl">
                     {editingId
                       ? displayName(form, isProspectSheet) || (isProspectSheet ? 'Prospect' : 'Client')
                       : isProspectSheet
@@ -1078,8 +1047,8 @@ function Clients({ mode = 'clients' }) {
                         {(form.serviceLines || []).length ? (
                           <ul className="mt-3 divide-y divide-ink/8 rounded-2xl bg-paper px-4">
                             {form.serviceLines.map((line, index) => (
-                              <li key={`${line.service || line.name}-${index}`} className="flex items-center justify-between gap-3 py-2.5">
-                                <span className="min-w-0 text-sm">
+                              <li key={`${line.service || line.name}-${index}`} className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                                <span className="min-w-0 truncate text-sm">
                                   {line.name}
                                   {line.quantity > 1 ? ` ×${line.quantity}` : ''}
                                 </span>

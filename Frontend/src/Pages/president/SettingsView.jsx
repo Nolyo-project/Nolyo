@@ -88,13 +88,13 @@ function SettingsView() {
     <div className="relative mx-auto max-w-5xl">
       <div className="pointer-events-none absolute -top-6 right-8 hidden h-40 w-40 rounded-full bg-copper/15 blur-2xl lg:block" />
       <div className="grid gap-6 lg:grid-cols-[18.5rem_minmax(0,1fr)]">
-      <aside className="relative overflow-hidden rounded-[1.8rem] bg-moss p-7 text-cream shadow-xl shadow-moss/20">
+      <aside className="relative overflow-hidden rounded-[1.8rem] bg-moss p-5 text-cream shadow-xl shadow-moss/20 sm:p-7">
         <div className="pointer-events-none absolute -top-10 -right-8 h-36 w-36 rounded-full bg-copper/40" />
         <div className="pointer-events-none absolute bottom-8 -left-10 h-28 w-28 rounded-full bg-cream/10" />
         <p className="relative text-[11px] font-semibold tracking-[0.2em] text-cream/50 uppercase">Fondateur</p>
         <div className="relative z-10 mt-6 flex flex-col items-center text-center">
           <Avatar user={user} light className="h-28 w-28 text-2xl ring-4 ring-cream/15" />
-          <h2 className="mt-4 font-display text-3xl tracking-tight">{user.name}</h2>
+          <h2 className="mt-4 font-display text-2xl tracking-tight sm:text-3xl">{user.name}</h2>
           <p className="mt-1 text-sm text-cream/65">{user.email}</p>
           <div className="mt-6 flex flex-col gap-2">
             <button

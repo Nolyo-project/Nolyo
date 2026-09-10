@@ -49,14 +49,14 @@ function AuthLayout() {
           <p className="inline-flex rounded-full bg-copper px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-cream uppercase">
             {panel.kicker}
           </p>
-          <h1 className="mt-5 font-display text-5xl leading-tight font-semibold">{panel.title}</h1>
+          <h1 className="mt-5 font-display text-4xl leading-tight font-semibold lg:text-5xl">{panel.title}</h1>
           <p className="mt-5 text-lg leading-relaxed text-cream/70">{panel.text}</p>
         </div>
         <p className="relative text-sm text-cream/45">© {new Date().getFullYear()} Nolyo</p>
       </aside>
 
       <div className="flex min-h-svh flex-col">
-        <div className="flex items-center justify-between px-6 py-5 lg:hidden">
+        <div className="flex items-center justify-between px-5 py-5 lg:hidden">
           <Logo to={homeTo} />
         </div>
         <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">

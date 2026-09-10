@@ -182,14 +182,14 @@ function Subscription() {
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <section className="rounded-[1.5rem] bg-cream p-5 ring-1 ring-ink/8 sm:p-6">
           <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Formule</p>
-          <h2 className="mt-2 font-display text-3xl tracking-tight">{planName}</h2>
+          <h2 className="mt-2 font-display text-2xl tracking-tight sm:text-3xl">{planName}</h2>
           <p className="mt-1 text-ink-soft">
             {sub.amount ? `${formatPrice(sub.amount)} / mois` : '—'} · {billingLabel(sub.status)}
           </p>
           <dl className="mt-5 space-y-3 text-sm">
             <div className="flex justify-between gap-3">
-              <dt className="text-ink-soft">Mois offert jusqu’au</dt>
-              <dd className="font-medium">{formatDay(sub.trialEndsAt) || '—'}</dd>
+              <dt className="min-w-0 text-ink-soft">Mois offert jusqu’au</dt>
+              <dd className="shrink-0 font-medium">{formatDay(sub.trialEndsAt) || '—'}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-ink-soft">Engagement jusqu’au</dt>

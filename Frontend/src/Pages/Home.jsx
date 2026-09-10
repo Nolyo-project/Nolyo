@@ -121,11 +121,11 @@ const audiences = [
 
 const faqItems = [
   {
-    q: 'Nolio est-il gratuit ?',
+    q: 'Nolyo est-il gratuit ?',
     a: 'Le premier mois est offert. Ensuite, vous choisissez votre formule (Essentiel ou Pro) avec un engagement de 6 mois — soit 7 mois au total.',
   },
   {
-    q: 'Puis-je tester Nolio sans créer de compte ?',
+    q: 'Puis-je tester Nolyo sans créer de compte ?',
     a: 'Oui. Vous pouvez découvrir l’interface pendant 5 minutes, sans créer de compte ni renseigner votre carte bancaire.',
   },
   {
@@ -141,8 +141,8 @@ const faqItems = [
     a: 'Avec Nolyo Pro, vos visiteurs ouvrent votre page publique, choisissent une prestation et un créneau disponible. Le rendez-vous arrive dans votre agenda. Les jours de congés que vous définissez ferment automatiquement la réservation.',
   },
   {
-    q: 'Nolio est-il adapté à mon activité ?',
-    a: 'Nolio est pensé pour les indépendants et petites structures qui veulent centraliser clients, rendez-vous et suivi d’activité — avec une vitrine en ligne si vous choisissez Pro.',
+    q: 'Nolyo est-il adapté à mon activité ?',
+    a: 'Nolyo est pensé pour les indépendants et petites structures qui veulent centraliser clients, rendez-vous et suivi d’activité — avec une vitrine en ligne si vous choisissez Pro.',
   },
 ]
 
@@ -238,14 +238,14 @@ function Home() {
       {/* 1. Hero */}
       <section
         id="accueil"
-        className="dash-sidebar relative flex min-h-[calc(100svh-4.75rem)] flex-col overflow-hidden text-cream"
+        className="dash-sidebar relative flex min-h-0 flex-col overflow-hidden text-cream lg:min-h-[calc(100svh-4.75rem)]"
       >
         <div className="relative mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-2 lg:gap-14 lg:py-12">
           <div>
             <p className="inline-flex rounded-full bg-copper px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-cream uppercase">
               L’outil pensé pour les indépendants
             </p>
-            <h1 className="mt-6 font-display text-5xl leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-7xl">
+            <h1 className="mt-6 font-display text-4xl leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-7xl">
               Gérez.
               <br />
               Développez.
@@ -253,7 +253,7 @@ function Home() {
               <span className="italic text-copper">Rayonnez.</span>
             </h1>
             <p className="mt-6 max-w-md text-lg leading-relaxed text-cream/75">
-              Nolio réunit vos clients, rendez-vous, devis, chiffre d’affaires et votre présence en ligne au même
+              Nolyo réunit vos clients, rendez-vous, devis, chiffre d’affaires et votre présence en ligne au même
               endroit.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -261,7 +261,7 @@ function Home() {
                 to="/#video"
                 className="inline-flex items-center justify-center rounded-full bg-copper px-6 py-3 text-sm font-semibold text-cream shadow-lg shadow-ink/20 transition hover:bg-copper-dark"
               >
-                Découvrir Nolio
+                Découvrir Nolyo
               </Link>
               <Link
                 to="/#fonctionnement"
@@ -271,13 +271,13 @@ function Home() {
               </Link>
             </div>
             <p className="mt-5 text-sm text-cream/80">🎁 Premier mois offert</p>
-            <p className="mt-1 text-sm text-cream/50">Testez Nolio avant de vous engager.</p>
+            <p className="mt-1 text-sm text-cream/50">Testez Nolyo avant de vous engager.</p>
           </div>
           <div className="min-w-0">
             <LiveAppFrame
               src={DEMO_DASHBOARD}
               title={`nolyo.fr/dashboard — ${demoLabel}`}
-              aspectClass="aspect-[16/12] sm:aspect-[16/11]"
+              aspectClass="aspect-[4/5] sm:aspect-[16/11]"
               scale={0.68}
             />
           </div>
@@ -343,18 +343,18 @@ function Home() {
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="mx-auto max-w-2xl text-center">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Présentation</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              Découvrez Nolio en quelques minutes
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
+              Découvrez Nolyo en quelques minutes
             </h2>
             <p className="mt-4 text-base leading-relaxed text-ink-soft">
-              Découvrez comment Nolio vous aide à gérer votre activité simplement, sans multiplier les outils.
+              Découvrez comment Nolyo vous aide à gérer votre activité simplement, sans multiplier les outils.
             </p>
           </div>
           <div className="mx-auto mt-10 max-w-4xl">
             <HomeVideo />
           </div>
           <div className="mt-8 flex flex-col items-center gap-3">
-            <p className="text-sm font-medium text-ink">Testez Nolio gratuitement</p>
+            <p className="text-sm font-medium text-ink">Testez Nolyo gratuitement</p>
             <div className="flex flex-wrap justify-center gap-3">
               <TryPreviewButton plan="pro" variant="header">
                 Essayer Pro · 5 min
@@ -372,7 +372,7 @@ function Home() {
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Le constat</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Votre activité ne devrait pas être éparpillée partout.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-ink-soft">
@@ -380,7 +380,7 @@ function Home() {
               suivre votre chiffre d’affaires. Et encore un autre outil pour votre présence en ligne.
             </p>
             <p className="mt-5 font-display text-2xl tracking-tight text-moss sm:text-3xl">
-              Nolio rassemble l’essentiel au même endroit.
+              Nolyo rassemble l’essentiel au même endroit.
             </p>
           </div>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -397,16 +397,16 @@ function Home() {
         </div>
       </section>
 
-      {/* 4. Pourquoi Nolio */}
+      {/* 4. Pourquoi Nolyo */}
       <section id="pourquoi" className="border-b border-ink/6 bg-moss text-cream">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Pourquoi Nolyo</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Un seul espace pour votre activité.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-cream/75">
-              Nolio est pensé pour éviter de multiplier les outils et vous permettre de retrouver l’essentiel au même
+              Nolyo est pensé pour éviter de multiplier les outils et vous permettre de retrouver l’essentiel au même
               endroit.
             </p>
           </div>
@@ -444,7 +444,7 @@ function Home() {
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Comment ça marche</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Simple à prendre en main. Pensé pour votre quotidien.
             </h2>
           </div>
@@ -465,7 +465,7 @@ function Home() {
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Tarifs</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Deux formules. Une seule idée : vous simplifier la vie.
             </h2>
             <p className="mt-4 text-base text-ink-soft">
@@ -479,7 +479,7 @@ function Home() {
                 Gestion privée
               </span>
               <p className="mt-4 text-sm font-semibold tracking-[0.18em] text-moss-mid uppercase">Essentiel</p>
-              <p className="mt-3 font-display text-5xl font-semibold tracking-tight">
+              <p className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
                 {new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
                   essentiel?.price || 9.99,
                 )}
@@ -517,7 +517,7 @@ function Home() {
                 Tout inclus
               </span>
               <p className="mt-4 text-sm font-semibold tracking-[0.18em] text-copper uppercase">Pro</p>
-              <p className="mt-3 font-display text-5xl font-semibold tracking-tight">
+              <p className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
                 {new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
                   pro?.price || 19.99,
                 )}
@@ -568,12 +568,12 @@ function Home() {
       <section id="pro" className="border-b border-ink/6 bg-cream/40">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Nolio Pro</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Nolyo Pro</p>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Votre activité mérite plus qu’un simple profil Instagram.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-ink-soft">
-              Avec Nolio Pro, créez votre page professionnelle pour présenter votre activité, vos prestations et
+              Avec Nolyo Pro, créez votre page professionnelle pour présenter votre activité, vos prestations et
               permettre à vos clients de vous contacter ou de réserver en ligne.
             </p>
           </div>
@@ -597,7 +597,7 @@ function Home() {
               </p>
               <div className="flex flex-wrap gap-3">
                 <TryPreviewButton plan="pro" variant="header">
-                  Découvrir Nolio Pro
+                  Découvrir Nolyo Pro
                 </TryPreviewButton>
                 <Link
                   to={demoPage}
@@ -618,8 +618,8 @@ function Home() {
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Pour qui</p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              Nolio s’adapte à votre activité.
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
+              Nolyo s’adapte à votre activité.
             </h2>
           </div>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -634,7 +634,7 @@ function Home() {
             ))}
           </div>
           <p className="mt-10 font-display text-2xl tracking-tight text-moss sm:text-3xl">
-            Vous êtes indépendant ? Nolio est fait pour vous.
+            Vous êtes indépendant ? Nolyo est fait pour vous.
           </p>
         </div>
       </section>
@@ -643,11 +643,11 @@ function Home() {
       <section id="philosophie" className="border-b border-ink/6 bg-paper-2">
         <div className="mx-auto max-w-3xl px-5 py-20 text-center sm:px-8 lg:py-24">
           <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Philosophie</p>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
             Moins d’outils. Plus de clarté.
           </h2>
           <p className="mt-6 text-base leading-relaxed text-ink-soft sm:text-lg">
-            Nolio est né d’une idée simple : un indépendant ne devrait pas avoir besoin de cinq outils différents pour
+            Nolyo est né d’une idée simple : un indépendant ne devrait pas avoir besoin de cinq outils différents pour
             gérer son activité.
           </p>
           <p className="mt-4 text-base leading-relaxed text-ink-soft sm:text-lg">
@@ -664,7 +664,7 @@ function Home() {
       <section id="faq" className="border-b border-ink/6">
         <div className="mx-auto max-w-3xl px-5 py-20 sm:px-8 lg:py-24">
           <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">FAQ</p>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">Questions fréquentes</h2>
+          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">Questions fréquentes</h2>
           <div className="mt-10 rounded-[1.5rem] bg-cream px-5 ring-1 ring-ink/6 sm:px-7">
             {faqItems.map((item, index) => (
               <FaqItem
@@ -680,13 +680,13 @@ function Home() {
 
       {/* 12. CTA final */}
       <section id="commencer" className="px-5 py-20 sm:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 rounded-[1.5rem] bg-moss px-8 py-12 text-cream sm:px-12 lg:flex-row lg:items-center">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 rounded-[1.5rem] bg-moss px-5 py-10 text-cream sm:px-12 sm:py-12 lg:flex-row lg:items-center">
           <div>
-            <h2 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Votre activité. Un seul espace.
             </h2>
             <p className="mt-3 max-w-lg text-cream/80">
-              Clients, rendez-vous, chiffre d’affaires, relances et présence en ligne : gérez l’essentiel avec Nolio.
+              Clients, rendez-vous, chiffre d’affaires, relances et présence en ligne : gérez l’essentiel avec Nolyo.
             </p>
             <p className="mt-4 text-sm text-cream/70">🎁 Premier mois offert</p>
           </div>
@@ -695,7 +695,7 @@ function Home() {
               to="/#offres"
               className="inline-flex items-center justify-center rounded-full bg-copper px-7 py-3.5 text-sm font-semibold text-cream transition hover:bg-copper-dark"
             >
-              Découvrir Nolio
+              Découvrir Nolyo
             </Link>
             <TryPreviewButton plan="pro" variant="ghost" className="justify-center">
               Tester gratuitement

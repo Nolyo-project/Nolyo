@@ -251,15 +251,17 @@ function Inbox() {
         ))}
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <nav className="space-y-1">
-          <p className="px-3 pb-2 text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase">Dossiers</p>
+      <div className="mt-8 grid min-w-0 gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+          <p className="hidden px-3 pb-2 text-[11px] font-semibold tracking-[0.16em] text-ink-soft uppercase lg:block">
+            Dossiers
+          </p>
           {folders.map((item) => (
             <button
               key={item.key}
               type="button"
               onClick={() => setFolder(item.key)}
-              className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm transition ${
+              className={`flex shrink-0 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left text-sm transition lg:w-full ${
                 folder === item.key ? 'bg-moss font-medium text-cream' : 'bg-cream text-ink hover:bg-paper'
               }`}
             >

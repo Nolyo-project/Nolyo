@@ -9,7 +9,7 @@ import TryPreviewButton from './TryPreviewButton'
 const marketingLinks = [
   { to: '/#constat', label: 'Fonctionnalités' },
   { to: '/#offres', label: 'Tarifs' },
-  { to: '/#pro', label: 'Nolio Pro' },
+  { to: '/#pro', label: 'Nolyo Pro' },
   { to: '/#faq', label: 'FAQ' },
   { to: '/rdv', label: 'Rendez-vous' },
   { to: '/inscription', label: 'J’ai un code' },
@@ -24,10 +24,10 @@ function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-ink/8 bg-paper/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5 sm:px-8">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:px-8">
         <Logo />
 
-        <nav className="hidden items-center gap-8 md:flex" aria-label="Navigation principale">
+        <nav className="hidden items-center gap-6 lg:flex xl:gap-8" aria-label="Navigation principale">
           {marketingLinks.map((link) => (
             <Link
               key={link.to}
@@ -39,7 +39,7 @@ function Header() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-3 lg:flex">
           {loading ? null : user ? (
             <>
               <Link to={spaceTo} className="text-sm font-medium text-ink-soft transition hover:text-ink">
@@ -70,7 +70,7 @@ function Header() {
 
         <button
           type="button"
-          className="grid h-10 w-10 place-items-center rounded-xl border border-ink/10 text-ink md:hidden"
+          className="grid h-10 w-10 place-items-center rounded-xl border border-ink/10 text-ink lg:hidden"
           aria-expanded={open}
           aria-controls="menu-mobile"
           onClick={() => setOpen((v) => !v)}
@@ -89,7 +89,7 @@ function Header() {
       </div>
 
       {open && (
-        <div id="menu-mobile" className="border-t border-ink/8 bg-paper px-5 py-4 md:hidden">
+        <div id="menu-mobile" className="border-t border-ink/8 bg-paper px-4 py-4 lg:hidden">
           <nav className="flex flex-col gap-1" aria-label="Navigation mobile">
             {marketingLinks.map((link) => (
               <Link

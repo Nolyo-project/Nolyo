@@ -90,7 +90,7 @@ function Stats() {
         ))}
       </section>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
         <Surface className="p-6">
           <h2 className="font-display text-2xl">À encaisser</h2>
           <p className="mt-1 text-sm text-ink-soft">Les dossiers qui attendent un paiement, pour ne plus les suivre ailleurs.</p>
@@ -101,7 +101,7 @@ function Stats() {
           ) : (
             <ul className="mt-5 space-y-3">
               {data.waitingMoney.map((item) => (
-                <li key={item.id} className="flex items-center justify-between gap-3 rounded-2xl bg-cream px-4 py-3">
+                <li key={item.id} className="flex flex-col gap-1 rounded-2xl bg-cream px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-medium">{item.name}</p>
                     <p className="text-sm text-ink-soft">{item.label}</p>

@@ -109,7 +109,7 @@ function PublicAbout() {
         <main className={publicPageMainClass(hasAside)}>
           <div className="min-w-0">
             <p className="page-accent text-[11px] font-semibold tracking-[0.22em] uppercase">À propos</p>
-            <h1 className="mt-3 max-w-3xl font-display text-4xl leading-[1.12] tracking-tight wrap-break-word sm:text-5xl lg:text-[3.4rem]">
+            <h1 className="mt-3 max-w-3xl font-display text-[2rem] leading-[1.12] tracking-tight wrap-break-word sm:text-5xl lg:text-[3.4rem]">
               {page.title || page.name}
             </h1>
             {page.tradeLabel || copy.label !== 'Autre métier' ? (

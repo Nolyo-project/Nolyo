@@ -78,7 +78,7 @@ function QrCodeContent({ user }) {
       />
 
       {!slug ? (
-        <Surface className="mt-8 p-8">
+        <Surface className="mt-8 p-5 sm:p-8">
           <p className="font-display text-2xl">Choisissez d’abord un lien.</p>
           <p className="mt-2 text-sm text-ink-soft">Le QR Code reprend l’adresse de votre page de présentation.</p>
           <Link to="/dashboard/page" className={`${primaryBtn} mt-6`}>
@@ -87,10 +87,10 @@ function QrCodeContent({ user }) {
         </Surface>
       ) : (
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-          <Surface className="grid place-items-center p-8">
+          <Surface className="grid place-items-center p-5 sm:p-8">
             <img src={imageUrl} alt="QR Code de la page professionnelle" className="w-full max-w-64 rounded-2xl bg-cream" />
           </Surface>
-          <Surface className="p-8">
+          <Surface className="p-5 sm:p-8">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Votre lien</p>
             <p className="mt-3 break-all font-medium">{url}</p>
             {!published ? (

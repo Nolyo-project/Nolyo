@@ -125,7 +125,7 @@ function TaskRow({ task, onToggle, onRename, onRemove }) {
       <button
         type="button"
         onClick={() => onRemove(task)}
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-soft/40 opacity-0 transition group-hover:opacity-100 hover:bg-ink/6 hover:text-copper"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-soft/50 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 hover:bg-ink/6 hover:text-copper"
         aria-label="Supprimer"
       >
         ×
@@ -385,7 +385,7 @@ function Journal() {
   const bar = view === 'day' ? progress : monthProgress
 
   return (
-    <main className="w-full px-5 py-8 lg:px-10 lg:py-10">
+    <main className="w-full min-w-0 px-4 py-6 sm:px-5 sm:py-8 lg:px-10 lg:py-10">
       <div className="w-full">
         <div className="flex items-center justify-between gap-3">
           <div className="flex gap-1 rounded-full bg-cream p-1 ring-1 ring-ink/6">
@@ -426,7 +426,7 @@ function Journal() {
             <Chevron dir="left" />
           </button>
           <div className="min-w-0 flex-1 text-center">
-            <p className="font-display text-[2.15rem] leading-none tracking-tight sm:text-5xl">
+            <p className="font-display text-[1.85rem] leading-none tracking-tight sm:text-5xl">
               {view === 'day' ? (isToday ? 'Aujourd’hui' : formatShortDay(dateKey)) : monthTitle(monthCursor)}
             </p>
             <p className="mt-2 text-sm text-ink-soft">

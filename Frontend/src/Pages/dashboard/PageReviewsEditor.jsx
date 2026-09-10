@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { useToast } from '../../context/ToastContext'
-import { ghostBtn, primaryBtn, quietBtn } from './ui'
+import { Pagination, ghostBtn, primaryBtn, quietBtn } from './ui'
 
 const STATUS_LABEL = {
   pending: 'En attente',
@@ -152,44 +152,7 @@ export function PageReviewsEditor() {
             ))}
           </ul>
 
-          {pageCount > 1 ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <p className="text-xs text-ink-soft">
-                Page {currentPage + 1} / {pageCount} · {reviews.length} avis
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className={ghostBtn}
-                  disabled={currentPage === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                >
-                  Précédent
-                </button>
-                <div className="flex gap-1.5">
-                  {Array.from({ length: pageCount }, (_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      aria-label={`Page ${i + 1}`}
-                      onClick={() => setPage(i)}
-                      className={`h-2.5 w-2.5 rounded-full transition ${
-                        i === currentPage ? 'bg-moss' : 'bg-ink/15 hover:bg-ink/30'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className={ghostBtn}
-                  disabled={currentPage >= pageCount - 1}
-                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                >
-                  Suivant
-                </button>
-              </div>
-            </div>
-          ) : null}
+          <Pagination page={currentPage + 1} pageCount={pageCount} onPage={(n) => setPage(n - 1)} />
         </>
       ) : (
         <p className="text-sm text-ink-soft">

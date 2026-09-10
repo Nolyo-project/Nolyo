@@ -269,7 +269,7 @@ function PublicProfile() {
         <>
           <main className={publicPageMainClass(hasAside)}>
             <div className="min-w-0">
-              <h1 className="max-w-3xl font-display text-4xl leading-[1.12] tracking-tight wrap-break-word sm:text-5xl lg:text-[3.4rem]">
+              <h1 className="max-w-3xl font-display text-[2rem] leading-[1.12] tracking-tight wrap-break-word sm:text-5xl lg:text-[3.4rem]">
                 {page.title}
               </h1>
               {page.tradeLabel || copy.label !== 'Autre métier' ? (
@@ -310,12 +310,12 @@ function PublicProfile() {
                           <ul className="grid gap-4 sm:grid-cols-2">
                             {block.items.map((item) => (
                               <li key={item._id} className="page-card rounded-[1.4rem] px-6 py-5 ring-1 ring-ink/8">
-                                <div className="flex items-start justify-between gap-4">
-                                  <div>
-                                    <p className="font-medium">{item.name}</p>
+                                <div className="flex min-w-0 items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="font-medium wrap-break-word">{item.name}</p>
                                     <p className="page-muted mt-1 text-sm">{item.durationMinutes} min</p>
                                   </div>
-                                  <p className="shrink-0 font-display text-xl">{servicePriceLabel(item, formatMoney)}</p>
+                                  <p className="shrink-0 font-display text-lg sm:text-xl">{servicePriceLabel(item, formatMoney)}</p>
                                 </div>
                               </li>
                             ))}
@@ -378,35 +378,70 @@ function PublicProfile() {
 
       {lightboxSrc ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 sm:p-10"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-ink/80 p-4 sm:p-10"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setLightbox(-1)
           }}
         >
+          <div className="relative flex w-full max-w-[64rem] items-center justify-center">
+            {photos.length > 1 ? (
+              <button
+                type="button"
+                aria-label="Photo précédente"
+                className="absolute left-0 hidden h-12 w-12 place-items-center rounded-full bg-cream/90 text-xl text-ink transition hover:bg-cream sm:grid sm:left-2"
+                onClick={() => setLightbox((current) => (current - 1 + photos.length) % photos.length)}
+              >
+                ‹
+              </button>
+            ) : null}
+            <img
+              src={lightboxSrc}
+              alt=""
+              className="max-h-[72svh] max-w-full rounded-[1.2rem] object-contain shadow-2xl sm:max-h-[88vh]"
+            />
+            {photos.length > 1 ? (
+              <button
+                type="button"
+                aria-label="Photo suivante"
+                className="absolute right-0 hidden h-12 w-12 place-items-center rounded-full bg-cream/90 text-xl text-ink transition hover:bg-cream sm:grid sm:right-2"
+                onClick={() => setLightbox((current) => (current + 1) % photos.length)}
+              >
+                ›
+              </button>
+            ) : null}
+          </div>
           {photos.length > 1 ? (
-            <button
-              type="button"
-              aria-label="Photo précédente"
-              className="absolute left-4 grid h-12 w-12 place-items-center rounded-full bg-cream/90 text-xl text-ink transition hover:bg-cream sm:left-8"
-              onClick={() => setLightbox((current) => (current - 1 + photos.length) % photos.length)}
-            >
-              ‹
-            </button>
-          ) : null}
-          <img src={lightboxSrc} alt="" className="max-h-[88vh] max-w-[min(100%,64rem)] rounded-[1.2rem] object-contain shadow-2xl" />
+            <div className="mt-4 flex items-center gap-3 sm:hidden">
+              <button
+                type="button"
+                aria-label="Photo précédente"
+                className="grid h-11 w-11 place-items-center rounded-full bg-cream/90 text-xl text-ink"
+                onClick={() => setLightbox((current) => (current - 1 + photos.length) % photos.length)}
+              >
+                ‹
+              </button>
+              <p className="min-w-12 text-center text-sm text-cream/80">
+                {lightbox + 1} / {photos.length}
+              </p>
+              <button
+                type="button"
+                aria-label="Photo suivante"
+                className="grid h-11 w-11 place-items-center rounded-full bg-cream/90 text-xl text-ink"
+                onClick={() => setLightbox((current) => (current + 1) % photos.length)}
+              >
+                ›
+              </button>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-cream/80 sm:absolute sm:bottom-6 sm:mt-0">
+              {lightbox + 1} / {photos.length}
+            </p>
+          )}
           {photos.length > 1 ? (
-            <button
-              type="button"
-              aria-label="Photo suivante"
-              className="absolute right-4 grid h-12 w-12 place-items-center rounded-full bg-cream/90 text-xl text-ink transition hover:bg-cream sm:right-8"
-              onClick={() => setLightbox((current) => (current + 1) % photos.length)}
-            >
-              ›
-            </button>
+            <p className="absolute bottom-6 hidden text-sm text-cream/80 sm:block">
+              {lightbox + 1} / {photos.length}
+            </p>
           ) : null}
-          <p className="absolute bottom-6 text-sm text-cream/80">
-            {lightbox + 1} / {photos.length}
-          </p>
         </div>
       ) : null}
       {reviewOpen ? (

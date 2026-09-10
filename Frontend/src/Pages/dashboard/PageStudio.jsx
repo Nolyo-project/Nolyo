@@ -506,7 +506,7 @@ export function PageStudio({ showQr, isPro }) {
       </div>
 
       <div className="rounded-[2rem] bg-[#f3eee4]/80 p-2 ring-1 ring-ink/8">
-        <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5">
+        <div className="-mx-0.5 flex snap-x snap-mandatory gap-1.5 overflow-x-auto px-0.5 pb-0.5">
           <StepTab id="home" label="Infos" hint="Texte et contact" current={section} onPick={setSection} />
           <StepTab id="hours" label="Horaires" hint="Ouverture" current={section} onPick={setSection} />
           <StepTab id="services" label="Prestations" hint="Titres et tarifs" current={section} onPick={setSection} />
@@ -679,7 +679,7 @@ export function PageStudio({ showQr, isPro }) {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-ink">Photos</p>
-                    <ul className="mt-1.5 grid grid-cols-3 gap-3">
+                    <ul className="mt-1.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
                       {[0, 1, 2].map((index) => (
                         <li key={index} className="overflow-hidden rounded-2xl bg-[#faf8f5] ring-1 ring-ink/10">
                           {page.photos[index] ? (
@@ -919,7 +919,7 @@ export function PageStudio({ showQr, isPro }) {
                 style={{ background: page.theme?.background || '#f3eee4' }}
               >
                 <div className="px-6 py-10 sm:px-10 sm:py-12">
-                  <p className="font-display text-4xl" style={{ color: page.theme?.accent || '#c45c26' }}>
+                  <p className="font-display text-3xl sm:text-4xl" style={{ color: page.theme?.accent || '#c45c26' }}>
                     Aperçu
                   </p>
                   <div

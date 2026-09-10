@@ -112,7 +112,7 @@ export function PipelineBar({ status }) {
         return (
           <li key={id} className="text-center">
             <span className={`mx-auto block h-1.5 rounded-full ${here ? 'bg-copper' : done ? 'bg-moss' : 'bg-ink/10'}`} />
-            <span className={`mt-2 block text-[10px] ${here ? 'font-semibold text-copper' : done ? 'text-ink' : 'text-ink-soft'}`}>
+            <span className={`mt-2 block text-[9px] leading-tight sm:text-[10px] ${here ? 'font-semibold text-copper' : done ? 'text-ink' : 'text-ink-soft'}`}>
               {label.replace('Les ', '')}
             </span>
           </li>

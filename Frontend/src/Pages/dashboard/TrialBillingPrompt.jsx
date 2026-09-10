@@ -232,8 +232,8 @@ export default function TrialBillingPrompt() {
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-moss/45 p-4 backdrop-blur-sm">
-      <div className="max-h-[min(92vh,46rem)] w-full max-w-xl overflow-y-auto rounded-[1.6rem] bg-cream p-6 shadow-2xl ring-1 ring-ink/8 sm:p-8">
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-moss/45 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="max-h-[min(92svh,46rem)] w-full max-w-xl overflow-y-auto rounded-t-[1.6rem] bg-cream p-5 shadow-2xl ring-1 ring-ink/8 sm:rounded-[1.6rem] sm:p-8">
         <p className="text-xs font-semibold tracking-[0.2em] text-copper uppercase">
           {isCommitment
             ? left === 0
@@ -245,7 +245,7 @@ export default function TrialBillingPrompt() {
                 ? 'Dernier jour offert'
                 : `Dans ${Math.max(left, 0)} jour${left > 1 ? 's' : ''}`}
         </p>
-        <h2 className="mt-2 font-display text-3xl tracking-tight">
+        <h2 className="mt-2 font-display text-2xl tracking-tight sm:text-3xl">
           {isCommitment
             ? 'Vos 7 mois se terminent bientôt.'
             : overdue

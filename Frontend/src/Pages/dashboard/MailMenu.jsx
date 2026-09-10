@@ -53,8 +53,8 @@ export function MailMenu({ email, name, subject, body, onPicked, className = '',
         {children || address}
       </button>
       {open ? (
-        <span className="absolute top-full left-0 z-30 mt-2 w-56 overflow-hidden rounded-2xl bg-paper p-2 shadow-xl ring-1 ring-ink/8">
-          <p className="px-3 py-1.5 text-[11px] font-semibold tracking-wide text-ink-soft uppercase">
+        <span className="absolute top-full left-0 z-30 mt-2 w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-paper p-2 shadow-xl ring-1 ring-ink/8">
+          <p className="wrap-break-word px-3 py-1.5 text-[11px] font-semibold tracking-wide text-ink-soft uppercase">
             Envoyer à {address}
           </p>
           <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-cream" onClick={() => pick(links.gmail)}>

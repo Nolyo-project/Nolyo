@@ -2,7 +2,11 @@ import { useEffect } from 'react'
 import { mediaUrl } from '../../api/client'
 
 export function PageShell({ children, className = '' }) {
-  return <main className={`w-full px-5 py-8 lg:px-10 lg:py-10 ${className}`.trim()}>{children}</main>
+  return (
+    <main className={`w-full min-w-0 px-4 py-6 sm:px-5 sm:py-8 lg:px-10 lg:py-10 ${className}`.trim()}>
+      {children}
+    </main>
+  )
 }
 
 export function Modal({ onClose, children, panelClassName = '', overlayClassName = '' }) {
@@ -21,13 +25,13 @@ export function Modal({ onClose, children, panelClassName = '', overlayClassName
 
   return (
     <div
-      className={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 sm:p-8 ${overlayClassName || 'z-50'}`.trim()}
+      className={`fixed inset-0 flex items-end justify-center overflow-y-auto bg-ink/40 p-0 sm:items-start sm:p-8 ${overlayClassName || 'z-50'}`.trim()}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose?.()
       }}
     >
       <div
-        className={`my-auto w-full rounded-[1.6rem] bg-paper p-6 shadow-2xl sm:p-8 ${panelClassName}`.trim()}
+        className={`my-0 max-h-[min(94svh,56rem)] w-full overflow-y-auto rounded-t-[1.6rem] bg-paper p-5 shadow-2xl sm:my-auto sm:rounded-[1.6rem] sm:p-8 ${panelClassName}`.trim()}
         onMouseDown={(event) => event.stopPropagation()}
       >
         {children}
@@ -38,15 +42,17 @@ export function Modal({ onClose, children, panelClassName = '', overlayClassName
 
 export function PageHeader({ kicker, title, description, actions }) {
   return (
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-5">
       <div className="min-w-0">
         {kicker ? (
           <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">{kicker}</p>
         ) : null}
-        <h1 className="mt-1 font-display text-3xl tracking-tight sm:text-4xl">{title}</h1>
+        <h1 className="mt-1 font-display text-[1.75rem] tracking-tight sm:text-4xl">{title}</h1>
         {description ? <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-ink-soft">{description}</p> : null}
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 lg:w-auto">{actions}</div>
+      ) : null}
     </div>
   )
 }
@@ -56,6 +62,45 @@ export function Surface({ as: Tag = 'div', className = '', children, ...props })
     <Tag className={`rounded-[1.5rem] bg-cream shadow-sm shadow-ink/5 ring-1 ring-ink/6 ${className}`} {...props}>
       {children}
     </Tag>
+  )
+}
+
+export function Pagination({ page, pageCount, onPage }) {
+  if (pageCount <= 1) return null
+  return (
+    <nav className="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onPage(Math.max(1, page - 1))}
+        className="rounded-full border border-ink/10 px-3 py-1.5 text-sm disabled:opacity-40"
+      >
+        Précédent
+      </button>
+      <p className="min-w-16 px-2 text-center text-sm text-ink-soft sm:hidden">
+        {page} / {pageCount}
+      </p>
+      <div className="hidden flex-wrap justify-center gap-2 sm:flex">
+        {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onPage(n)}
+            className={`h-9 min-w-9 rounded-full px-2 text-sm ${n === page ? 'bg-moss text-cream' : 'bg-cream text-ink-soft'}`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        disabled={page >= pageCount}
+        onClick={() => onPage(Math.min(pageCount, page + 1))}
+        className="rounded-full border border-ink/10 px-3 py-1.5 text-sm disabled:opacity-40"
+      >
+        Suivant
+      </button>
+    </nav>
   )
 }
 
@@ -73,26 +118,26 @@ export function Accordion({ id, title, hint, open, onToggle, children }) {
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
+        className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left sm:px-6 sm:py-5"
         aria-expanded={open}
       >
         <span className="min-w-0">
-          <span className="block font-display text-2xl">{title}</span>
+          <span className="block font-display text-xl sm:text-2xl">{title}</span>
           {hint ? <span className="mt-0.5 block text-sm text-ink-soft">{hint}</span> : null}
         </span>
         <span className={`shrink-0 text-lg text-ink-soft transition ${open ? 'rotate-180' : ''}`} aria-hidden>
           ⌄
         </span>
       </button>
-      {open ? <div className="border-t border-ink/6 px-6 pt-5 pb-6">{children}</div> : null}
+      {open ? <div className="border-t border-ink/6 px-4 pt-5 pb-6 sm:px-6">{children}</div> : null}
     </Surface>
   )
 }
 
 export const primaryBtn =
-  'inline-flex items-center justify-center rounded-full bg-moss px-5 py-2.5 text-sm font-semibold text-cream transition hover:bg-ink disabled:opacity-60'
+  'inline-flex items-center justify-center rounded-full bg-moss px-4 py-2.5 text-center text-sm font-semibold text-cream transition hover:bg-ink disabled:opacity-60 sm:px-5'
 export const ghostBtn =
-  'inline-flex items-center justify-center rounded-full border border-ink/10 bg-cream px-4 py-2 text-sm transition hover:border-ink/20 hover:bg-paper'
+  'inline-flex items-center justify-center rounded-full border border-ink/10 bg-cream px-3 py-2 text-center text-sm transition hover:border-ink/20 hover:bg-paper sm:px-4'
 export const quietBtn = 'text-xs font-medium text-ink-soft transition hover:text-copper'
 
 function Icon({ children, className = 'h-[18px] w-[18px]' }) {

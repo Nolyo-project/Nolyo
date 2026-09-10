@@ -16,13 +16,42 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: clip;
+  overflow-y: auto;
 }
 
 body {
   margin: 0;
+  overflow-x: clip;
+  overflow-y: auto;
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+#root {
+  min-width: 0;
+  max-width: 100%;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+}
+
+iframe {
+  max-width: 100%;
+}
+
+table {
+  max-width: 100%;
+}
+
+input,
+select,
+textarea {
+  max-width: 100%;
 }
 
 ::selection {
@@ -39,6 +68,11 @@ body {
 .dash-canvas {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--color-cream) 72%, var(--color-paper)) 0%, var(--color-paper) 18rem);
+}
+
+.dash-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .dash-scroll::-webkit-scrollbar {

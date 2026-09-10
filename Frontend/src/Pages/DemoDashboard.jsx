@@ -100,7 +100,7 @@ function DemoDashboard() {
   const planName = planLabels[user?.subscription?.plan] || 'Nolyo Pro'
 
   return (
-    <div className="h-svh overflow-hidden bg-paper text-ink lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)]">
+    <div className="min-h-dvh bg-paper text-ink lg:grid lg:h-dvh lg:grid-cols-[17.5rem_minmax(0,1fr)] lg:overflow-hidden">
       <aside className="dash-sidebar hidden h-svh flex-col text-cream lg:flex" aria-hidden>
         <div className="flex flex-col items-start gap-2.5 px-5 pt-6 pb-4">
           <Logo to="/" inverted className="pointer-events-none block" />
@@ -124,7 +124,7 @@ function DemoDashboard() {
         </div>
       </aside>
 
-      <div className="dash-canvas flex min-h-0 min-w-0 flex-col">
+      <div className="dash-canvas flex min-h-0 min-w-0 flex-col lg:h-full lg:overflow-hidden">
         <header className="flex shrink-0 items-center justify-between gap-4 border-b border-ink/6 bg-cream/50 px-5 py-3 backdrop-blur-md lg:px-10">
           <div className="flex min-w-0 items-center gap-3">
             <div className="lg:hidden">
@@ -140,7 +140,7 @@ function DemoDashboard() {
           </span>
         </header>
 
-        <div className="dash-scroll min-h-0 flex-1 overflow-y-auto">
+        <div className="dash-scroll min-w-0 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           {error ? (
             <p className="m-8 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
           ) : !user || !data ? (

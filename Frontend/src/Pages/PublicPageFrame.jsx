@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { homeForUser } from '../auth/homeForUser'
 import { publicPageStyle } from '../data/pageTheme'
 import Logo from '../components/Logo'
+import { publicPageChrome } from './PublicPageAside'
 
 export function PublicPageFrame({ slug, page, error, current = 'home', children }) {
   const { user } = useAuth()
@@ -29,6 +30,7 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
   const initial = (page.title || page.name || 'N').slice(0, 1).toUpperCase()
   const isOwner = Boolean(user?.page?.slug) && user.page.slug === String(slug || '').toLowerCase()
   const themeStyle = publicPageStyle(page.theme)
+  const chrome = publicPageChrome(page, slug)
   const navClass = (id) =>
     `rounded-full px-4 py-2 text-sm font-medium transition ${
       current === id ? 'page-cta shadow-sm' : 'page-nav-link hover:bg-ink/5 hover:text-[var(--page-ink)]'
@@ -37,17 +39,18 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
   return (
     <div className="public-page min-h-svh" style={themeStyle}>
       <header className="absolute inset-x-0 top-0 z-20">
-        <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-3 px-5 py-5 sm:px-8 lg:px-12">
-          <p className="min-w-0 truncate text-[11px] font-semibold tracking-[0.28em] text-cream/80 uppercase">
+        <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-2 px-4 py-4 sm:gap-3 sm:px-8 lg:px-12">
+          <p className="min-w-0 truncate text-[10px] font-semibold tracking-[0.22em] text-cream/80 uppercase sm:text-[11px] sm:tracking-[0.28em]">
             {page.name}
           </p>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {isOwner ? (
               <Link
                 to={homeForUser(user)}
-                className="rounded-full bg-cream px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-paper"
+                className="rounded-full bg-cream px-3 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-paper sm:px-4"
               >
-                Tableau de bord
+                <span className="sm:hidden">Espace</span>
+                <span className="hidden sm:inline">Tableau de bord</span>
               </Link>
             ) : null}
             <Logo size="sm" className="rounded-full bg-cream/55 px-2 py-1 hover:bg-cream/80" />
@@ -55,7 +58,7 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
         </div>
       </header>
 
-      <div className="relative z-0 h-56 overflow-hidden bg-moss sm:h-72 lg:h-[28rem]">
+      <div className="relative z-0 h-44 overflow-hidden bg-moss sm:h-72 lg:h-[28rem]">
         {cover ? (
           <img src={cover} alt="" className="h-full w-full object-cover" />
         ) : (
@@ -64,40 +67,17 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
         <div className="absolute inset-0 bg-linear-to-t from-[color:var(--page-bg)] via-transparent to-ink/50" />
       </div>
 
-      {page.away ? (
-        <div
-          className="sticky top-0 z-30 border-b border-ink/10 bg-[var(--page-accent)] px-5 py-3 text-center text-[var(--page-accent-ink)] shadow-sm sm:px-8"
-          role="status"
-        >
-          <p className="text-sm font-semibold tracking-wide">
-            Actuellement en congés
-            {page.awayLabel ? <span className="font-normal opacity-90"> · {page.awayLabel}</span> : null}
-          </p>
-          <p className="mt-0.5 text-xs opacity-80">La réservation en ligne reprend bientôt</p>
-        </div>
-      ) : page.nextAwayLabel ? (
-        <div
-          className="relative z-10 border-b border-ink/8 bg-[color-mix(in_srgb,var(--page-accent)_14%,var(--page-bg))] px-5 py-2.5 text-center sm:px-8"
-          role="status"
-        >
-          <p className="text-sm font-medium text-[var(--page-ink)]">
-            Prochains congés
-            <span className="page-muted font-normal"> · {page.nextAwayLabel}</span>
-          </p>
-        </div>
-      ) : null}
-
-      <div className="relative mx-auto min-w-0 max-w-[92rem] px-5 sm:px-8 lg:px-12">
-        <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
-          <div className="relative z-10 -mt-16 sm:-mt-20 lg:-mt-24">
+      <div className="relative mx-auto min-w-0 max-w-[92rem] px-4 sm:px-8 lg:px-12">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
+          <div className="relative z-10 -mt-14 sm:-mt-20 lg:-mt-24">
             {page.avatar ? (
               <img
                 src={mediaUrl(page.avatar)}
                 alt=""
-                className="h-32 w-32 rounded-full object-cover shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[6px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 lg:h-44 lg:w-44"
+                className="h-24 w-24 rounded-full object-cover shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[5px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 sm:ring-[6px] lg:h-44 lg:w-44"
               />
             ) : (
-              <div className="page-cta grid h-32 w-32 place-items-center rounded-full font-display text-4xl shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[6px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 lg:h-44 lg:w-44">
+              <div className="page-cta grid h-24 w-24 place-items-center rounded-full font-display text-3xl shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[5px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 sm:text-4xl sm:ring-[6px] lg:h-44 lg:w-44">
                 {initial}
               </div>
             )}
@@ -112,15 +92,63 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
           </nav>
         </div>
 
+        {page.away ? (
+          <div
+            className="mt-4 rounded-2xl bg-[var(--page-accent)] px-4 py-3 text-center text-[var(--page-accent-ink)] sm:mt-5 sm:px-5"
+            role="status"
+          >
+            <p className="text-sm leading-snug font-semibold">Actuellement en congés</p>
+            {page.awayLabel ? (
+              <p className="mt-1 text-xs leading-snug font-normal wrap-break-word opacity-90">{page.awayLabel}</p>
+            ) : null}
+            <p className="mt-1 text-xs leading-snug opacity-80">La réservation en ligne reprend bientôt</p>
+          </div>
+        ) : page.nextAwayLabel ? (
+          <div
+            className="mt-4 rounded-2xl bg-[color-mix(in_srgb,var(--page-accent)_14%,var(--page-bg))] px-4 py-3 text-center ring-1 ring-ink/8 sm:mt-5 sm:px-5"
+            role="status"
+          >
+            <p className="text-sm leading-snug font-medium text-[var(--page-ink)]">Prochains congés</p>
+            <p className="page-muted mt-1 text-xs leading-snug wrap-break-word">{page.nextAwayLabel}</p>
+          </div>
+        ) : null}
+
         {children}
       </div>
 
-      <footer className="page-muted mx-auto max-w-[92rem] px-5 py-10 text-center text-[11px] opacity-70 sm:px-8 lg:px-12">
+      <footer
+        className={`page-muted mx-auto max-w-[92rem] px-4 pt-10 text-center text-[11px] opacity-70 sm:px-8 lg:px-12 ${
+          chrome.bookingPath
+            ? 'pb-[max(6.5rem,calc(env(safe-area-inset-bottom)+5.25rem))] lg:pb-10'
+            : 'pb-[max(2.5rem,env(safe-area-inset-bottom))] lg:pb-10'
+        }`}
+      >
         Présenté avec{' '}
         <Link to="/" className="underline decoration-ink/15 underline-offset-2 hover:text-ink hover:opacity-100">
           Nolyo
         </Link>
       </footer>
+
+      {chrome.bookingPath ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-[color-mix(in_srgb,var(--page-bg)_92%,transparent)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden">
+          <div className="flex gap-2">
+            <Link
+              to={chrome.quotePath && !chrome.sessionServices.length ? chrome.quotePath : chrome.bookingPath}
+              className="page-cta flex min-w-0 flex-1 items-center justify-center rounded-full px-4 py-3 text-sm font-semibold"
+            >
+              {chrome.sessionServices.length ? 'Réserver' : chrome.quotePath ? 'Demander un devis' : 'Réserver'}
+            </Link>
+            {chrome.quotePath && chrome.sessionServices.length ? (
+              <Link
+                to={chrome.quotePath}
+                className="flex min-w-0 flex-1 items-center justify-center rounded-full px-4 py-3 text-sm font-semibold ring-1 ring-ink/12"
+              >
+                Devis
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

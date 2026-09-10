@@ -95,7 +95,7 @@ export function OverviewView({ user, data, interactive = true }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">{formatLongDate()}</p>
-          <h1 className="mt-1 font-display text-3xl tracking-tight sm:text-5xl">Bonjour, {firstName}.</h1>
+          <h1 className="mt-1 font-display text-[1.75rem] tracking-tight sm:text-5xl">Bonjour, {firstName}.</h1>
           <p className="mt-2 text-ink-soft">{copy.overviewHint}</p>
           {user.page?.published && user.page?.slug && hasModule(user, 'page') ? (
             <p className="mt-3">
