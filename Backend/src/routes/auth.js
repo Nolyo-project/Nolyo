@@ -428,7 +428,7 @@ router.patch('/me', requireAuth, async (req, res) => {
     })
     const kept = new Set((next.about.people || []).map((person) => person.photo).filter(Boolean))
     for (const person of current.about.people || []) {
-      if (person.photo && !kept.has(person.photo)) removeFile(person.photo)
+      if (person.photo && !kept.has(person.photo)) await removeFile(person.photo)
     }
     if (next.published) {
       if (!next.slug) {
@@ -456,8 +456,8 @@ router.patch('/me', requireAuth, async (req, res) => {
 
 router.post('/me/avatar', requireAuth, handleMulter, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
-  removeFile(req.user.avatar)
-  req.user.avatar = saveImage(req.file, 'avatars', String(req.user._id))
+  await removeFile(req.user.avatar)
+  req.user.avatar = await saveImage(req.file, 'avatars', String(req.user._id))
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
   req.user.page = ensureFounderPerson(page, req.user, req.user.avatar)
   await req.user.save()
@@ -466,7 +466,7 @@ router.post('/me/avatar', requireAuth, handleMulter, async (req, res) => {
 
 router.delete('/me/avatar', requireAuth, async (req, res) => {
   const previous = req.user.avatar
-  removeFile(req.user.avatar)
+  await removeFile(req.user.avatar)
   req.user.avatar = ''
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
   const people = [...(page.about?.people || [])]
@@ -483,8 +483,8 @@ router.post('/me/page/photos', requireAuth, handleMulter, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
   const index = Math.min(1, Math.max(0, Number(req.body?.index) || 0))
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
-  removeFile(page.photos[index])
-  page.photos[index] = saveImage(req.file, 'pages', `${req.user._id}-${index}`)
+  await removeFile(page.photos[index])
+  page.photos[index] = await saveImage(req.file, 'pages', `${req.user._id}-${index}`)
   req.user.page = page
   await req.user.save()
   await sendUser(res, req.user)
@@ -493,8 +493,8 @@ router.post('/me/page/photos', requireAuth, handleMulter, async (req, res) => {
 router.post('/me/page/banner', requireAuth, handleMulter, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
-  removeFile(page.banner)
-  page.banner = saveImage(req.file, 'pages', `${req.user._id}-banner`)
+  await removeFile(page.banner)
+  page.banner = await saveImage(req.file, 'pages', `${req.user._id}-banner`)
   req.user.page = page
   await req.user.save()
   await sendUser(res, req.user)
@@ -502,7 +502,7 @@ router.post('/me/page/banner', requireAuth, handleMulter, async (req, res) => {
 
 router.delete('/me/page/banner', requireAuth, async (req, res) => {
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
-  removeFile(page.banner)
+  await removeFile(page.banner)
   page.banner = ''
   req.user.page = page
   await req.user.save()
@@ -515,10 +515,10 @@ router.post('/me/page/people/:index/photo', requireAuth, handleMulter, async (re
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
   const people = [...(page.about.people || [])]
   while (people.length <= index) people.push({ name: '', role: '', bio: '', photo: '' })
-  removeFile(people[index].photo)
+  await removeFile(people[index].photo)
   people[index] = {
     ...people[index],
-    photo: saveImage(req.file, 'pages', `${req.user._id}-person-${index}`),
+    photo: await saveImage(req.file, 'pages', `${req.user._id}-person-${index}`),
     name: people[index].name || req.user.name || '',
     role: people[index].role || (index === 0 ? founderRole(req.user) : ''),
   }
@@ -533,7 +533,7 @@ router.delete('/me/page/people/:index/photo', requireAuth, async (req, res) => {
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
   const people = [...(page.about.people || [])]
   if (!people[index]) return res.status(404).json({ error: 'Personne introuvable.' })
-  removeFile(people[index].photo)
+  await removeFile(people[index].photo)
   people[index] = { ...people[index], photo: '' }
   page.about = { ...page.about, people }
   req.user.page = page
@@ -544,7 +544,7 @@ router.delete('/me/page/people/:index/photo', requireAuth, async (req, res) => {
 router.delete('/me/page/photos/:index', requireAuth, async (req, res) => {
   const index = Math.min(1, Math.max(0, Number(req.params.index) || 0))
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
-  removeFile(page.photos[index])
+  await removeFile(page.photos[index])
   page.photos[index] = ''
   req.user.page = page
   await req.user.save()

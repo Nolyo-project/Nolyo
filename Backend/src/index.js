@@ -22,7 +22,7 @@ const billingRouter = require('./routes/billing')
 const { runBillingJobs } = require('./jobs/billing')
 const { runReminderJobs } = require('./jobs/reminders')
 const { schedule: scheduleCron } = require('node-cron')
-const { UPLOAD_ROOT } = require('./utils/uploads')
+const { UPLOAD_ROOT, serveUpload, ingestDiskUploads } = require('./utils/uploads')
 
 function fillMissingEnv() {
   const envPath = path.join(__dirname, '../.env')
@@ -118,6 +118,7 @@ function stripeRawBody(req, res, next) {
 app.post('/api/stripe/webhook', stripeRawBody, handleStripeWebhook)
 app.use(express.json())
 app.use(express.text({ type: 'text/plain', limit: '32kb' }))
+app.use('/uploads', serveUpload)
 app.use('/uploads', express.static(UPLOAD_ROOT))
 
 app.use('/api/health', healthRouter)
@@ -149,6 +150,7 @@ app.use((err, _req, res, _next) => {
 
 async function start() {
   await connectDb()
+  await ingestDiskUploads().catch((err) => console.warn('Sync images', err.message))
   await ensurePresident()
   const SiteSettings = require('./models/SiteSettings')
   await SiteSettings.getSiteSettings()

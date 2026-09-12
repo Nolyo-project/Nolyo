@@ -12,10 +12,12 @@ const { removeFile } = require('./uploads')
 async function deleteMemberAccount(user) {
   const id = user._id
   const page = User.pickPage(user.page?.toObject?.() || user.page || {})
-  removeFile(user.avatar)
-  removeFile(page.banner)
-  for (const photo of page.photos || []) removeFile(photo)
-  for (const person of page.about?.people || []) removeFile(person.photo)
+  await Promise.all([
+    removeFile(user.avatar),
+    removeFile(page.banner),
+    ...(page.photos || []).map((photo) => removeFile(photo)),
+    ...(page.about?.people || []).map((person) => removeFile(person.photo)),
+  ])
 
   await Promise.all([
     Appointment.deleteMany({ user: id }),

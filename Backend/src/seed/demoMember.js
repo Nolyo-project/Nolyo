@@ -16,7 +16,7 @@ const User = require('../models/User')
 const { getTrade } = require('../data/trades')
 const { pickWorkspace } = require('../data/workspace')
 const { deleteMemberAccount } = require('../utils/deleteAccount')
-const { UPLOAD_ROOT } = require('../utils/uploads')
+const { UPLOAD_ROOT, saveLocalFileToStore } = require('../utils/uploads')
 
 const PASSWORD = process.env.DEMO_PASSWORD || 'NolioDemo2026!'
 
@@ -643,6 +643,13 @@ async function fillDemoImages(user, urls, force = false) {
   const avatarOk = await ensureLocalImage(urls.avatar, avatarAbs, force)
   const bannerOk = await ensureLocalImage(urls.banner, bannerAbs, force)
   const photoOk = await Promise.all(urls.photos.map((url, index) => ensureLocalImage(url, photoAbs[index], force)))
+  if (avatarOk) await saveLocalFileToStore(avatarAbs, `avatars/${id}.jpg`, 'image/jpeg')
+  if (bannerOk) await saveLocalFileToStore(bannerAbs, `pages/${id}-banner.jpg`, 'image/jpeg')
+  await Promise.all(
+    photoOk.map((ok, index) =>
+      ok ? saveLocalFileToStore(photoAbs[index], `pages/${id}-${index}.jpg`, 'image/jpeg') : null,
+    ),
+  )
   return {
     avatar: avatarOk ? `/uploads/avatars/${id}.jpg` : '',
     banner: bannerOk ? `/uploads/pages/${id}-banner.jpg` : '',
