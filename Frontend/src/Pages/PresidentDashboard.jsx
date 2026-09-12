@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Logo from '../components/Logo'
@@ -49,7 +49,11 @@ function PresidentDashboard() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [rdvBadge, setRdvBadge] = useState(0)
   const [testimonialsBadge, setTestimonialsBadge] = useState(0)
+  const [requestsBadge, setRequestsBadge] = useState(0)
+  const [liveNotice, setLiveNotice] = useState('')
   const [upcomingRdv, setUpcomingRdv] = useState([])
+  const badgesRef = useRef({ requests: 0, rdv: 0, upcoming: 0, testimonials: 0, deletions: 0 })
+  const bootstrappedRef = useRef(false)
 
   const q = query.trim().toLowerCase()
   const firstName = user.name.split(' ')[0]
@@ -104,14 +108,14 @@ function PresidentDashboard() {
   const todoCount = todoRequests.length + codeReady.length + pendingDeletions
   const recentMembers = members.slice(0, 3)
 
-  async function load() {
+  async function load({ silent = false } = {}) {
     const from = new Date()
     const to = new Date(Date.now() + 14 * 86400000)
     const [subs, dels, mems, badges, rdv] = await Promise.all([
       api('/api/president/requests'),
       api('/api/president/deletions'),
       api('/api/president/members'),
-      api('/api/president/badges').catch(() => ({ badges: { rdv: 0, testimonials: 0 } })),
+      api('/api/president/badges').catch(() => ({ badges: { rdv: 0, testimonials: 0, requests: 0, deletions: 0 } })),
       api(
         `/api/president/appointments?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
       ).catch(() => ({ appointments: [] })),
@@ -126,23 +130,72 @@ function PresidentDashboard() {
     setSelectedDeletionId((current) => current || dels.requests?.[0]?.id || null)
     setMemberCounts(mems.counts || {})
     setMembers(mems.members || [])
-    setRdvBadge(badges.badges?.rdv || 0)
-    setTestimonialsBadge(badges.badges?.testimonials || 0)
+    const nextBadges = {
+      rdv: badges.badges?.rdv || 0,
+      upcoming: badges.badges?.upcoming || 0,
+      testimonials: badges.badges?.testimonials || 0,
+      requests: badges.badges?.requests || subs.counts?.received || 0,
+      deletions: badges.badges?.deletions || dels.counts?.pending || 0,
+    }
+    setRdvBadge(nextBadges.rdv)
+    setTestimonialsBadge(nextBadges.testimonials)
+    setRequestsBadge(nextBadges.requests)
     setUpcomingRdv(
       (rdv.appointments || [])
         .filter((item) => item.status === 'planned' && new Date(item.startAt) >= from)
         .slice(0, 3),
     )
+
+    if (bootstrappedRef.current) {
+      const prev = badgesRef.current
+      const parts = []
+      if (nextBadges.requests > prev.requests) {
+        parts.push(
+          nextBadges.requests - prev.requests === 1
+            ? 'Nouvelle demande d’abonnement'
+            : `${nextBadges.requests - prev.requests} nouvelles demandes`,
+        )
+      }
+      if (nextBadges.upcoming > (prev.upcoming || 0)) {
+        parts.push(
+          nextBadges.upcoming - (prev.upcoming || 0) === 1
+            ? 'Nouveau rendez-vous'
+            : `${nextBadges.upcoming - (prev.upcoming || 0)} nouveaux rendez-vous`,
+        )
+      }
+      if (nextBadges.deletions > prev.deletions) {
+        parts.push('Nouvelle demande de suppression')
+      }
+      if (parts.length) {
+        setLiveNotice(parts.join(' · '))
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification('Nolyo', { body: parts.join(' · '), tag: 'nolyo-founder' })
+        }
+      }
+    }
+    badgesRef.current = nextBadges
+    bootstrappedRef.current = true
+    if (!silent) setError('')
   }
 
   useEffect(() => {
     load().catch((err) => setError(err.message))
     function refresh() {
-      load().catch(() => {})
+      load({ silent: true }).catch(() => {})
     }
     window.addEventListener('nolio-workspace-changed', refresh)
-    return () => window.removeEventListener('nolio-workspace-changed', refresh)
+    const timer = window.setInterval(refresh, 12000)
+    return () => {
+      window.removeEventListener('nolio-workspace-changed', refresh)
+      window.clearInterval(timer)
+    }
   }, [])
+
+  useEffect(() => {
+    if (!liveNotice) return undefined
+    const t = window.setTimeout(() => setLiveNotice(''), 8000)
+    return () => window.clearTimeout(t)
+  }, [liveNotice])
 
   function openRequest(id) {
     setSelectedId(id)
@@ -284,9 +337,9 @@ function PresidentDashboard() {
           {navItems.map(([id, label]) => (
             <button key={id} type="button" className={navClass(view === id)} onClick={() => go(id)}>
               <span>{label}</span>
-              {id === 'subscriptions' && todoRequests.length ? (
+              {id === 'subscriptions' && (requestsBadge || todoRequests.length) ? (
                 <span className="grid min-w-[1.15rem] place-items-center rounded-full bg-copper px-1.5 py-0.5 text-[10px] font-semibold">
-                  {todoRequests.length}
+                  {requestsBadge || todoRequests.length}
                 </span>
               ) : null}
               {id === 'rdv' && rdvBadge ? (
@@ -376,6 +429,22 @@ function PresidentDashboard() {
               : 'min-w-0 px-4 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-10 lg:py-8'
           }
         >
+          {liveNotice ? (
+            <div className="mb-4 flex shrink-0 items-center justify-between gap-3 rounded-2xl bg-moss px-4 py-3 text-sm text-cream shadow-sm">
+              <p className="font-medium">{liveNotice}</p>
+              <button
+                type="button"
+                className="shrink-0 rounded-full bg-cream/15 px-3 py-1 text-xs font-semibold hover:bg-cream/25"
+                onClick={() => {
+                  if (liveNotice.includes('demande')) openStage()
+                  else if (liveNotice.includes('rendez-vous')) go('rdv')
+                  setLiveNotice('')
+                }}
+              >
+                Voir
+              </button>
+            </div>
+          ) : null}
           {error ? <p className="mb-4 shrink-0 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
 
           {view === 'home' && q ? (

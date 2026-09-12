@@ -420,15 +420,33 @@ router.post('/deletions/:id/refuse', async (req, res) => {
 })
 
 router.get('/badges', async (req, res) => {
-  const [rdv, testimonials] = await Promise.all([
+  const now = new Date()
+  const in14 = new Date(Date.now() + 14 * 86400000)
+  const [rdv, upcoming, testimonials, requestsReceived, deletionsPending] = await Promise.all([
     Appointment.countDocuments({
       user: req.user._id,
       status: 'planned',
       startAt: { $gte: startOfDay(), $lte: endOfDay() },
     }),
+    Appointment.countDocuments({
+      user: req.user._id,
+      status: 'planned',
+      startAt: { $gte: now, $lte: in14 },
+    }),
     SiteReview.countDocuments({ status: 'pending' }),
+    SubscriptionRequest.countDocuments({ status: 'received' }),
+    AccountDeletionRequest.countDocuments({ status: 'pending' }),
   ])
-  res.json({ badges: { rdv, testimonials } })
+  res.json({
+    badges: {
+      rdv,
+      upcoming,
+      testimonials,
+      requests: requestsReceived,
+      deletions: deletionsPending,
+      inbox: requestsReceived + deletionsPending + testimonials,
+    },
+  })
 })
 
 router.get('/testimonials', async (req, res) => {

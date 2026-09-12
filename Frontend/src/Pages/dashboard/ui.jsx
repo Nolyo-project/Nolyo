@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { mediaUrl } from '../../api/client'
 
 export function PageShell({ children, className = '' }) {
@@ -260,8 +260,20 @@ export function initials(name) {
 }
 
 export function Avatar({ user, className = 'h-10 w-10', light = false }) {
-  if (user?.avatar) {
-    return <img src={mediaUrl(user.avatar)} alt="" className={`shrink-0 rounded-full object-cover ${className}`} />
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    setFailed(false)
+  }, [user?.avatar])
+
+  if (user?.avatar && !failed) {
+    return (
+      <img
+        src={mediaUrl(user.avatar)}
+        alt=""
+        className={`shrink-0 rounded-full object-cover ${className}`}
+        onError={() => setFailed(true)}
+      />
+    )
   }
   return (
     <span

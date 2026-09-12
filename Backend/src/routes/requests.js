@@ -1,13 +1,18 @@
 const express = require('express')
 const { plans, getPlan } = require('../config/plans')
 const SubscriptionRequest = require('../models/SubscriptionRequest')
-const { sendRequestReceived } = require('../utils/emails')
+const User = require('../models/User')
+const { sendRequestReceived, sendFounderNewRequest } = require('../utils/emails')
 const { createCustomerForRequest } = require('../utils/stripe')
 
 const router = express.Router()
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 router.get('/plans', (_req, res) => {
@@ -65,14 +70,25 @@ router.post('/', async (req, res) => {
     console.error('Stripe customer', err.message)
   }
 
-  let mail = { ok: false, error: null }
+  let mail = { ok: false, error: null, founder: false }
   try {
     await sendRequestReceived(request)
-    mail = { ok: true, error: null }
-    console.info('[mail] demande envoyée →', request.email)
+    mail.ok = true
+    console.info('[mail] demande client →', request.email)
   } catch (err) {
-    mail = { ok: false, error: err?.text || err?.message || 'Échec envoi e-mail' }
+    mail.error = err?.text || err?.message || 'Échec envoi e-mail'
     console.error('Mail demande', mail.error)
+  }
+
+  // EmailJS : 1 req/s — alerte fondateur juste après
+  try {
+    await sleep(1200)
+    const founder = await User.findOne({ role: 'president' }).select('name email')
+    await sendFounderNewRequest(request, founder)
+    mail.founder = true
+    console.info('[mail] alerte fondateur →', founder?.email)
+  } catch (err) {
+    console.error('Mail fondateur demande', err?.text || err.message)
   }
 
   res.status(201).json({

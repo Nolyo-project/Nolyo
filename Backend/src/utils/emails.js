@@ -31,6 +31,37 @@ L’équipe Nolyo`
   })
 }
 
+async function sendFounderNewRequest(request, founder) {
+  if (!founder?.email) return { skipped: true, reason: 'no-founder' }
+  const plan = request.plan === 'pro' ? 'Nolyo Pro' : 'Nolyo Essentiel'
+  const href = publicUrl('/president')
+  const subject = `Nouvelle demande — ${request.company || request.name} (${plan})`
+  const text = `Bonjour ${firstName(founder.name)},
+
+Nouvelle demande d’abonnement sur Nolyo.
+
+Nom : ${request.name}
+E-mail : ${request.email}
+Activité : ${request.company || '—'}
+Offre : ${plan}
+${request.message ? `\nMessage :\n${request.message}\n` : ''}
+Ouvre ton espace fondateur pour la traiter : ${href}`
+  return sendMail({
+    to: founder.email,
+    replyTo: request.email,
+    subject,
+    text,
+    html: `<p style="line-height:1.6;margin:0 0 16px;">Bonjour ${firstName(founder.name)},</p>
+      <p style="line-height:1.6;margin:0 0 16px;"><strong>Nouvelle demande d’abonnement</strong> sur Nolyo.</p>
+      <p style="line-height:1.6;margin:0 0 4px;">Nom : ${request.name}</p>
+      <p style="line-height:1.6;margin:0 0 4px;">E-mail : ${request.email}</p>
+      <p style="line-height:1.6;margin:0 0 4px;">Activité : ${request.company || '—'}</p>
+      <p style="line-height:1.6;margin:0 0 16px;">Offre : ${plan}</p>
+      ${request.message ? `<p style="line-height:1.6;margin:0 0 16px;">Message : ${request.message}</p>` : ''}
+      <p style="line-height:1.6;margin:0;"><a href="${href}" style="display:inline-block;background:#243026;color:#faf7f1;text-decoration:none;padding:12px 22px;border-radius:999px;">Ouvrir l’espace fondateur</a></p>`,
+  })
+}
+
 async function sendInviteCode(request) {
   const name = firstName(request.name)
   const href = publicUrl(`/inscription?code=${encodeURIComponent(request.inviteCode)}`)
@@ -462,6 +493,7 @@ L’équipe Nolyo`
 
 module.exports = {
   sendRequestReceived,
+  sendFounderNewRequest,
   sendInviteCode,
   sendWelcome,
   sendTrialEnding,
