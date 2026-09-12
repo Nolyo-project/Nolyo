@@ -792,7 +792,9 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
                 gridTemplateRows: `auto ${agendaHeight}`,
               }}
             >
-              <div className="grid place-items-end pb-2 pr-1 text-[11px] text-ink-soft"> </div>
+              <div className="sticky top-0 z-20 grid place-items-end bg-cream/95 pb-2 pr-1 text-[11px] text-ink-soft backdrop-blur-sm">
+                {' '}
+              </div>
               {visibleDays.map((day) => {
                 const open = workDays.includes(day.getDay())
                 const away = dayIsAbsent(day, absences)
@@ -801,8 +803,8 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
                 return (
                   <div
                     key={`head-${day.toISOString()}`}
-                    className={`rounded-t-xl px-1 py-2 text-center ${
-                      shut ? 'bg-ink/8' : isToday ? 'bg-copper/5' : 'bg-paper/70'
+                    className={`sticky top-0 z-20 rounded-t-xl px-1 py-2 text-center backdrop-blur-sm ${
+                      shut ? 'bg-ink/8' : isToday ? 'bg-copper/10' : 'bg-cream/95'
                     }`}
                   >
                     <p

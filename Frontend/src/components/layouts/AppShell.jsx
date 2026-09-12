@@ -87,7 +87,7 @@ export function DashFrame({
         className={
           lockViewport
             ? 'dash-sidebar hidden h-full min-h-0 flex-col text-cream lg:flex'
-            : 'dash-sidebar hidden min-h-0 flex-col text-cream lg:sticky lg:top-0 lg:flex lg:h-dvh'
+            : 'dash-sidebar hidden min-h-0 flex-col text-cream lg:sticky lg:top-0 lg:flex lg:h-dvh lg:self-start'
         }
       >
         {sidebar}

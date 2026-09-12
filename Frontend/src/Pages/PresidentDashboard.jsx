@@ -333,7 +333,7 @@ function PresidentDashboard() {
           <Logo to={founderHomePath()} inverted />
           <p className="mt-2 text-[11px] font-semibold tracking-[0.18em] text-cream/50 uppercase">Fondateur</p>
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-4">
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-4">
           {navItems.map(([id, label]) => (
             <button key={id} type="button" className={navClass(view === id)} onClick={() => go(id)}>
               <span>{label}</span>
@@ -363,7 +363,7 @@ function PresidentDashboard() {
             Site public
           </a>
         </nav>
-        <div className="border-t border-cream/10 px-4 py-4">
+        <div className="mt-auto shrink-0 border-t border-cream/10 px-4 py-4">
           <button
             type="button"
             onClick={() => go('settings')}
@@ -387,7 +387,7 @@ function PresidentDashboard() {
 
   return (
     <DashFrame
-      lockViewport={false}
+      lockViewport
       colsClass="lg:grid-cols-[16.75rem_minmax(0,1fr)]"
       sidebar={renderSidebar()}
       drawer={
@@ -396,8 +396,8 @@ function PresidentDashboard() {
         </MobileDrawer>
       }
     >
-      <div className="dash-canvas min-w-0">
-        <header className="sticky top-0 z-30 flex flex-col gap-3 border-b border-ink/6 bg-cream/90 px-4 py-3 backdrop-blur-md sm:px-5 lg:px-10">
+      <div className="dash-canvas flex min-h-0 min-w-0 flex-col lg:h-full lg:overflow-hidden">
+        <header className="sticky top-0 z-30 flex shrink-0 flex-col gap-3 border-b border-ink/6 bg-cream/90 px-4 py-3 backdrop-blur-md sm:px-5 lg:static lg:px-10 lg:bg-cream/50">
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Bureau Nolyo</p>
@@ -425,8 +425,8 @@ function PresidentDashboard() {
         <div
           className={
             view === 'rdv'
-              ? 'min-w-0 pb-[max(1.25rem,env(safe-area-inset-bottom))]'
-              : 'min-w-0 px-4 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-10 lg:py-8'
+              ? 'dash-scroll min-w-0 pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:min-h-0 lg:flex-1 lg:overflow-y-auto'
+              : 'dash-scroll min-w-0 px-4 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-10 lg:py-8'
           }
         >
           {liveNotice ? (
