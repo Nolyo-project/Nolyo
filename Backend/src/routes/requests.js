@@ -65,11 +65,21 @@ router.post('/', async (req, res) => {
     console.error('Stripe customer', err.message)
   }
 
-  sendRequestReceived(request).catch((err) => console.error('Mail demande', err.message))
+  let mail = { ok: false, error: null }
+  try {
+    await sendRequestReceived(request)
+    mail = { ok: true, error: null }
+    console.info('[mail] demande envoyée →', request.email)
+  } catch (err) {
+    mail = { ok: false, error: err?.text || err?.message || 'Échec envoi e-mail' }
+    console.error('Mail demande', mail.error)
+  }
 
   res.status(201).json({
-    message:
-      'Votre demande a bien été transmise. Un e-mail de confirmation vous a été envoyé. Vous recevrez ensuite un devis, puis un code unique pour vous inscrire. Le premier mois est offert.',
+    message: mail.ok
+      ? 'Votre demande a bien été transmise. Un e-mail de confirmation vous a été envoyé. Vous recevrez ensuite un devis, puis un code unique pour vous inscrire. Le premier mois est offert.'
+      : 'Votre demande a bien été transmise. L’e-mail de confirmation n’a pas pu partir pour le moment — nous vous recontacterons.',
+    mail,
     request: {
       id: request._id,
       plan: request.plan,

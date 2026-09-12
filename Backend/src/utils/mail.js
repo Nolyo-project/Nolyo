@@ -8,13 +8,14 @@ const SIGNATURE = {
   site: 'nolyo.fr',
 }
 
+function env(name) {
+  return String(process.env[name] || '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+}
+
 function mailEnabled() {
-  return Boolean(
-    process.env.EMAILJS_SERVICE_ID &&
-      process.env.EMAILJS_TEMPLATE_ID &&
-      process.env.EMAILJS_PUBLIC_KEY &&
-      process.env.EMAILJS_PRIVATE_KEY,
-  )
+  return Boolean(env('EMAILJS_SERVICE_ID') && env('EMAILJS_TEMPLATE_ID') && env('EMAILJS_PUBLIC_KEY') && env('EMAILJS_PRIVATE_KEY'))
 }
 
 function signatureText() {
@@ -110,8 +111,8 @@ async function sendMail({ to, subject, text, html, replyTo }) {
 
   try {
     await emailjs.send(
-      process.env.EMAILJS_SERVICE_ID,
-      process.env.EMAILJS_TEMPLATE_ID,
+      env('EMAILJS_SERVICE_ID'),
+      env('EMAILJS_TEMPLATE_ID'),
       {
         to_email: recipient,
         email: recipient,
@@ -119,12 +120,12 @@ async function sendMail({ to, subject, text, html, replyTo }) {
         subject: String(subject).trim(),
         message,
         html_body: htmlBody,
-        from_name: process.env.MAIL_FROM_NAME || 'Nolyo',
+        from_name: env('MAIL_FROM_NAME') || 'Nolyo',
         reply_to: reply || recipient,
       },
       {
-        publicKey: process.env.EMAILJS_PUBLIC_KEY,
-        privateKey: process.env.EMAILJS_PRIVATE_KEY,
+        publicKey: env('EMAILJS_PUBLIC_KEY'),
+        privateKey: env('EMAILJS_PRIVATE_KEY'),
       },
     )
     return { ok: true }

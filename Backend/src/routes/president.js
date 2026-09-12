@@ -1024,6 +1024,34 @@ router.get('/site-settings', async (_req, res) => {
   res.json({ settings: settings.toAdminJSON() })
 })
 
+router.post('/test-mail', async (req, res) => {
+  const { sendMail, mailEnabled } = require('../utils/mail')
+  const to = String(req.body?.to || req.user.email || '').trim().toLowerCase()
+  if (!to) return res.status(400).json({ error: 'Indiquez un e-mail de test.' })
+  if (!mailEnabled()) {
+    return res.status(503).json({
+      error: 'EmailJS non configuré sur ce serveur (EMAILJS_* manquants).',
+      mail: 'disabled',
+    })
+  }
+  try {
+    await sendMail({
+      to,
+      subject: `Test Nolyo — ${new Date().toLocaleString('fr-FR')}`,
+      text: 'Ceci est un e-mail de test envoyé depuis le serveur Nolyo (Railway / API).',
+      html: '<p style="line-height:1.6;margin:0;">Ceci est un e-mail de test envoyé depuis le serveur Nolyo (Railway / API).</p>',
+    })
+    return res.json({ ok: true, to, message: 'E-mail de test envoyé. Vérifiez EmailJS History et votre boîte.' })
+  } catch (err) {
+    return res.status(502).json({
+      ok: false,
+      to,
+      error: err?.text || err?.message || 'Échec EmailJS',
+      status: err?.status || null,
+    })
+  }
+})
+
 router.patch('/site-settings', async (req, res) => {
   const SiteSettings = require('../models/SiteSettings')
   const { sendMaintenanceNotice } = require('../utils/emails')

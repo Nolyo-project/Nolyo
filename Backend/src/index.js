@@ -178,8 +178,14 @@ async function start() {
       console.log(`API listening on http://localhost:${port}`)
       const { mailEnabled } = require('./utils/mail')
       if (mailEnabled()) {
+        const svc = String(process.env.EMAILJS_SERVICE_ID || '')
+          .trim()
+          .replace(/^['"]|['"]$/g, '')
+        const tpl = String(process.env.EMAILJS_TEMPLATE_ID || '')
+          .trim()
+          .replace(/^['"]|['"]$/g, '')
         console.info(
-          `EmailJS OK (service=${process.env.EMAILJS_SERVICE_ID}, template=${process.env.EMAILJS_TEMPLATE_ID}, privateKey=${process.env.EMAILJS_PRIVATE_KEY ? 'oui' : 'non'})`,
+          `EmailJS OK (service=${svc}, template=${tpl}, privateKey=${process.env.EMAILJS_PRIVATE_KEY ? 'oui' : 'non'})`,
         )
       } else {
         console.warn('EmailJS non configuré — les e-mails ne partiront pas (EMAILJS_* manquants).')
