@@ -141,6 +141,12 @@ export function formatMinutes(total) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
+/** Pas visuel de l’agenda : 15 min si les RDV sont très courts, sinon 30 min. */
+export function agendaSlotMinutes(durationMinutes) {
+  const duration = Number(durationMinutes) || 60
+  return duration <= 15 ? 15 : 30
+}
+
 export function buildDaySlots(workStart, workEnd, durationMinutes) {
   const start = parseMinutes(workStart)
   const end = parseMinutes(workEnd)

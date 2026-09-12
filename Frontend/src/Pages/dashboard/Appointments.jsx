@@ -9,6 +9,7 @@ import {
   addDays,
   agendaEventRect,
   agendaRangeMinutes,
+  agendaSlotMinutes,
   appointmentDurationMinutes,
   appointmentOverlaps,
   buildDaySlots,
@@ -121,14 +122,12 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
     const match = days.find((day) => toDateInput(day) === key)
     return [match || days[0]]
   }, [days, focusDay, isWeek])
+  const slotStep = agendaSlotMinutes(schedule.durationMinutes)
   const slots = useMemo(
-    () => buildDaySlots(schedule.workStart, schedule.workEnd, schedule.durationMinutes),
-    [schedule],
+    () => buildDaySlots(schedule.workStart, schedule.workEnd, slotStep),
+    [schedule.workEnd, schedule.workStart, slotStep],
   )
-  const agendaRange = useMemo(
-    () => agendaRangeMinutes(slots, schedule.durationMinutes),
-    [schedule.durationMinutes, slots],
-  )
+  const agendaRange = useMemo(() => agendaRangeMinutes(slots, slotStep), [slotStep, slots])
   const nowPct = useMemo(() => {
     const date = new Date(now)
     const minutes = date.getHours() * 60 + date.getMinutes()
@@ -156,7 +155,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
           return
         }
         const appointment = visible.find((item) =>
-          appointmentOverlaps(item, start, schedule.durationMinutes),
+          appointmentOverlaps(item, start, slotStep),
         )
         if (appointment) {
           map.set(key, { status: 'busy', appointment })
@@ -178,7 +177,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
       })
     })
     return { map, free, taken: takenIds.size }
-  }, [absences, appointments, days, drag?.id, now, schedule.durationMinutes, slots, workDays])
+  }, [absences, appointments, days, drag?.id, now, slotStep, slots, workDays])
 
   async function loadWeek(start) {
     const from = start.toISOString()
@@ -824,7 +823,9 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
                 {slots.map((slot, slotIndex) => (
                   <p
                     key={slot.label}
-                    className="absolute right-1 text-[11px] leading-none text-ink-soft"
+                    className={`absolute right-1 leading-none text-ink-soft ${
+                      slot.startMinutes % 60 === 0 ? 'text-[11px]' : 'text-[10px] opacity-55'
+                    }`}
                     style={{
                       top: `${(slotIndex / slots.length) * 100}%`,
                       transform: 'translateY(-0.35em)',

@@ -59,6 +59,14 @@ function workPreview(work) {
   return work.image || sitePreviewUrl(work.url)
 }
 
+function WorkMedia({ src, alt, className }) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return <div className="grid aspect-[4/3] place-items-center page-muted text-sm">{alt}</div>
+  }
+  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />
+}
+
 function chunkReviews(list, size = 3) {
   const pages = []
   for (let i = 0; i < list.length; i += size) pages.push(list.slice(i, i + size))
@@ -429,14 +437,12 @@ function PublicProfile() {
                       const host = work.url ? siteHostname(work.url) : ''
                       const className =
                         'group relative block w-full overflow-hidden rounded-[1.4rem] text-left'
-                      const media = preview ? (
-                        <img
+                      const media = (
+                        <WorkMedia
                           src={preview}
                           alt={host || ''}
                           className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-[1.04]"
                         />
-                      ) : (
-                        <div className="grid aspect-[4/3] place-items-center page-muted text-sm">{host}</div>
                       )
                       const caption = host ? (
                         <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent px-4 pb-3 pt-8 text-sm font-medium text-cream">
