@@ -71,40 +71,66 @@ function wrapHtml(body) {
 </html>`
 }
 
+const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/
+
+/** Garde une adresse e-mail propre (évite « Name <mail> », espaces, HTML). */
+function normalizeEmail(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  const angled = raw.match(/<([^>]+)>/)
+  const candidate = (angled ? angled[1] : raw).trim().replace(/^mailto:/i, '').toLowerCase()
+  return EMAIL_RE.test(candidate) ? candidate : ''
+}
+
 /**
- * Envoi via EmailJS (1 template générique : to_email, subject, message, html_body).
- * Activer « Allow EmailJS API for non-browser applications » dans Account → Security.
+ * Envoi via EmailJS (1 template générique).
+ * Dans le template EmailJS, le champ « To Email » doit être exactement : {{to_email}}
+ * Subject = {{subject}} · Body HTML = {{{html_body}}} (triples accolades)
+ * Account → Security : activer l’API hors navigateur + private key
  */
 async function sendMail({ to, subject, text, html, replyTo }) {
-  if (!to || !subject) return { skipped: true, reason: 'missing-to-or-subject' }
+  const recipient = normalizeEmail(to)
+  const reply = normalizeEmail(replyTo)
+  if (!recipient || !subject) {
+    return { skipped: true, reason: recipient ? 'missing-subject' : 'invalid-recipient' }
+  }
 
   const htmlBody = html ? wrapHtml(html) : ''
   const rawText = text || (html ? String(html).replace(/<[^>]+>/g, ' ') : '')
   const message = `${rawText.trim()}${signatureText()}`
 
   if (!mailEnabled()) {
-    console.warn('[mail:dry-run] EmailJS non configuré — e-mail non envoyé:', subject, '→', to)
+    console.warn('[mail:dry-run] EmailJS non configuré — e-mail non envoyé:', subject, '→', recipient)
     return { skipped: true, reason: 'emailjs-disabled' }
   }
 
-  await emailjs.send(
-    process.env.EMAILJS_SERVICE_ID,
-    process.env.EMAILJS_TEMPLATE_ID,
-    {
-      to_email: to,
-      email: to,
-      subject,
-      message,
-      html_body: htmlBody,
-      from_name: process.env.MAIL_FROM_NAME || 'Nolyo',
-      reply_to: replyTo || '',
-    },
-    {
-      publicKey: process.env.EMAILJS_PUBLIC_KEY,
-      privateKey: process.env.EMAILJS_PRIVATE_KEY || undefined,
-    },
-  )
-  return { ok: true }
+  try {
+    await emailjs.send(
+      process.env.EMAILJS_SERVICE_ID,
+      process.env.EMAILJS_TEMPLATE_ID,
+      {
+        // Même valeur sous plusieurs noms : le template doit utiliser {{to_email}}
+        to_email: recipient,
+        email: recipient,
+        user_email: recipient,
+        to: recipient,
+        subject: String(subject).trim(),
+        message,
+        html_body: htmlBody,
+        from_name: process.env.MAIL_FROM_NAME || 'Nolyo',
+        reply_to: reply || recipient,
+      },
+      {
+        publicKey: process.env.EMAILJS_PUBLIC_KEY,
+        privateKey: process.env.EMAILJS_PRIVATE_KEY || undefined,
+      },
+    )
+    return { ok: true }
+  } catch (err) {
+    const detail = err?.text || err?.message || String(err)
+    console.error(`[mail] échec EmailJS → ${recipient} · ${subject} · ${detail}`)
+    throw err
+  }
 }
 
 module.exports = { sendMail, mailEnabled, wrapHtml, signatureHtml, signatureText }
