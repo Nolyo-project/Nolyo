@@ -36,6 +36,7 @@ import Cgv from './Pages/legal/Cgv'
 import MentionsLegales from './Pages/legal/MentionsLegales'
 import PolitiqueConfidentialite from './Pages/legal/PolitiqueConfidentialite'
 import PreviewExpiryWatcher from './components/PreviewExpiryWatcher'
+import IdleSessionWatcher from './components/IdleSessionWatcher'
 import AnalyticsBeacon from './components/AnalyticsBeacon'
 import { canVisitModule } from './data/workspace'
 import { isAdminHost, siteOrigin } from './config/site'
@@ -254,6 +255,7 @@ function App() {
       <AuthProvider>
         <ToastProvider>
           <PreviewExpiryWatcher />
+          <IdleSessionWatcher />
           <AnalyticsBeacon />
           {isAdminHost() ? (
             <AdminGate>

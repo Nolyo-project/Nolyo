@@ -37,7 +37,12 @@ function Finances() {
   }
 
   useEffect(() => {
-    load().catch((err) => setError(err.message))
+    function refresh() {
+      load().catch((err) => setError(err.message))
+    }
+    refresh()
+    window.addEventListener('nolio-workspace-changed', refresh)
+    return () => window.removeEventListener('nolio-workspace-changed', refresh)
   }, [month])
 
   function update(event) {

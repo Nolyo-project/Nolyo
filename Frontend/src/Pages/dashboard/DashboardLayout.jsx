@@ -268,8 +268,10 @@ function DashboardLayout() {
         .catch(() => {})
     }
     load()
-    const timer = window.setInterval(load, 30000)
     window.addEventListener('nolio-workspace-changed', load)
+    const timer = window.setInterval(() => {
+      window.dispatchEvent(new Event('nolio-workspace-changed'))
+    }, 12000)
     return () => {
       window.clearInterval(timer)
       window.removeEventListener('nolio-workspace-changed', load)

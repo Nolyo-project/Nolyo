@@ -150,10 +150,15 @@ function Inbox() {
   const [pendingId, setPendingId] = useState('')
 
   useEffect(() => {
-    if (!isPro) return
-    api('/api/workspace/inbox')
-      .then((data) => setItems(data.items))
-      .catch((err) => setError(err.message))
+    if (!isPro) return undefined
+    function load() {
+      api('/api/workspace/inbox')
+        .then((data) => setItems(data.items))
+        .catch((err) => setError(err.message))
+    }
+    load()
+    window.addEventListener('nolio-workspace-changed', load)
+    return () => window.removeEventListener('nolio-workspace-changed', load)
   }, [isPro])
 
   const unread = useMemo(() => items.filter((item) => !item.read), [items])

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { homeForUser, needsOnboarding } from '../auth/homeForUser'
 import { useAuth } from '../context/AuthContext'
 import { adminOrigin, isAdminHost, publicSiteHref, siteOrigin } from '../config/site'
@@ -11,10 +11,12 @@ function Login() {
   const { login, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [params] = useSearchParams()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const admin = isAdminHost()
+  const idleLogout = params.get('idle') === '1'
 
   function update(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -84,6 +86,12 @@ function Login() {
           </Link>
         </p>
       )}
+
+        {idleLogout ? (
+          <p className="mt-4 rounded-2xl bg-moss/10 px-4 py-3 text-sm text-moss">
+            Session terminée après 20 minutes d’inactivité. Reconnectez-vous pour continuer.
+          </p>
+        ) : null}
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <label className="block text-sm font-medium">

@@ -654,7 +654,7 @@ router.post('/pages/:slug/book', async (req, res) => {
   if (user.notifications?.pushBooking !== false) {
     sendPushToUser(user, {
       title: 'Nouveau rendez-vous',
-      body: `${contact.name || 'Un client'} · ${appointment.serviceName} · ${new Date(appointment.startAt).toLocaleString('fr-FR')}`,
+      body: `${contact.name || 'Un client'} · ${appointment.serviceName} · ${new Date(appointment.startAt).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`,
       url: '/dashboard/rdv',
     }).catch((err) => console.error('Booking push', err.message))
   }
@@ -833,7 +833,7 @@ Fondateur de Nolyo`,
   if (user.notifications?.pushBooking !== false) {
     sendPushToUser(user, {
       title: 'Nouveau rendez-vous découverte',
-      body: `${contact.name || 'Un prospect'} · ${appointment.serviceName} · ${new Date(appointment.startAt).toLocaleString('fr-FR')}`,
+      body: `${contact.name || 'Un prospect'} · ${appointment.serviceName} · ${new Date(appointment.startAt).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`,
       url: '/president',
     }).catch((err) => console.error('Founder booking push', err.message))
   }

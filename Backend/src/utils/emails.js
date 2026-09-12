@@ -346,14 +346,17 @@ Fondateur de Nolyo`;
 
 function bookingWhen(startAt) {
   const date = new Date(startAt);
+  const opts = { timeZone: "Europe/Paris" };
   return {
     dateLabel: date.toLocaleDateString("fr-FR", {
+      ...opts,
       weekday: "long",
       day: "numeric",
       month: "long",
       year: "numeric",
     }),
     timeLabel: date.toLocaleTimeString("fr-FR", {
+      ...opts,
       hour: "2-digit",
       minute: "2-digit",
     }),

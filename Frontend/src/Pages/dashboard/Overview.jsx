@@ -218,9 +218,14 @@ function Overview() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    api('/api/workspace/overview')
-      .then((res) => setData(res.overview))
-      .catch((err) => setError(err.message))
+    function load() {
+      api('/api/workspace/overview')
+        .then((res) => setData(res.overview))
+        .catch((err) => setError(err.message))
+    }
+    load()
+    window.addEventListener('nolio-workspace-changed', load)
+    return () => window.removeEventListener('nolio-workspace-changed', load)
   }, [])
 
   if (error) {

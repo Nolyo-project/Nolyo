@@ -67,7 +67,12 @@ function AbsencesContent() {
   }
 
   useEffect(() => {
-    load().catch((err) => setError(err.message))
+    function refresh() {
+      load().catch((err) => setError(err.message))
+    }
+    refresh()
+    window.addEventListener('nolio-workspace-changed', refresh)
+    return () => window.removeEventListener('nolio-workspace-changed', refresh)
   }, [])
 
   const today = todayIso()
