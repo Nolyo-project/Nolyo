@@ -145,7 +145,8 @@ app.use((_req, res) => {
 
 app.use((err, _req, res, _next) => {
   console.error(err)
-  res.status(500).json({ error: 'Erreur serveur.' })
+  const status = Number(err.status) || 500
+  res.status(status).json({ error: status === 400 ? err.message || 'Requête invalide.' : 'Erreur serveur.' })
 })
 
 async function start() {

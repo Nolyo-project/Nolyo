@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, apiUpload, mediaUrl, sitePreviewUrl, websiteHref } from '../../api/client'
+import { prepareImageFile } from '../../utils/prepareImage'
 import { useAuth } from '../../context/AuthContext'
 import { ghostBtn, primaryBtn, quietBtn } from './ui'
 import { ACCENT_PRESETS, BACKGROUND_PRESETS, SURFACE_PRESETS, parseHex, pickTheme } from '../../data/pageTheme'
@@ -11,6 +12,15 @@ const studioField =
   'mt-1.5 w-full rounded-2xl border border-ink/15 bg-[#faf8f5] px-4 py-3 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-copper focus:ring-2 focus:ring-copper/15'
 
 const emptyPerson = { name: '', role: '', bio: '', photo: '' }
+
+function StudioImage({ src, alt = '', className, fallback }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
+  if (!src || failed) return fallback || null
+  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />
+}
 
 const DAY_OPTIONS = [
   { id: 1, label: 'Lun' },
@@ -123,7 +133,7 @@ function pageFromUser(user) {
 
 function StudioPanel({ title, hint, children }) {
   return (
-    <section className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-ink/10 sm:p-7">
+    <section className="min-w-0 rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-ink/10 sm:p-7">
       {title ? (
         <div className="mb-5">
           <h2 className="font-display text-2xl tracking-tight text-ink">{title}</h2>
@@ -202,6 +212,7 @@ export function PageStudio({ showQr, isPro }) {
   const [ok, setOk] = useState('')
   const [pending, setPending] = useState(false)
   const [pendingPhoto, setPendingPhoto] = useState('')
+  const [localMedia, setLocalMedia] = useState({})
   const [copied, setCopied] = useState(false)
   const [emailForm, setEmailForm] = useState(() => emailFormFromUser(user))
   const [emailPending, setEmailPending] = useState(false)
@@ -212,6 +223,15 @@ export function PageStudio({ showQr, isPro }) {
   useEffect(() => {
     setPage(pageFromUser(user))
   }, [user.id])
+
+  useEffect(() => {
+    setPage((current) => ({
+      ...current,
+      avatar: user?.avatar || '',
+      banner: user?.page?.banner || '',
+      photos: [0, 1].map((i) => user?.page?.photos?.[i] || ''),
+    }))
+  }, [user?.avatar, user?.page?.banner, user?.page?.photos?.[0], user?.page?.photos?.[1]])
 
   useEffect(() => {
     setEmailForm(emailFormFromUser(user))
@@ -375,13 +395,32 @@ export function PageStudio({ showQr, isPro }) {
     }
   }
 
+  function setLocalPreview(key, file) {
+    setLocalMedia((current) => {
+      if (current[key]) URL.revokeObjectURL(current[key])
+      return { ...current, [key]: file ? URL.createObjectURL(file) : '' }
+    })
+  }
+
+  function clearLocalPreview(key) {
+    setLocalMedia((current) => {
+      if (current[key]) URL.revokeObjectURL(current[key])
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }
+
   async function uploadPagePhoto(index, file) {
     if (!file) return
+    const key = `page-${index}`
     setError('')
-    setPendingPhoto(`page-${index}`)
+    setLocalPreview(key, file)
+    setPendingPhoto(key)
     try {
+      const prepared = await prepareImageFile(file)
       const body = new FormData()
-      body.append('file', file)
+      body.append('file', prepared)
       body.append('index', String(index))
       const data = await apiUpload('/api/auth/me/page/photos', body)
       updateUser(data.user)
@@ -390,6 +429,7 @@ export function PageStudio({ showQr, isPro }) {
         photos: [0, 1].map((i) => data.user.page?.photos?.[i] || ''),
         workUrls: [0, 1].map((i) => data.user.page?.workUrls?.[i] || current.workUrls?.[i] || ''),
       }))
+      clearLocalPreview(key)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -445,13 +485,16 @@ export function PageStudio({ showQr, isPro }) {
   async function uploadAvatar(file) {
     if (!file) return
     setError('')
+    setLocalPreview('avatar', file)
     setPendingPhoto('avatar')
     try {
+      const prepared = await prepareImageFile(file)
       const body = new FormData()
-      body.append('file', file)
+      body.append('file', prepared)
       const data = await apiUpload('/api/auth/me/avatar', body)
       updateUser(data.user)
       setPage(pageFromUser(data.user))
+      clearLocalPreview('avatar')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -475,13 +518,16 @@ export function PageStudio({ showQr, isPro }) {
   async function uploadBanner(file) {
     if (!file) return
     setError('')
+    setLocalPreview('banner', file)
     setPendingPhoto('banner')
     try {
+      const prepared = await prepareImageFile(file)
       const body = new FormData()
-      body.append('file', file)
+      body.append('file', prepared)
       const data = await apiUpload('/api/auth/me/page/banner', body)
       updateUser(data.user)
       setPage((current) => ({ ...current, banner: data.user.page?.banner || '' }))
+      clearLocalPreview('banner')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -504,18 +550,22 @@ export function PageStudio({ showQr, isPro }) {
 
   async function uploadPersonPhoto(index, file) {
     if (!file) return
+    const key = `person-${index}`
     setError('')
-    setPendingPhoto(`person-${index}`)
+    setLocalPreview(key, file)
+    setPendingPhoto(key)
     try {
       await api('/api/auth/me', {
         method: 'PATCH',
         body: { page: { ...page, theme: pickTheme(page.theme) } },
       })
+      const prepared = await prepareImageFile(file)
       const payload = new FormData()
-      payload.append('file', file)
+      payload.append('file', prepared)
       const uploaded = await apiUpload(`/api/auth/me/page/people/${index}/photo`, payload)
       updateUser(uploaded.user)
       setPage(pageFromUser(uploaded.user))
+      clearLocalPreview(key)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -707,7 +757,7 @@ export function PageStudio({ showQr, isPro }) {
       {showForm ? (
         <form onSubmit={savePage} className="space-y-6">
           {section === 'home' ? (
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid items-start gap-6 lg:grid-cols-2">
               <StudioPanel title="Votre page" hint="Ce que vos clients lisent en premier.">
                 <div className="space-y-4">
                   <label className="block text-sm font-semibold text-ink">
@@ -736,7 +786,7 @@ export function PageStudio({ showQr, isPro }) {
                   <label className="block text-sm font-semibold text-ink">
                     Présentation
                     <textarea
-                      className={`${studioField} min-h-36 resize-y`}
+                      className={`${studioField} max-h-56 min-h-36 resize-y`}
                       name="description"
                       value={page.description}
                       onChange={updateField}
@@ -758,11 +808,11 @@ export function PageStudio({ showQr, isPro }) {
                     </p>
                     <div className="mt-1.5 flex items-center gap-4">
                       <div className="h-24 w-24 overflow-hidden rounded-full bg-[#faf8f5] ring-1 ring-ink/10">
-                        {page.avatar ? (
-                          <img src={mediaUrl(page.avatar)} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="grid h-full place-items-center text-[11px] text-ink-soft">Photo</div>
-                        )}
+                        <StudioImage
+                          src={localMedia.avatar || mediaUrl(page.avatar)}
+                          className="h-full w-full object-cover"
+                          fallback={<div className="grid h-full place-items-center text-[11px] text-ink-soft">Photo</div>}
+                        />
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <label className={`${quietBtn} cursor-pointer`}>
@@ -788,11 +838,13 @@ export function PageStudio({ showQr, isPro }) {
                   <div>
                     <p className="text-sm font-semibold text-ink">Bannière</p>
                     <div className="mt-1.5 overflow-hidden rounded-2xl bg-[#faf8f5] ring-1 ring-ink/10">
-                      {page.banner ? (
-                        <img src={mediaUrl(page.banner)} alt="" className="aspect-21/9 w-full object-cover" />
-                      ) : (
-                        <div className="grid aspect-21/9 place-items-center text-xs text-ink-soft">Image large</div>
-                      )}
+                      <div className="aspect-[21/9] w-full overflow-hidden bg-[#faf8f5]">
+                        <StudioImage
+                          src={localMedia.banner || mediaUrl(page.banner)}
+                          className="h-full w-full object-cover"
+                          fallback={<div className="grid h-full place-items-center text-xs text-ink-soft">Image large</div>}
+                        />
+                      </div>
                       <div className="flex flex-wrap gap-2 p-2">
                         <label className={`${quietBtn} cursor-pointer`}>
                           {pendingPhoto === 'banner' ? 'Envoi…' : page.banner ? 'Changer' : 'Ajouter'}
@@ -823,16 +875,22 @@ export function PageStudio({ showQr, isPro }) {
                       {[0, 1].map((index) => {
                         const photo = page.photos[index]
                         const link = page.workUrls[index]
-                        const preview = photo ? mediaUrl(photo) : sitePreviewUrl(websiteHref(link))
+                        const preview =
+                          localMedia[`page-${index}`] ||
+                          (photo ? mediaUrl(photo) : sitePreviewUrl(websiteHref(link)))
                         return (
                           <li key={index} className="overflow-hidden rounded-2xl bg-[#faf8f5] ring-1 ring-ink/10">
-                            {preview ? (
-                              <img src={preview} alt="" className="aspect-[4/3] w-full object-cover" />
-                            ) : (
-                              <div className="grid aspect-[4/3] place-items-center px-4 text-center text-xs text-ink-soft">
-                                Photo ou aperçu du site
-                              </div>
-                            )}
+                            <div className="aspect-[4/3] w-full overflow-hidden bg-[#faf8f5]">
+                              <StudioImage
+                                src={preview}
+                                className="h-full w-full object-cover"
+                                fallback={
+                                  <div className="grid h-full place-items-center px-4 text-center text-xs text-ink-soft">
+                                    Photo ou aperçu du site
+                                  </div>
+                                }
+                              />
+                            </div>
                             <div className="space-y-2 p-2">
                               <input
                                 className={`${studioField} mt-0`}
@@ -1016,11 +1074,13 @@ export function PageStudio({ showQr, isPro }) {
                   {people.map((person, index) => (
                     <li key={index} className="flex items-start gap-4 rounded-[1.4rem] border border-ink/12 bg-[#faf8f5] p-4">
                       <div className="w-28 shrink-0 self-start overflow-hidden rounded-2xl bg-white ring-1 ring-ink/10">
-                        {person.photo ? (
-                          <img src={mediaUrl(person.photo)} alt="" className="aspect-square w-full object-cover" />
-                        ) : (
-                          <div className="grid aspect-square place-items-center text-[11px] text-ink-soft">Photo</div>
-                        )}
+                        <div className="aspect-square w-full overflow-hidden bg-white">
+                          <StudioImage
+                            src={localMedia[`person-${index}`] || mediaUrl(person.photo)}
+                            className="h-full w-full object-cover"
+                            fallback={<div className="grid h-full place-items-center text-[11px] text-ink-soft">Photo</div>}
+                          />
+                        </div>
                         <div className="flex flex-wrap gap-1 p-1.5">
                           <label className={`${quietBtn} cursor-pointer`}>
                             {pendingPhoto === `person-${index}` ? '…' : person.photo ? 'Changer' : 'Ajouter'}

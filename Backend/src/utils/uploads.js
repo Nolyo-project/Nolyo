@@ -59,13 +59,26 @@ function storedFile() {
   return require('../models/StoredFile')
 }
 
+function fileBuffer(value) {
+  if (!value) return null
+  if (Buffer.isBuffer(value)) return value
+  if (value.buffer) return Buffer.from(value.buffer)
+  if (Array.isArray(value.data)) return Buffer.from(value.data)
+  try {
+    return Buffer.from(value)
+  } catch {
+    return null
+  }
+}
+
 async function upsertStoredFile(relative, mime, buffer) {
   const key = String(relative || '').replace(/\\/g, '/')
-  if (!key || !buffer?.length) return
+  const data = fileBuffer(buffer)
+  if (!key || !data?.length) return
   await storedFile().findOneAndUpdate(
     { key },
-    { key, mime: mime || 'application/octet-stream', data: buffer },
-    { upsert: true },
+    { key, mime: mime || 'application/octet-stream', data },
+    { upsert: true, setDefaultsOnInsert: true },
   )
 }
 
@@ -93,22 +106,36 @@ async function removeFile(url) {
 async function saveImage(file, folder, basename) {
   const ext = EXT[file.mimetype] || '.jpg'
   const relative = `${folder}/${basename}${ext}`
-  const abs = path.join(UPLOAD_ROOT, relative)
-  ensureDir(path.dirname(abs))
-  fs.writeFileSync(abs, file.buffer)
-  await upsertStoredFile(relative, file.mimetype, file.buffer)
+  const data = fileBuffer(file.buffer)
+  if (!data?.length) {
+    const error = new Error('Image invalide.')
+    error.status = 400
+    throw error
+  }
+  await upsertStoredFile(relative, file.mimetype, data)
+  try {
+    const abs = path.join(UPLOAD_ROOT, relative)
+    ensureDir(path.dirname(abs))
+    fs.writeFileSync(abs, data)
+  } catch (err) {
+    console.warn('Image disque non écrite', err.message)
+  }
   return publicPath(relative)
 }
 
-async function serveUpload(req, res, next) {
-  const key = decodeURIComponent(req.path || '')
-    .replace(/^\/+/, '')
-    .replace(/\\/g, '/')
+function uploadKeyFromRequest(req) {
+  const raw = decodeURIComponent(String(req.originalUrl || req.url || req.path || '').split('?')[0])
+  const stripped = raw.startsWith('/uploads/') ? raw.slice('/uploads/'.length) : raw.replace(/^\/+/, '')
+  return stripped.replace(/\\/g, '/')
+}
+
+async function serveUploadAsync(req, res, next) {
+  const key = uploadKeyFromRequest(req)
   if (!key || key.includes('..')) return next()
   try {
     const doc = await storedFile().findOne({ key }).lean()
-    if (doc?.data) {
-      const body = Buffer.isBuffer(doc.data) ? doc.data : Buffer.from(doc.data.buffer || doc.data)
+    const body = fileBuffer(doc?.data)
+    if (body?.length) {
       res.setHeader('Content-Type', doc.mime || 'application/octet-stream')
       res.setHeader('Cache-Control', 'public, max-age=86400')
       return res.send(body)
@@ -116,7 +143,14 @@ async function serveUpload(req, res, next) {
   } catch {
     /* fallback disque */
   }
-  return next()
+  const abs = path.join(UPLOAD_ROOT, key)
+  if (fs.existsSync(abs)) return next()
+  res.setHeader('Cache-Control', 'no-store')
+  return res.status(404).end()
+}
+
+function serveUpload(req, res, next) {
+  Promise.resolve(serveUploadAsync(req, res, next)).catch(next)
 }
 
 async function ingestDiskUploads() {

@@ -457,7 +457,7 @@ router.patch('/me', requireAuth, async (req, res) => {
 router.post('/me/avatar', requireAuth, handleMulter, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
   await removeFile(req.user.avatar)
-  req.user.avatar = await saveImage(req.file, 'avatars', String(req.user._id))
+  req.user.avatar = await saveImage(req.file, 'avatars', `${req.user._id}-${Date.now()}`)
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
   req.user.page = ensureFounderPerson(page, req.user, req.user.avatar)
   await req.user.save()
@@ -484,7 +484,7 @@ router.post('/me/page/photos', requireAuth, handleMulter, async (req, res) => {
   const index = Math.min(1, Math.max(0, Number(req.body?.index) || 0))
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
   await removeFile(page.photos[index])
-  page.photos[index] = await saveImage(req.file, 'pages', `${req.user._id}-${index}`)
+  page.photos[index] = await saveImage(req.file, 'pages', `${req.user._id}-${index}-${Date.now()}`)
   req.user.page = page
   await req.user.save()
   await sendUser(res, req.user)
@@ -494,7 +494,7 @@ router.post('/me/page/banner', requireAuth, handleMulter, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
   await removeFile(page.banner)
-  page.banner = await saveImage(req.file, 'pages', `${req.user._id}-banner`)
+  page.banner = await saveImage(req.file, 'pages', `${req.user._id}-banner-${Date.now()}`)
   req.user.page = page
   await req.user.save()
   await sendUser(res, req.user)
@@ -518,7 +518,7 @@ router.post('/me/page/people/:index/photo', requireAuth, handleMulter, async (re
   await removeFile(people[index].photo)
   people[index] = {
     ...people[index],
-    photo: await saveImage(req.file, 'pages', `${req.user._id}-person-${index}`),
+    photo: await saveImage(req.file, 'pages', `${req.user._id}-person-${index}-${Date.now()}`),
     name: people[index].name || req.user.name || '',
     role: people[index].role || (index === 0 ? founderRole(req.user) : ''),
   }

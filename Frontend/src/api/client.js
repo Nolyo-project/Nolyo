@@ -12,7 +12,9 @@ export function apiUrl(path = '') {
 export function mediaUrl(url = '') {
   if (!url) return ''
   if (/^https?:\/\//i.test(url) || url.startsWith('data:') || url.startsWith('blob:')) return url
-  return apiUrl(url)
+  const resolved = apiUrl(url)
+  if (!resolved.includes('/uploads/')) return resolved
+  return `${resolved}${resolved.includes('?') ? '&' : '?'}v=2`
 }
 
 export function websiteHref(url = '') {

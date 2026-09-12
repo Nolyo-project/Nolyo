@@ -61,6 +61,9 @@ function workPreview(work) {
 
 function WorkMedia({ src, alt, className }) {
   const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
   if (!src || failed) {
     return <div className="grid aspect-[4/3] place-items-center page-muted text-sm">{alt}</div>
   }
