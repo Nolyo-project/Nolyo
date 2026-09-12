@@ -275,24 +275,12 @@ export function PublicPageAside({ page, slug, copy }) {
         ) : null}
 
         {bookingPath ? (
-          <div className="mt-8 hidden space-y-2 lg:block">
-            {sessionServices.length || !quotePath ? (
-              <Link
-                to={quotePath && !sessionServices.length ? quotePath : bookingPath}
-                className="page-cta flex w-full items-center justify-center rounded-full px-5 py-3.5 text-sm font-semibold transition"
-              >
-                {sessionServices.length ? copy.bookingCta : copy.quoteCta}
-              </Link>
-            ) : null}
-            {quotePath && sessionServices.length ? (
-              <Link
-                to={quotePath}
-                className="flex w-full items-center justify-center rounded-full px-5 py-3 text-sm font-semibold ring-1 ring-ink/12 transition hover:ring-[var(--page-accent)]"
-              >
-                {copy.quoteCta}
-              </Link>
-            ) : null}
-          </div>
+          <Link
+            to={quotePath && !sessionServices.length ? quotePath : bookingPath}
+            className="page-cta mt-8 flex w-full items-center justify-center rounded-full px-5 py-3.5 text-sm font-semibold transition"
+          >
+            Réserver
+          </Link>
         ) : bookHref ? (
           <a
             href={bookHref}

@@ -3,13 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api, mediaUrl, siteHostname, sitePreviewUrl, websiteHref } from '../api/client'
 import { loadPublicPage } from '../data/demoPublicPage'
 import { copyForTrade } from '../data/trades'
-import {
-  groupServicesByHeading,
-  hasAboutContent,
-  isQuoteService,
-  pagePortrait,
-  servicePriceLabel,
-} from '../data/pageTheme'
+import { groupServicesByHeading, hasAboutContent, pagePortrait, servicePriceLabel } from '../data/pageTheme'
 import { formatMoney } from './dashboard/format'
 import { Modal } from './dashboard/ui'
 import { PublicPageAside, publicPageChrome, publicPageMainClass } from './PublicPageAside'
@@ -265,7 +259,7 @@ function PublicProfile() {
   }, [lightbox, photos.length])
 
   const copy = copyForTrade(page?.trade)
-  const { hasAside, bookingPath } = publicPageChrome(page, slug)
+  const { hasAside } = publicPageChrome(page, slug)
   const lightboxSrc = lightbox >= 0 ? photos[lightbox] : ''
   const pageUrl = typeof window !== 'undefined' ? `${window.location.origin}/p/${slug}` : `/p/${slug}`
   const seoDescription =
@@ -387,34 +381,17 @@ function PublicProfile() {
                         ) : null}
                         {block.items.length ? (
                           <ul className="grid gap-4 sm:grid-cols-2">
-                            {block.items.map((item) => {
-                              const bookHref = bookingPath
-                                ? isQuoteService(item)
-                                  ? `/p/${slug}/reserver?type=devis&service=${item._id}`
-                                  : `/p/${slug}/reserver?service=${item._id}`
-                                : ''
-                              return (
-                                <li key={item._id} className="page-card rounded-[1.4rem] px-6 py-5 ring-1 ring-ink/8">
-                                  <div className="flex min-w-0 items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <p className="font-medium wrap-break-word">{item.name}</p>
-                                      <p className="page-muted mt-1 text-sm">{item.durationMinutes} min</p>
-                                    </div>
-                                    <p className="shrink-0 font-display text-lg sm:text-xl">
-                                      {servicePriceLabel(item, formatMoney)}
-                                    </p>
+                            {block.items.map((item) => (
+                              <li key={item._id} className="page-card rounded-[1.4rem] px-6 py-5 ring-1 ring-ink/8">
+                                <div className="flex min-w-0 items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="font-medium wrap-break-word">{item.name}</p>
+                                    <p className="page-muted mt-1 text-sm">{item.durationMinutes} min</p>
                                   </div>
-                                  {bookHref ? (
-                                    <Link
-                                      to={bookHref}
-                                      className="page-cta mt-4 inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold"
-                                    >
-                                      Réserver
-                                    </Link>
-                                  ) : null}
-                                </li>
-                              )
-                            })}
+                                  <p className="shrink-0 font-display text-lg sm:text-xl">{servicePriceLabel(item, formatMoney)}</p>
+                                </div>
+                              </li>
+                            ))}
                           </ul>
                         ) : null}
                       </div>
