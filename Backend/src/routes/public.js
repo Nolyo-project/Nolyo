@@ -326,18 +326,27 @@ router.post('/track', async (req, res) => {
   const ip = String(req.ip || req.headers['x-forwarded-for'] || 'unknown').split(',')[0].trim()
   if (tooManyTracks(ip)) return res.status(204).end()
 
+  let payload = req.body
+  if (typeof payload === 'string') {
+    try {
+      payload = JSON.parse(payload)
+    } catch {
+      payload = {}
+    }
+  }
+
   const { trackEvent } = require('../utils/analytics')
-  const type = String(req.body?.type || '').trim()
+  const type = String(payload?.type || '').trim()
   if (type !== 'page_view') return res.status(204).end()
 
   await trackEvent({
     type: 'page_view',
-    path: req.body?.path,
-    referrer: req.body?.referrer,
-    source: req.body?.source || req.body?.utm_source,
-    medium: req.body?.medium || req.body?.utm_medium,
-    campaign: req.body?.campaign || req.body?.utm_campaign,
-    sessionId: req.body?.sessionId,
+    path: payload?.path,
+    referrer: payload?.referrer,
+    source: payload?.source || payload?.utm_source,
+    medium: payload?.medium || payload?.utm_medium,
+    campaign: payload?.campaign || payload?.utm_campaign,
+    sessionId: payload?.sessionId,
   })
   res.status(204).end()
 })

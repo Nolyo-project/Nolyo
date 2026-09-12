@@ -66,30 +66,40 @@ const origins = [
   process.env.SITE_ORIGIN,
 ]
   .filter(Boolean)
-  .flatMap((value) => value.split(',').map((item) => item.trim()).filter(Boolean))
+  .flatMap((value) => value.split(',').map((item) => item.trim().replace(/\/$/, '')).filter(Boolean))
+  .flatMap((origin) => {
+    if (!/^https?:\/\/www\./i.test(origin)) {
+      return [origin, origin.replace(/^(https?:\/\/)/i, '$1www.')]
+    }
+    return [origin, origin.replace(/^(https?:\/\/)www\./i, '$1')]
+  })
+
+function isAllowedOrigin(origin) {
+  if (origins.includes(origin)) return true
+  if (/^http:\/\/(localhost|127\.0\.0\.1|admin\.localhost):\d+$/.test(origin)) return true
+  if (/^https:\/\/(www\.)?nolyo\.fr$/.test(origin) || origin === 'https://admin.nolyo.fr') return true
+  if (/^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i.test(origin)) return true
+  return false
+}
 
 function corsOrigin(origin, callback) {
   if (!origin) return callback(null, true)
-  if (origins.includes(origin)) return callback(null, true)
-  if (/^http:\/\/(localhost|127\.0\.0\.1|admin\.localhost):\d+$/.test(origin)) return callback(null, true)
-  if (/^https:\/\/(www\.)?nolyo\.fr$/.test(origin) || origin === 'https://admin.nolyo.fr') {
-    return callback(null, true)
-  }
-  // Previews / domaines Vercel en attendant les DNS custom
-  if (/^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i.test(origin)) {
-    return callback(null, true)
-  }
+  if (isAllowedOrigin(origin)) return callback(null, origin)
   return callback(new Error('Origine non autorisée.'))
 }
 
 const app = express()
 const port = Number(process.env.PORT) || 5050
 
-app.use(
-  cors({
-    origin: corsOrigin,
-  }),
-)
+const corsOptions = {
+  origin: corsOrigin,
+  credentials: true,
+  methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}
+
+app.use(cors(corsOptions))
+app.options(/.*/, cors(corsOptions))
 
 // Stripe exige les octets exacts du body (signature HMAC).
 function stripeRawBody(req, res, next) {
@@ -107,6 +117,7 @@ function stripeRawBody(req, res, next) {
 
 app.post('/api/stripe/webhook', stripeRawBody, handleStripeWebhook)
 app.use(express.json())
+app.use(express.text({ type: 'text/plain', limit: '32kb' }))
 app.use('/uploads', express.static(UPLOAD_ROOT))
 
 app.use('/api/health', healthRouter)

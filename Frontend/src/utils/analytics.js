@@ -61,9 +61,11 @@ export async function trackPageView(pathname = window.location.pathname) {
     ...utm,
   }
 
+  const payload = JSON.stringify(body)
+
   try {
     if (navigator.sendBeacon) {
-      const blob = new Blob([JSON.stringify(body)], { type: 'application/json' })
+      const blob = new Blob([payload], { type: 'text/plain' })
       navigator.sendBeacon(apiUrl('/api/public/track'), blob)
       return
     }
@@ -74,9 +76,10 @@ export async function trackPageView(pathname = window.location.pathname) {
   try {
     await fetch(apiUrl('/api/public/track'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'text/plain' },
+      body: payload,
       keepalive: true,
+      credentials: 'omit',
     })
   } catch {
     /* ignore */
