@@ -1,7 +1,9 @@
 /**
  * Cadre live pour embarquer le vrai dashboard / la vraie page publique sur la landing.
  * pointer-events désactivés pour éviter de naviguer hors de la page d’accueil.
- * L’iframe est rendue en largeur desktop puis réduite, pour garder sidebar + en-têtes.
+ *
+ * variant="app"  → iframe en largeur desktop puis réduite (sidebar visible).
+ * variant="page" → largeur réelle du cadre (page publique lisible, pas un hero géant).
  */
 const DESKTOP_WIDTH = 1440
 
@@ -10,8 +12,12 @@ export default function LiveAppFrame({
   title,
   className = '',
   heightClass = 'h-[min(78svh,44rem)] sm:h-[min(84svh,56rem)]',
+  variant = 'app',
   desktopWidth = DESKTOP_WIDTH,
 }) {
+  const isApp = variant === 'app'
+  const href = src.includes('?') ? `${src}&embed=1` : `${src}?embed=1`
+
   return (
     <div
       className={`home-preview-frame overflow-hidden rounded-[1.5rem] bg-paper shadow-2xl shadow-ink/20 ring-1 ring-ink/10 ${className}`.trim()}
@@ -24,15 +30,23 @@ export default function LiveAppFrame({
       </div>
       <div className={`relative w-full overflow-hidden bg-paper ${heightClass}`}>
         <iframe
-          src={src}
+          src={href}
           title={title}
           loading="lazy"
           tabIndex={-1}
-          className="home-preview-iframe pointer-events-none absolute top-0 left-0 h-full border-0"
-          style={{
-            width: desktopWidth,
-            maxWidth: 'none',
-          }}
+          className={
+            isApp
+              ? 'home-preview-iframe pointer-events-none absolute top-0 left-0 h-full border-0'
+              : 'pointer-events-none absolute inset-0 h-full w-full border-0'
+          }
+          style={
+            isApp
+              ? {
+                  width: desktopWidth,
+                  maxWidth: 'none',
+                }
+              : undefined
+          }
         />
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { mediaUrl } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { pagePortrait, publicPageStyle } from '../data/pageTheme'
@@ -8,6 +8,9 @@ import { publicPageChrome } from './PublicPageAside'
 
 export function PublicPageFrame({ slug, page, error, current = 'home', children }) {
   const { user } = useAuth()
+  const [params] = useSearchParams()
+  const embedded =
+    params.get('embed') === '1' || (typeof window !== 'undefined' && window.self !== window.top)
   const cover = mediaUrl(page?.banner || page?.works?.[0]?.image || (page?.photos || [])[0] || '')
   const portrait = mediaUrl(pagePortrait(page))
   const [coverFailed, setCoverFailed] = useState(false)
@@ -65,7 +68,11 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
         </div>
       </header>
 
-      <div className="relative z-0 h-44 overflow-hidden bg-moss sm:h-72 lg:h-[28rem]">
+      <div
+        className={`relative z-0 overflow-hidden bg-moss ${
+          embedded ? 'h-36 sm:h-44' : 'h-44 sm:h-72 lg:h-[28rem]'
+        }`}
+      >
         {cover && !coverFailed ? (
           <img src={cover} alt="" className="h-full w-full object-cover" onError={() => setCoverFailed(true)} />
         ) : (
@@ -76,16 +83,26 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
 
       <div className="relative mx-auto min-w-0 max-w-[92rem] px-4 sm:px-8 lg:px-12">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
-          <div className="relative z-10 -mt-14 sm:-mt-20 lg:-mt-24">
+          <div className={`relative z-10 ${embedded ? '-mt-10' : '-mt-14 sm:-mt-20 lg:-mt-24'}`}>
             {portrait && !portraitFailed ? (
               <img
                 src={portrait}
                 alt=""
-                className="h-24 w-24 rounded-full object-cover shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[5px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 sm:ring-[6px] lg:h-44 lg:w-44"
+                className={
+                  embedded
+                    ? 'h-20 w-20 rounded-full object-cover shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[4px] ring-[color:var(--page-bg)] sm:h-24 sm:w-24'
+                    : 'h-24 w-24 rounded-full object-cover shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[5px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 sm:ring-[6px] lg:h-44 lg:w-44'
+                }
                 onError={() => setPortraitFailed(true)}
               />
             ) : (
-              <div className="page-cta grid h-24 w-24 place-items-center rounded-full font-display text-3xl shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[5px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 sm:text-4xl sm:ring-[6px] lg:h-44 lg:w-44">
+              <div
+                className={
+                  embedded
+                    ? 'page-cta grid h-20 w-20 place-items-center rounded-full font-display text-2xl shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[4px] ring-[color:var(--page-bg)] sm:h-24 sm:w-24'
+                    : 'page-cta grid h-24 w-24 place-items-center rounded-full font-display text-3xl shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[5px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 sm:text-4xl sm:ring-[6px] lg:h-44 lg:w-44'
+                }
+              >
                 {initial}
               </div>
             )}
@@ -137,7 +154,7 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
         </Link>
       </footer>
 
-      {chrome.bookingPath ? (
+      {chrome.bookingPath && !embedded ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-[color-mix(in_srgb,var(--page-bg)_92%,transparent)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden">
           <div className="flex gap-2">
             <Link

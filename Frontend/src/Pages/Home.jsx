@@ -703,6 +703,7 @@ function Home() {
             <LiveAppFrame
               src={demoPage}
               title={`nolyo.fr${demoPage}`}
+              variant="page"
             />
           </Reveal>
 
