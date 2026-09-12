@@ -1,16 +1,17 @@
 /**
  * Cadre live pour embarquer le vrai dashboard / la vraie page publique sur la landing.
  * pointer-events désactivés pour éviter de naviguer hors de la page d’accueil.
- * scale = 1 → la page remplit tout le cadre (recommandé en pleine largeur).
+ * L’iframe est rendue en largeur desktop puis réduite, pour garder sidebar + en-têtes.
  */
+const DESKTOP_WIDTH = 1440
+
 export default function LiveAppFrame({
   src,
   title,
   className = '',
-  heightClass = 'h-[min(78svh,44rem)] sm:h-[min(82svh,52rem)]',
-  scale = 1,
+  heightClass = 'h-[min(78svh,44rem)] sm:h-[min(84svh,56rem)]',
+  desktopWidth = DESKTOP_WIDTH,
 }) {
-  const pct = `${(100 / scale).toFixed(2)}%`
   return (
     <div
       className={`home-preview-frame overflow-hidden rounded-[1.5rem] bg-paper shadow-2xl shadow-ink/20 ring-1 ring-ink/10 ${className}`.trim()}
@@ -27,12 +28,10 @@ export default function LiveAppFrame({
           title={title}
           loading="lazy"
           tabIndex={-1}
-          className="pointer-events-none absolute top-0 left-0 border-0"
+          className="home-preview-iframe pointer-events-none absolute top-0 left-0 h-full border-0"
           style={{
-            width: pct,
-            height: pct,
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
+            width: desktopWidth,
+            maxWidth: 'none',
           }}
         />
       </div>

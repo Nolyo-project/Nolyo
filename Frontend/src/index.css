@@ -42,6 +42,14 @@ iframe {
   max-width: 100%;
 }
 
+.home-preview-iframe {
+  width: 1440px;
+  max-width: none;
+  height: 100%;
+  transform: scale(calc(100cqi / 1440));
+  transform-origin: top left;
+}
+
 table {
   max-width: 100%;
 }
@@ -317,6 +325,7 @@ textarea {
 }
 
 .home-preview-frame {
+  container-type: inline-size;
   transition:
     transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.55s ease;
