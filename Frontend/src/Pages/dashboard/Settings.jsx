@@ -9,6 +9,7 @@ import { ServicesEditor } from './ServicesEditor'
 import { Accordion, Avatar, PageHeader, PageShell, ghostBtn, icons, primaryBtn, quietBtn } from './ui'
 import { MODULES, workspaceForUser } from '../../data/workspace'
 import { ensurePushSubscription } from '../../utils/push'
+import { passwordStrengthError } from '../../utils/password'
 
 const LEGAL_FORMS = [
   'Micro-entreprise',
@@ -349,6 +350,11 @@ function Settings() {
     setPasswordOk('')
     if (passwords.newPassword !== passwords.confirm) {
       setPasswordError('Les mots de passe ne correspondent pas.')
+      return
+    }
+    const strength = passwordStrengthError(passwords.newPassword)
+    if (strength) {
+      setPasswordError(strength)
       return
     }
     setPendingPassword(true)
@@ -931,7 +937,7 @@ function Settings() {
 
         <Accordion
           title="Mot de passe"
-          hint="Au moins 8 caractères."
+          hint="8 caractères min., une majuscule, un caractère spécial."
           open={open.password}
           onToggle={() => toggle('password')}
         >

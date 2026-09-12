@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { api, mediaUrl } from "../api/client";
-import HomeVideo from "../components/HomeVideo";
 import LiveAppFrame from "../components/LiveAppFrame";
 import TestimonialsCarousel, {
   reviewStats,
 } from "../components/TestimonialsCarousel";
 import TryPreviewButton from "../components/TryPreviewButton";
-import { plans, trialNote } from "../data/plans";
+import { plans } from "../data/plans";
 
 const DEMO_DASHBOARD = "/apercu/dashboard";
 const DEMO_PAGE_FALLBACK = "/p/maison-brume";
@@ -199,6 +198,38 @@ function formatMembers(count) {
   return new Intl.NumberFormat("fr-FR").format(count);
 }
 
+function Reveal({ children, className = "", stagger = false, as: Tag = "div" }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      el.classList.add("is-in");
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        el.classList.add("is-in");
+        io.disconnect();
+      },
+      { threshold: 0.14, rootMargin: "0px 0px -8% 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <Tag
+      ref={ref}
+      className={`${stagger ? "home-reveal-stagger" : "home-reveal"} ${className}`.trim()}
+    >
+      {children}
+    </Tag>
+  );
+}
+
 function Home() {
   const location = useLocation();
   const [faqOpen, setFaqOpen] = useState(0);
@@ -250,59 +281,98 @@ function Home() {
     maximumFractionDigits: 1,
   });
 
+  const priceFrom = new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(essentiel?.price || 9.99);
+
   return (
     <main className="bg-paper">
       {/* 1. Hero */}
       <section
         id="accueil"
-        className="dash-sidebar relative flex min-h-0 flex-col overflow-hidden text-cream lg:min-h-[calc(100svh-4.75rem)]"
+        className="dash-sidebar relative flex min-h-[calc(100svh-4.75rem)] flex-col overflow-hidden text-cream"
       >
-        <div className="relative mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-2 lg:gap-14 lg:py-12">
-          <div>
-            <p className="inline-flex rounded-full bg-copper px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-cream uppercase">
-              L’outil pensé pour les indépendants
-            </p>
-            <h1 className="mt-6 font-display text-4xl leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-7xl">
-              Gérez.
-              <br />
-              Développez.
-              <br />
-              <span className="italic text-copper">Rayonnez.</span>
-            </h1>
-            <p className="mt-6 max-w-md text-lg leading-relaxed text-cream/75">
-              Nolyo réunit vos clients, rendez-vous, devis, chiffre d’affaires
-              et votre présence en ligne au même endroit.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <Link
-                to="/#video"
-                className="inline-flex items-center justify-center rounded-full bg-copper px-6 py-3 text-sm font-semibold text-cream shadow-lg shadow-ink/20 transition hover:bg-copper-dark"
-              >
-                Découvrir Nolyo
-              </Link>
-              <Link
-                to="/#fonctionnement"
-                className="inline-flex items-center justify-center rounded-full border border-cream/25 px-6 py-3 text-sm font-semibold text-cream transition hover:border-cream/45 hover:bg-cream/5"
-              >
-                Voir comment ça marche
-              </Link>
-            </div>
-            <p className="mt-5 text-sm text-cream/80">🎁 Premier mois offert</p>
-            <p className="mt-1 text-sm text-cream/50">
-              Testez Nolyo avant de vous engager.
-            </p>
+        <div
+          className="home-hero-orb pointer-events-none absolute -top-24 -right-16 h-[28rem] w-[28rem] rounded-full bg-copper/25 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="home-hero-orb-b pointer-events-none absolute bottom-[-20%] left-[-10%] h-[22rem] w-[22rem] rounded-full bg-cream/8 blur-3xl"
+          aria-hidden
+        />
+
+        <div className="relative mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center px-5 py-16 sm:px-8 lg:py-20">
+          <p
+            className="home-hero-rise font-display text-sm font-semibold tracking-[0.28em] text-copper uppercase sm:text-base"
+            style={{ animationDelay: "0.05s" }}
+          >
+            Nolyo
+          </p>
+
+          <h1 className="mt-6 max-w-3xl">
+            <span
+              className="home-hero-rise block font-display text-4xl leading-[1.08] font-semibold tracking-tight sm:text-6xl lg:text-7xl"
+              style={{ animationDelay: "0.15s" }}
+            >
+              Gérez votre activité.
+            </span>
+            <span
+              className="home-hero-rise mt-2 block font-display text-3xl leading-[1.12] font-semibold tracking-tight text-cream/90 sm:mt-3 sm:text-5xl lg:text-6xl"
+              style={{ animationDelay: "0.28s" }}
+            >
+              Donnez à vos clients une vraie expérience en ligne.
+            </span>
+          </h1>
+
+          <div
+            className="home-hero-line mt-7 h-px w-24 bg-copper"
+            aria-hidden
+          />
+
+          <p
+            className="home-hero-rise mt-7 max-w-xl text-base leading-relaxed text-cream/75 sm:text-lg"
+            style={{ animationDelay: "0.42s" }}
+          >
+            Avec Nolyo, créez votre espace professionnel, présentez vos services
+            et permettez à vos clients de prendre rendez-vous en ligne.
+          </p>
+
+          <p
+            className="home-hero-rise mt-5 text-sm font-medium text-cream/90 sm:text-base"
+            style={{ animationDelay: "0.52s" }}
+          >
+            À partir de {priceFrom} €/mois.
+          </p>
+
+          <div
+            className="home-hero-rise mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center"
+            style={{ animationDelay: "0.62s" }}
+          >
+            <Link
+              to="/#offres"
+              className="home-cta-pulse inline-flex items-center justify-center rounded-full bg-copper px-7 py-3.5 text-sm font-semibold text-cream shadow-lg shadow-ink/20 transition hover:bg-copper-dark hover:shadow-xl"
+            >
+              Découvrir Nolyo
+            </Link>
+            <TryPreviewButton plan="pro" variant="ghost" className="justify-center">
+              Essayer 5 min
+            </TryPreviewButton>
           </div>
-          <div className="min-w-0">
-            <LiveAppFrame
-              src={DEMO_DASHBOARD}
-              title={`nolyo.fr/dashboard — ${demoLabel}`}
-              aspectClass="aspect-[4/5] sm:aspect-[16/11]"
-              scale={0.68}
-            />
-          </div>
+
+          <p
+            className="home-hero-rise mt-12 max-w-2xl font-display text-xl leading-snug tracking-tight text-cream sm:text-2xl lg:text-3xl"
+            style={{ animationDelay: "0.78s" }}
+          >
+            Votre gestion + votre page professionnelle + vos rendez-vous en
+            ligne.
+          </p>
         </div>
 
-        <div className="relative mx-auto w-full max-w-6xl px-5 pb-8 sm:px-8 lg:pb-10">
+        <div
+          className="home-hero-fade relative mx-auto w-full max-w-6xl px-5 pb-10 sm:px-8"
+          style={{ animationDelay: "0.95s" }}
+        >
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex items-center gap-4 rounded-[1.35rem] bg-cream/12 px-5 py-4 ring-1 ring-cream/12 backdrop-blur-sm">
               {faces.length > 0 ? (
@@ -365,48 +435,10 @@ function Home() {
         </div>
       </section>
 
-      {/* 2. Vidéo */}
-      <section id="video" className="border-b border-ink/6 bg-cream/50">
-        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
-              Présentation
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
-              Découvrez Nolyo en quelques minutes
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-ink-soft">
-              Découvrez comment Nolyo vous aide à gérer votre activité
-              simplement, sans multiplier les outils.
-            </p>
-          </div>
-          <div className="mx-auto mt-10 max-w-4xl">
-            <HomeVideo />
-          </div>
-          <div className="mt-8 flex flex-col items-center gap-3">
-            <p className="text-sm font-medium text-ink">
-              Testez Nolyo gratuitement
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <TryPreviewButton plan="pro" variant="header">
-                Essayer Pro · 5 min
-              </TryPreviewButton>
-              <TryPreviewButton
-                plan="essentiel"
-                variant="header"
-                className="!bg-moss-mid"
-              >
-                Essayer Essentiel · 5 min
-              </TryPreviewButton>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Constat */}
+      {/* 2. Constat */}
       <section id="constat" className="border-b border-ink/6">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
               Le constat
             </p>
@@ -421,12 +453,12 @@ function Home() {
             <p className="mt-5 font-display text-2xl tracking-tight text-moss sm:text-3xl">
               Nolyo rassemble l’essentiel au même endroit.
             </p>
-          </div>
-          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          </Reveal>
+          <Reveal stagger className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {constatCards.map((item) => (
               <article
                 key={item.title}
-                className="rounded-[1.35rem] bg-cream p-5 ring-1 ring-ink/6 transition hover:-translate-y-0.5 hover:ring-ink/12"
+                className="home-reveal-item rounded-[1.35rem] bg-cream p-5 ring-1 ring-ink/6 transition hover:-translate-y-1 hover:ring-ink/12"
               >
                 <h3 className="font-medium text-ink">{item.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-ink-soft">
@@ -434,17 +466,17 @@ function Home() {
                 </p>
               </article>
             ))}
-          </div>
+          </Reveal>
         </div>
       </section>
 
-      {/* 4. Pourquoi Nolyo */}
+      {/* 3. Pourquoi Nolyo */}
       <section
         id="pourquoi"
         className="border-b border-ink/6 bg-moss text-cream"
       >
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
               Pourquoi Nolyo
             </p>
@@ -455,55 +487,52 @@ function Home() {
               Nolyo est pensé pour éviter de multiplier les outils et vous
               permettre de retrouver l’essentiel au même endroit.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="mt-12 grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="min-w-0">
-              <LiveAppFrame
-                src={DEMO_DASHBOARD}
-                title={`Tableau de bord Nolyo — ${demoLabel}`}
-                aspectClass="aspect-[16/12]"
-                scale={0.7}
-              />
+          <Reveal className="home-preview-wrap mt-12 min-w-0 lg:mx-[-1.5rem]">
+            <LiveAppFrame
+              src={DEMO_DASHBOARD}
+              title={`Tableau de bord Nolyo — ${demoLabel}`}
+            />
+          </Reveal>
+
+          <Reveal className="home-chip-stagger mt-10">
+            <div className="flex flex-wrap gap-2.5">
+              {whyModules.map((label) => (
+                <span
+                  key={label}
+                  className="home-chip rounded-full bg-cream/10 px-4 py-2 text-sm text-cream ring-1 ring-cream/15 transition hover:bg-cream/16"
+                >
+                  {label}
+                </span>
+              ))}
             </div>
-            <div>
-              <div className="flex flex-wrap gap-2.5">
-                {whyModules.map((label) => (
-                  <span
-                    key={label}
-                    className="rounded-full bg-cream/10 px-4 py-2 text-sm text-cream ring-1 ring-cream/15"
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-10 font-display text-3xl tracking-tight sm:text-4xl">
-                Moins d’onglets. Moins de bricolage. Plus de clarté.
-              </p>
-            </div>
-          </div>
+            <p className="mt-10 font-display text-3xl tracking-tight sm:text-4xl">
+              Moins d’onglets. Moins de bricolage. Plus de clarté.
+            </p>
+          </Reveal>
         </div>
       </section>
 
-      {/* 5. Comment ça marche */}
+      {/* 4. Comment ça marche */}
       <section
         id="fonctionnement"
         className="border-b border-ink/6 bg-paper-2/70"
       >
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
               Comment ça marche
             </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Simple à prendre en main. Pensé pour votre quotidien.
             </h2>
-          </div>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
+          </Reveal>
+          <Reveal stagger className="mt-12 grid gap-5 md:grid-cols-3">
             {steps.map((step) => (
               <article
                 key={step.n}
-                className="rounded-[1.5rem] bg-cream p-6 ring-1 ring-ink/6"
+                className="home-reveal-item rounded-[1.5rem] bg-cream p-6 ring-1 ring-ink/6 transition hover:-translate-y-1"
               >
                 <p className="font-display text-sm text-copper">{step.n}</p>
                 <h3 className="mt-3 font-display text-2xl">{step.title}</h3>
@@ -512,7 +541,7 @@ function Home() {
                 </p>
               </article>
             ))}
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -656,7 +685,7 @@ function Home() {
       {/* 7. Focus Pro */}
       <section id="pro" className="border-b border-ink/6 bg-cream/40">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
               Nolyo Pro
             </p>
@@ -668,64 +697,69 @@ function Home() {
               votre activité, vos prestations et permettre à vos clients de vous
               contacter ou de réserver en ligne.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="mt-12 grid items-center gap-10 lg:grid-cols-2">
+          <Reveal className="home-preview-wrap mt-12 min-w-0 lg:mx-[-1.5rem]">
             <LiveAppFrame
               src={demoPage}
               title={`nolyo.fr${demoPage}`}
-              aspectClass="aspect-[4/5] sm:aspect-[16/12]"
-              scale={0.62}
             />
-            <div className="space-y-6">
-              {proFocus.map((item) => (
-                <article key={item.title}>
-                  <h3 className="font-display text-2xl tracking-tight">
-                    {item.title}
-                  </h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
-                    {item.text}
-                  </p>
-                </article>
-              ))}
-              <p className="text-sm text-ink-soft">
-                Exemple réel : la page publique du compte démo{" "}
-                <span className="font-medium text-ink">{demoLabel}</span>.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <TryPreviewButton plan="pro" variant="header">
-                  Découvrir Nolyo Pro
-                </TryPreviewButton>
-                <Link
-                  to={demoPage}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-ink ring-1 ring-ink/12 transition hover:bg-ink/5"
-                >
-                  Voir la page démo
-                </Link>
-              </div>
+          </Reveal>
+
+          <Reveal stagger className="mt-12 grid gap-6 sm:grid-cols-3">
+            {proFocus.map((item) => (
+              <article
+                key={item.title}
+                className="home-reveal-item rounded-[1.35rem] bg-cream p-5 ring-1 ring-ink/6"
+              >
+                <h3 className="font-display text-2xl tracking-tight">
+                  {item.title}
+                </h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
+                  {item.text}
+                </p>
+              </article>
+            ))}
+          </Reveal>
+
+          <Reveal className="mt-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <p className="text-sm text-ink-soft">
+              Exemple réel : la page publique du compte démo{" "}
+              <span className="font-medium text-ink">{demoLabel}</span>.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <TryPreviewButton plan="pro" variant="header">
+                Découvrir Nolyo Pro
+              </TryPreviewButton>
+              <Link
+                to={demoPage}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-ink ring-1 ring-ink/12 transition hover:bg-ink/5"
+              >
+                Voir la page démo
+              </Link>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* 8. Pour qui */}
       <section id="pour-qui" className="border-b border-ink/6">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
               Pour qui
             </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Nolyo s’adapte à votre activité.
             </h2>
-          </div>
-          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          </Reveal>
+          <Reveal stagger className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {audiences.map((item) => (
               <article
                 key={item.title}
-                className="rounded-[1.35rem] bg-cream p-5 ring-1 ring-ink/6 transition hover:-translate-y-0.5"
+                className="home-reveal-item rounded-[1.35rem] bg-cream p-5 ring-1 ring-ink/6 transition hover:-translate-y-1"
               >
                 <h3 className="font-medium">{item.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-ink-soft">
@@ -733,30 +767,34 @@ function Home() {
                 </p>
               </article>
             ))}
-          </div>
-          <p className="mt-10 font-display text-2xl tracking-tight text-moss sm:text-3xl">
-            Vous êtes indépendant ? Nolyo est fait pour vous.
-          </p>
+          </Reveal>
+          <Reveal className="mt-10">
+            <p className="font-display text-2xl tracking-tight text-moss sm:text-3xl">
+              Vous êtes indépendant ? Nolyo est fait pour vous.
+            </p>
+          </Reveal>
         </div>
       </section>
 
       {/* 9. Philosophie */}
       <section id="philosophie" className="border-b border-ink/6 bg-paper-2">
         <div className="mx-auto max-w-3xl px-5 py-20 text-center sm:px-8 lg:py-24">
-          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
-            Philosophie
-          </p>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
-            Moins d’outils. Plus de clarté.
-          </h2>
-          <p className="mt-6 text-base leading-relaxed text-ink-soft sm:text-lg">
-            Nolyo est né d’une idée simple : un indépendant ne devrait pas avoir
-            besoin de cinq outils différents pour gérer son activité.
-          </p>
-          <p className="mt-4 text-base leading-relaxed text-ink-soft sm:text-lg">
-            Nous voulons créer un outil simple, accessible et réellement pensé
-            pour les personnes qui travaillent seules.
-          </p>
+          <Reveal>
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+              Philosophie
+            </p>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
+              Moins d’outils. Plus de clarté.
+            </h2>
+            <p className="mt-6 text-base leading-relaxed text-ink-soft sm:text-lg">
+              Nolyo est né d’une idée simple : un indépendant ne devrait pas avoir
+              besoin de cinq outils différents pour gérer son activité.
+            </p>
+            <p className="mt-4 text-base leading-relaxed text-ink-soft sm:text-lg">
+              Nous voulons créer un outil simple, accessible et réellement pensé
+              pour les personnes qui travaillent seules.
+            </p>
+          </Reveal>
         </div>
       </section>
 

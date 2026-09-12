@@ -3,6 +3,7 @@ import { api, apiUpload } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { fieldClass } from '../dashboard/format'
 import { Avatar, primaryBtn, quietBtn } from '../dashboard/ui'
+import { passwordStrengthError } from '../../utils/password'
 import { joinName, splitName } from './shared'
 
 function SettingsView() {
@@ -30,6 +31,13 @@ function SettingsView() {
     event.preventDefault()
     setError('')
     setOk('')
+    if (newPassword) {
+      const strength = passwordStrengthError(newPassword)
+      if (strength) {
+        setError(strength)
+        return
+      }
+    }
     setPending(true)
     try {
       const body = {
@@ -153,7 +161,10 @@ function SettingsView() {
             />
           </label>
         </div>
-        <p className="mt-3 text-xs text-ink-soft">Le mot de passe actuel est demandé pour changer l’e-mail ou le mot de passe.</p>
+        <p className="mt-3 text-xs text-ink-soft">
+          Le mot de passe actuel est demandé pour changer l’e-mail ou le mot de passe. Nouveau mot de
+          passe : 8 caractères min., une majuscule, un caractère spécial.
+        </p>
         {error ? <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
         {ok ? <p className="mt-4 rounded-2xl bg-moss/10 px-4 py-3 text-sm text-moss">{ok}</p> : null}
         <div className="mt-6 flex flex-wrap items-center gap-4">

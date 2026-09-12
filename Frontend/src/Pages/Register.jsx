@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { homeForUser } from '../auth/homeForUser'
 import { useAuth } from '../context/AuthContext'
+import { passwordStrengthError } from '../utils/password'
 
 const fieldClass =
   'mt-1.5 w-full rounded-2xl border border-ink/10 bg-cream px-4 py-3 text-sm outline-none transition focus:border-copper'
@@ -29,6 +30,12 @@ function Register() {
 
     if (form.password !== form.confirm) {
       setError('Les mots de passe ne correspondent pas.')
+      return
+    }
+
+    const strength = passwordStrengthError(form.password)
+    if (strength) {
+      setError(strength)
       return
     }
 
@@ -111,6 +118,9 @@ function Register() {
             onChange={update}
             required
           />
+          <span className="mt-1.5 block text-xs text-ink-soft">
+            Au moins 8 caractères, une majuscule et un caractère spécial (! @ # ?…).
+          </span>
         </label>
         <label className="block text-sm font-medium">
           Confirmer le mot de passe

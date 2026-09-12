@@ -71,6 +71,30 @@ router.post('/', async (req, res) => {
   }
 
   let mail = { ok: false, error: null, founder: false }
+
+  // Fondateur d’abord (EmailJS 1 req/s) — sinon l’alerte tombe souvent
+  try {
+    const founder =
+      (await User.findOne({ role: 'president' }).select('name email')) || {
+        name: process.env.PRESIDENT_NAME || 'Florentin',
+        email: '',
+      }
+    const alertTo = String(process.env.PRESIDENT_EMAIL || founder.email || '')
+      .trim()
+      .toLowerCase()
+    if (!alertTo) {
+      console.error('Mail fondateur: aucune adresse (PRESIDENT_EMAIL / compte président)')
+    } else {
+      await sendFounderNewRequest(request, { name: founder.name, email: alertTo })
+      mail.founder = true
+      console.info('[mail] alerte fondateur →', alertTo)
+    }
+  } catch (err) {
+    console.error('Mail fondateur demande', err?.text || err.message)
+  }
+
+  await sleep(2000)
+
   try {
     await sendRequestReceived(request)
     mail.ok = true
@@ -78,17 +102,6 @@ router.post('/', async (req, res) => {
   } catch (err) {
     mail.error = err?.text || err?.message || 'Échec envoi e-mail'
     console.error('Mail demande', mail.error)
-  }
-
-  // EmailJS : 1 req/s — alerte fondateur juste après
-  try {
-    await sleep(1200)
-    const founder = await User.findOne({ role: 'president' }).select('name email')
-    await sendFounderNewRequest(request, founder)
-    mail.founder = true
-    console.info('[mail] alerte fondateur →', founder?.email)
-  } catch (err) {
-    console.error('Mail fondateur demande', err?.text || err.message)
   }
 
   res.status(201).json({

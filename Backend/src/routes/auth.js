@@ -12,6 +12,7 @@ const { pickWorkspace } = require('../data/workspace')
 const { startMemberSubscription } = require('../utils/stripe')
 const { sendWelcome } = require('../utils/emails')
 const { applyOnboarding } = require('../utils/applyOnboarding')
+const { passwordStrengthError } = require('../utils/password')
 
 async function sendUser(res, user, status = 200, extras = {}) {
   const json = await AccountDeletionRequest.decorateUser(user)
@@ -112,8 +113,8 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'Adresse e-mail invalide.' })
   }
 
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' })
+  if (passwordStrengthError(password)) {
+    return res.status(400).json({ error: passwordStrengthError(password) })
   }
 
   if (!code) {
@@ -335,8 +336,9 @@ router.patch('/me', requireAuth, async (req, res) => {
   }
 
   if (newPassword) {
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' })
+    const strength = passwordStrengthError(newPassword)
+    if (strength) {
+      return res.status(400).json({ error: strength })
     }
     if (!(await req.user.checkPassword(currentPassword))) {
       return res.status(400).json({ error: 'Mot de passe actuel incorrect.' })
