@@ -75,16 +75,16 @@ function wrapHtml(body) {
  * Envoi via EmailJS (1 template générique : to_email, subject, message, html_body).
  * Activer « Allow EmailJS API for non-browser applications » dans Account → Security.
  */
-async function sendMail({ to, subject, text, html }) {
-  if (!to || !subject) return { skipped: true }
+async function sendMail({ to, subject, text, html, replyTo }) {
+  if (!to || !subject) return { skipped: true, reason: 'missing-to-or-subject' }
 
   const htmlBody = html ? wrapHtml(html) : ''
   const rawText = text || (html ? String(html).replace(/<[^>]+>/g, ' ') : '')
   const message = `${rawText.trim()}${signatureText()}`
 
   if (!mailEnabled()) {
-    console.info('[mail:dry-run]', subject, '→', to)
-    return { skipped: true }
+    console.warn('[mail:dry-run] EmailJS non configuré — e-mail non envoyé:', subject, '→', to)
+    return { skipped: true, reason: 'emailjs-disabled' }
   }
 
   await emailjs.send(
@@ -92,10 +92,12 @@ async function sendMail({ to, subject, text, html }) {
     process.env.EMAILJS_TEMPLATE_ID,
     {
       to_email: to,
+      email: to,
       subject,
       message,
       html_body: htmlBody,
       from_name: process.env.MAIL_FROM_NAME || 'Nolyo',
+      reply_to: replyTo || '',
     },
     {
       publicKey: process.env.EMAILJS_PUBLIC_KEY,

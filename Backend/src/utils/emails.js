@@ -351,12 +351,33 @@ ${company}`
     guestConfirm?.fallbackBody ||
     defaultGuestBody
 
-  const tasks = []
+  const jobs = []
+
+  if (contact.email) {
+    const htmlBody = customBody
+      .split(/\n+/)
+      .map((line) => `<p style="line-height:1.6;margin:0 0 12px;">${line || '&nbsp;'}</p>`)
+      .join('')
+    jobs.push({
+      label: 'client',
+      mail: {
+        to: contact.email,
+        replyTo: owner.email,
+        subject: customSubject,
+        text: customBody,
+        html: htmlBody,
+      },
+    })
+  } else {
+    console.warn('Booking mail: pas d’e-mail client, confirmation non envoyée')
+  }
 
   if (notif.emailBooking !== false) {
-    tasks.push(
-      sendMail({
+    jobs.push({
+      label: 'owner',
+      mail: {
         to: owner.email,
+        replyTo: contact.email || owner.email,
         subject: `Nouveau rendez-vous — ${contact.name || guestFirst}`,
         text: `Bonjour ${firstName(owner.name)},
 
@@ -374,26 +395,23 @@ Ouvrez votre agenda Nolyo pour le détail.`,
           ${contact.phone ? `<p style="line-height:1.6;margin:0 0 4px;">Tél. : ${contact.phone}</p>` : ''}
           <p style="line-height:1.6;margin:0 0 4px;">Prestation : ${serviceName}</p>
           <p style="line-height:1.6;margin:0 0 16px;">Quand : ${dateLabel} à ${timeLabel}</p>`,
-      }),
-    )
+      },
+    })
   }
 
-  if (contact.email) {
-    const htmlBody = customBody
-      .split(/\n+/)
-      .map((line) => `<p style="line-height:1.6;margin:0 0 12px;">${line || '&nbsp;'}</p>`)
-      .join('')
-    tasks.push(
-      sendMail({
-        to: contact.email,
-        subject: customSubject,
-        text: customBody,
-        html: htmlBody,
-      }),
-    )
+  // EmailJS : 1 requête / seconde. Les envoyer en parallèle faisait échouer la confirmation client.
+  for (let i = 0; i < jobs.length; i += 1) {
+    if (i > 0) await new Promise((resolve) => setTimeout(resolve, 1200))
+    const job = jobs[i]
+    try {
+      const result = await sendMail(job.mail)
+      if (result?.skipped) {
+        console.warn(`[mail] ${job.label} ignoré (${result.reason || 'skipped'}) → ${job.mail.to}`)
+      }
+    } catch (err) {
+      console.error(`[mail] ${job.label} échoué → ${job.mail.to}`, err?.text || err?.message || err)
+    }
   }
-
-  await Promise.allSettled(tasks)
 }
 
 async function sendMaintenanceNotice(user, { startsAt, endsAt, message } = {}) {
