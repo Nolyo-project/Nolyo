@@ -84,8 +84,11 @@ function normalizeEmail(value) {
 
 /**
  * Envoi via EmailJS (1 template générique).
- * Dans le template EmailJS, le champ « To Email » doit être exactement : {{to_email}}
- * Subject = {{subject}} · Body HTML = {{{html_body}}} (triples accolades)
+ * Dans le template EmailJS :
+ *   To Email = {{{to_email}}}   (triples accolades — sinon le @ est échappé → 422 corrupted)
+ *   Reply To = {{{reply_to}}}
+ *   Subject  = {{subject}}
+ *   Content  = {{{html_body}}}
  * Account → Security : activer l’API hors navigateur + private key
  */
 async function sendMail({ to, subject, text, html, replyTo }) {
@@ -109,11 +112,9 @@ async function sendMail({ to, subject, text, html, replyTo }) {
       process.env.EMAILJS_SERVICE_ID,
       process.env.EMAILJS_TEMPLATE_ID,
       {
-        // Même valeur sous plusieurs noms : le template doit utiliser {{to_email}}
         to_email: recipient,
         email: recipient,
         user_email: recipient,
-        to: recipient,
         subject: String(subject).trim(),
         message,
         html_body: htmlBody,
