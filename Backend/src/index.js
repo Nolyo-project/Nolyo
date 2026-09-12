@@ -176,6 +176,14 @@ async function start() {
   await new Promise((resolve, reject) => {
     const server = app.listen(port, () => {
       console.log(`API listening on http://localhost:${port}`)
+      const { mailEnabled } = require('./utils/mail')
+      if (mailEnabled()) {
+        console.info(
+          `EmailJS OK (service=${process.env.EMAILJS_SERVICE_ID}, template=${process.env.EMAILJS_TEMPLATE_ID}, privateKey=${process.env.EMAILJS_PRIVATE_KEY ? 'oui' : 'non'})`,
+        )
+      } else {
+        console.warn('EmailJS non configuré — les e-mails ne partiront pas (EMAILJS_* manquants).')
+      }
       resolve(server)
     })
     server.on('error', (err) => {
