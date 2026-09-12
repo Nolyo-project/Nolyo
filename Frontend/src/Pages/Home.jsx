@@ -302,7 +302,7 @@ function Home() {
           aria-hidden
         />
 
-        <div className="relative mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center px-5 py-16 sm:px-8 lg:py-20">
+        <div className="relative mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center px-5 py-12 sm:px-8 sm:py-16 lg:py-20">
           <p
             className="home-hero-rise font-display text-sm font-semibold tracking-[0.28em] text-copper uppercase sm:text-base"
             style={{ animationDelay: "0.05s" }}
@@ -312,13 +312,13 @@ function Home() {
 
           <h1 className="mt-6 max-w-3xl">
             <span
-              className="home-hero-rise block font-display text-4xl leading-[1.08] font-semibold tracking-tight sm:text-6xl lg:text-7xl"
+              className="home-hero-rise block font-display text-[2rem] leading-[1.1] font-semibold tracking-tight sm:text-5xl lg:text-6xl"
               style={{ animationDelay: "0.15s" }}
             >
               Gérez votre activité.
             </span>
             <span
-              className="home-hero-rise mt-2 block font-display text-3xl leading-[1.12] font-semibold tracking-tight text-cream/90 sm:mt-3 sm:text-5xl lg:text-6xl"
+              className="home-hero-rise mt-2 block font-display text-[1.65rem] leading-[1.15] font-semibold tracking-tight text-cream/90 sm:mt-3 sm:text-4xl lg:text-5xl"
               style={{ animationDelay: "0.28s" }}
             >
               Donnez à vos clients une vraie expérience en ligne.
@@ -489,7 +489,7 @@ function Home() {
             </p>
           </Reveal>
 
-          <Reveal className="home-preview-wrap mt-12 min-w-0 lg:mx-[-1.5rem]">
+          <Reveal className="home-preview-wrap mt-10 min-w-0 sm:mt-12">
             <LiveAppFrame
               src={DEMO_DASHBOARD}
               title={`Tableau de bord Nolyo — ${demoLabel}`}
@@ -699,11 +699,10 @@ function Home() {
             </p>
           </Reveal>
 
-          <Reveal className="home-preview-wrap mt-12 min-w-0 lg:mx-[-1.5rem]">
+          <Reveal className="home-preview-wrap mt-10 min-w-0 sm:mt-12">
             <LiveAppFrame
               src={demoPage}
               title={`nolyo.fr${demoPage}`}
-              variant="page"
             />
           </Reveal>
 

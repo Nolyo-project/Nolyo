@@ -100,8 +100,8 @@ function DemoDashboard() {
   const planName = planLabels[user?.subscription?.plan] || 'Nolyo Pro'
 
   return (
-    <div className="grid h-dvh min-h-dvh grid-cols-[17.5rem_minmax(0,1fr)] overflow-hidden bg-paper text-ink">
-      <aside className="dash-sidebar flex h-full min-h-0 flex-col text-cream" aria-hidden>
+    <div className="flex min-h-dvh flex-col overflow-hidden bg-paper text-ink md:grid md:h-dvh md:grid-cols-[16.5rem_minmax(0,1fr)]">
+      <aside className="dash-sidebar hidden h-full min-h-0 flex-col text-cream md:flex" aria-hidden>
         <div className="flex flex-col items-start gap-2.5 px-5 pt-6 pb-4">
           <Logo to="/" inverted className="pointer-events-none block" />
           <p className="text-[11px] font-semibold tracking-[0.18em] text-cream/55 uppercase">{planName}</p>
@@ -125,8 +125,11 @@ function DemoDashboard() {
       </aside>
 
       <div className="dash-canvas flex min-h-0 min-w-0 flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-ink/6 bg-cream/50 px-5 py-3 backdrop-blur-md lg:px-10">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-ink/6 bg-cream/50 px-4 py-3 backdrop-blur-md sm:px-5 lg:px-10">
           <div className="flex min-w-0 items-center gap-3">
+            <div className="md:hidden">
+              <Logo to="/" className="pointer-events-none" />
+            </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Espace</p>
               <p className="truncate text-sm font-medium">{spaceName}</p>

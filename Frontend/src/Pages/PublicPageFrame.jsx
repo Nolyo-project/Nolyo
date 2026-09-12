@@ -47,7 +47,7 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
     }`
 
   return (
-    <div className="public-page min-h-svh" style={themeStyle}>
+    <div className={`public-page min-h-svh overflow-x-clip ${embedded ? 'public-page-embed' : ''}`} style={themeStyle}>
       <header className="absolute inset-x-0 top-0 z-20">
         <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-2 px-4 py-4 sm:gap-3 sm:px-8 lg:px-12">
           <p className="min-w-0 truncate text-[10px] font-semibold tracking-[0.22em] text-cream/80 uppercase sm:text-[11px] sm:tracking-[0.28em]">
@@ -70,7 +70,7 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
 
       <div
         className={`relative z-0 overflow-hidden bg-moss ${
-          embedded ? 'h-36 sm:h-44' : 'h-44 sm:h-72 lg:h-[28rem]'
+          embedded ? 'h-32 sm:h-40' : 'h-40 sm:h-56 lg:h-80'
         }`}
       >
         {cover && !coverFailed ? (
