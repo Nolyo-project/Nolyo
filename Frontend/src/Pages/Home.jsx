@@ -317,13 +317,13 @@ function Home() {
 
           <h1 className="mt-6 max-w-3xl">
             <span
-              className="home-hero-rise block font-display text-[2rem] leading-[1.1] font-semibold tracking-tight sm:text-5xl lg:text-6xl"
+              className="home-hero-rise block font-display text-4xl leading-[1.08] font-semibold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl"
               style={{ animationDelay: "0.15s" }}
             >
               Gérez votre activité.
             </span>
             <span
-              className="home-hero-rise mt-2 block font-display text-[1.65rem] leading-[1.15] font-semibold tracking-tight text-cream/90 sm:mt-3 sm:text-4xl lg:text-5xl"
+              className="home-hero-rise mt-2 block font-display text-3xl leading-[1.12] font-semibold tracking-tight text-cream/90 sm:mt-3 sm:text-4xl lg:text-5xl"
               style={{ animationDelay: "0.28s" }}
             >
               Donnez à vos clients une vraie expérience en ligne.
@@ -495,7 +495,7 @@ function Home() {
           </Reveal>
 
           <Reveal className="home-preview-wrap mt-10 min-w-0 sm:mt-12">
-            <LandingDashPreview label={demoLabel} />
+            <LandingDashPreview />
           </Reveal>
 
           <Reveal className="home-chip-stagger mt-10">
@@ -702,7 +702,7 @@ function Home() {
           </Reveal>
 
           <Reveal className="home-preview-wrap mt-10 min-w-0 sm:mt-12">
-            <LandingPagePreview slug={demoSlug} />
+            <LandingPagePreview />
           </Reveal>
 
           <Reveal stagger className="mt-12 grid gap-6 sm:grid-cols-3">

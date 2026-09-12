@@ -18,6 +18,19 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  font-size: 16px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 18px;
+  }
+}
+
+@media (min-width: 1280px) {
+  html {
+    font-size: 20px;
+  }
 }
 
 html,
