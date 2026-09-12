@@ -1,150 +1,152 @@
-import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { api, mediaUrl } from '../api/client'
-import HomeVideo from '../components/HomeVideo'
-import LiveAppFrame from '../components/LiveAppFrame'
-import TestimonialsCarousel, { reviewStats } from '../components/TestimonialsCarousel'
-import TryPreviewButton from '../components/TryPreviewButton'
-import { plans, trialNote } from '../data/plans'
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { api, mediaUrl } from "../api/client";
+import HomeVideo from "../components/HomeVideo";
+import LiveAppFrame from "../components/LiveAppFrame";
+import TestimonialsCarousel, {
+  reviewStats,
+} from "../components/TestimonialsCarousel";
+import TryPreviewButton from "../components/TryPreviewButton";
+import { plans, trialNote } from "../data/plans";
 
-const DEMO_DASHBOARD = '/apercu/dashboard'
-const DEMO_PAGE_FALLBACK = '/p/maison-brume'
+const DEMO_DASHBOARD = "/apercu/dashboard";
+const DEMO_PAGE_FALLBACK = "/p/maison-brume";
 
-const essentiel = plans.find((p) => p.id === 'essentiel')
-const pro = plans.find((p) => p.id === 'pro')
+const essentiel = plans.find((p) => p.id === "essentiel");
+const pro = plans.find((p) => p.id === "pro");
 
 const constatCards = [
   {
-    title: 'Vos clients',
-    text: 'Retrouvez vos clients, prospects et informations importantes dans un seul espace.',
+    title: "Vos clients",
+    text: "Retrouvez vos clients, prospects et informations importantes dans un seul espace.",
   },
   {
-    title: 'Vos rendez-vous',
-    text: 'Gérez votre agenda et gardez les informations liées à chaque rendez-vous.',
+    title: "Vos rendez-vous",
+    text: "Gérez votre agenda et gardez les informations liées à chaque rendez-vous.",
   },
   {
-    title: 'Votre activité',
-    text: 'Suivez votre chiffre d’affaires et gardez une vision claire de votre activité.',
+    title: "Votre activité",
+    text: "Suivez votre chiffre d’affaires et gardez une vision claire de votre activité.",
   },
   {
-    title: 'Votre présence en ligne',
-    text: 'Avec Nolyo Pro, présentez votre activité et permettez à vos clients de réserver en ligne.',
+    title: "Votre présence en ligne",
+    text: "Avec Nolyo Pro, présentez votre activité et permettez à vos clients de réserver en ligne.",
   },
-]
+];
 
 const whyModules = [
-  'Clients',
-  'Agenda',
-  'Relances',
-  'Devis',
-  'Chiffre d’affaires',
-  'Statistiques',
-  'Page professionnelle',
-]
+  "Clients",
+  "Agenda",
+  "Relances",
+  "Devis",
+  "Chiffre d’affaires",
+  "Statistiques",
+  "Page professionnelle",
+];
 
 const steps = [
   {
-    n: '01',
-    title: 'Testez',
-    text: 'Découvrez Nolyo pendant 5 minutes, sans créer de compte et sans carte bancaire.',
+    n: "01",
+    title: "Testez",
+    text: "Découvrez Nolyo pendant 5 minutes, sans créer de compte et sans carte bancaire.",
   },
   {
-    n: '02',
-    title: 'Choisissez',
-    text: 'Essentiel pour gérer votre activité, ou Pro pour gérer, présenter et développer votre activité.',
+    n: "02",
+    title: "Choisissez",
+    text: "Essentiel pour gérer votre activité, ou Pro pour gérer, présenter et développer votre activité.",
   },
   {
-    n: '03',
-    title: 'Développez',
-    text: 'Configurez votre espace et commencez à centraliser votre activité.',
+    n: "03",
+    title: "Développez",
+    text: "Configurez votre espace et commencez à centraliser votre activité.",
   },
-]
+];
 
 const essentielFeatures = [
-  'Tableau de bord privé',
-  'Fiches clients & historique',
-  'Prospects et suivi',
-  'Agenda et rendez-vous',
-  'Notes et tâches',
-  'Chiffre d’affaires, mois par mois',
-  'Relances clients',
-  'Paiement sécurisé Stripe',
-]
+  "Tableau de bord privé",
+  "Fiches clients & historique",
+  "Prospects et suivi",
+  "Agenda et rendez-vous",
+  "Notes et tâches",
+  "Chiffre d’affaires, mois par mois",
+  "Relances clients",
+  "Paiement sécurisé Stripe",
+];
 
 const proFeatures = [
-  'Tout Nolyo Essentiel',
-  'Page professionnelle personnalisée',
-  'Réservations en ligne 24h/24',
-  'Vos clients réservent sans créer de compte',
-  'Demandes de devis en ligne',
-  'Ajout au calendrier (Google & Apple)',
-  'Congés : fermeture auto de la réservation',
-  'QR Code vers votre page',
-  'Avis clients modérés',
-  'Tableau de bord & statistiques',
-  'Dépenses et cotisations',
-]
+  "Tout Nolyo Essentiel",
+  "Page professionnelle personnalisée",
+  "Réservations en ligne 24h/24",
+  "Vos clients réservent sans créer de compte",
+  "Demandes de devis en ligne",
+  "Ajout au calendrier (Google & Apple)",
+  "Congés : fermeture auto de la réservation",
+  "QR Code vers votre page",
+  "Avis clients modérés",
+  "Tableau de bord & statistiques",
+  "Dépenses et cotisations",
+];
 
 const proFocus = [
   {
-    title: 'Présentez-vous',
-    text: 'Votre activité, vos prestations et votre univers.',
+    title: "Présentez-vous",
+    text: "Votre activité, vos prestations et votre univers.",
   },
   {
-    title: 'Soyez trouvé',
-    text: 'Partagez facilement votre page avec un lien ou un QR Code.',
+    title: "Soyez trouvé",
+    text: "Partagez facilement votre page avec un lien ou un QR Code.",
   },
   {
-    title: 'Soyez réservé',
-    text: 'Vos clients choisissent directement un créneau disponible.',
+    title: "Soyez réservé",
+    text: "Vos clients choisissent directement un créneau disponible.",
   },
-]
+];
 
 const audiences = [
   {
-    title: 'Beauté & bien-être',
-    text: 'Coiffeurs, esthéticiennes, praticiens, masseurs…',
+    title: "Beauté & bien-être",
+    text: "Coiffeurs, esthéticiennes, praticiens, masseurs…",
   },
   {
-    title: 'Freelances',
-    text: 'Développeurs, graphistes, consultants…',
+    title: "Freelances",
+    text: "Développeurs, graphistes, consultants…",
   },
   {
-    title: 'Prestataires',
-    text: 'Artisans, photographes, services à domicile…',
+    title: "Prestataires",
+    text: "Artisans, photographes, services à domicile…",
   },
   {
-    title: 'Indépendants',
-    text: 'Toute personne qui souhaite mieux gérer son activité.',
+    title: "Indépendants",
+    text: "Toute personne qui souhaite mieux gérer son activité.",
   },
-]
+];
 
 const faqItems = [
   {
-    q: 'Nolyo est-il gratuit ?',
-    a: 'Le premier mois est offert. Ensuite, vous choisissez votre formule (Essentiel ou Pro) avec un engagement de 6 mois — soit 7 mois au total.',
+    q: "Nolyo est-il gratuit ?",
+    a: "Le premier mois est offert. Ensuite, vous choisissez votre formule (Essentiel ou Pro) avec un engagement de 6 mois — soit 7 mois au total.",
   },
   {
-    q: 'Puis-je tester Nolyo sans créer de compte ?',
-    a: 'Oui. Vous pouvez découvrir l’interface pendant 5 minutes, sans créer de compte ni renseigner votre carte bancaire.',
+    q: "Puis-je tester Nolyo sans créer de compte ?",
+    a: "Oui. Vous pouvez découvrir l’interface pendant 5 minutes, sans créer de compte ni renseigner votre carte bancaire.",
   },
   {
-    q: 'Quelle est la différence entre Essentiel et Pro ?',
-    a: 'Essentiel sert à gérer votre activité en privé (clients, agenda, notes, chiffre d’affaires, relances). Pro ajoute la page professionnelle, la réservation et les devis en ligne, le QR Code, les avis, les statistiques, les congés et le suivi des dépenses.',
+    q: "Quelle est la différence entre Essentiel et Pro ?",
+    a: "Essentiel sert à gérer votre activité en privé (clients, agenda, notes, chiffre d’affaires, relances). Pro ajoute la page professionnelle, la réservation et les devis en ligne, le QR Code, les avis, les statistiques, les congés et le suivi des dépenses.",
   },
   {
-    q: 'Puis-je changer de formule ?',
-    a: 'Vous pouvez passer une fois d’Essentiel à Pro depuis votre espace (pendant le mois offert sans surcoût ; ensuite la différence du mois en cours peut être prélevée). Le retour de Pro vers Essentiel n’est pas prévu.',
+    q: "Puis-je changer de formule ?",
+    a: "Vous pouvez passer une fois d’Essentiel à Pro depuis votre espace (pendant le mois offert sans surcoût ; ensuite la différence du mois en cours peut être prélevée). Le retour de Pro vers Essentiel n’est pas prévu.",
   },
   {
-    q: 'Comment fonctionne la réservation en ligne ?',
-    a: 'Avec Nolyo Pro, vos visiteurs ouvrent votre page publique, choisissent une prestation et un créneau disponible. Le rendez-vous arrive dans votre agenda. Les jours de congés que vous définissez ferment automatiquement la réservation.',
+    q: "Comment fonctionne la réservation en ligne ?",
+    a: "Avec Nolyo Pro, vos visiteurs ouvrent votre page publique, choisissent une prestation et un créneau disponible. Le rendez-vous arrive dans votre agenda. Les jours de congés que vous définissez ferment automatiquement la réservation.",
   },
   {
-    q: 'Nolyo est-il adapté à mon activité ?',
-    a: 'Nolyo est pensé pour les indépendants et petites structures qui veulent centraliser clients, rendez-vous et suivi d’activité — avec une vitrine en ligne si vous choisissez Pro.',
+    q: "Nolyo est-il adapté à mon activité ?",
+    a: "Nolyo est pensé pour les indépendants et petites structures qui veulent centraliser clients, rendez-vous et suivi d’activité — avec une vitrine en ligne si vous choisissez Pro.",
   },
-]
+];
 
 function FaqItem({ item, open, onToggle }) {
   return (
@@ -156,21 +158,31 @@ function FaqItem({ item, open, onToggle }) {
         onClick={onToggle}
       >
         <span className="font-medium text-ink">{item.q}</span>
-        <span className={`shrink-0 text-ink-soft transition ${open ? 'rotate-180' : ''}`} aria-hidden>
+        <span
+          className={`shrink-0 text-ink-soft transition ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        >
           ⌄
         </span>
       </button>
-      {open ? <p className="pb-5 text-sm leading-relaxed text-ink-soft">{item.a}</p> : null}
+      {open ? (
+        <p className="pb-5 text-sm leading-relaxed text-ink-soft">{item.a}</p>
+      ) : null}
     </div>
-  )
+  );
 }
 
 function Stars({ rating }) {
-  const filled = Math.round(rating)
+  const filled = Math.round(rating);
   return (
     <span className="inline-flex items-center gap-0.5 text-copper" aria-hidden>
       {[1, 2, 3, 4, 5].map((n) => (
-        <svg key={n} viewBox="0 0 20 20" className="h-4 w-4" fill={n <= filled ? 'currentColor' : 'none'}>
+        <svg
+          key={n}
+          viewBox="0 0 20 20"
+          className="h-4 w-4"
+          fill={n <= filled ? "currentColor" : "none"}
+        >
           <path
             d="M10 2.5l2.2 4.46 4.92.72-3.56 3.47.84 4.9L10 13.74 5.6 16.05l.84-4.9L2.88 7.68l4.92-.72L10 2.5z"
             stroke="currentColor"
@@ -180,58 +192,63 @@ function Stars({ rating }) {
         </svg>
       ))}
     </span>
-  )
+  );
 }
 
 function formatMembers(count) {
-  return new Intl.NumberFormat('fr-FR').format(count)
+  return new Intl.NumberFormat("fr-FR").format(count);
 }
 
 function Home() {
-  const location = useLocation()
-  const [faqOpen, setFaqOpen] = useState(0)
-  const [stats, setStats] = useState({ members: null, faces: [] })
-  const [avisStats, setAvisStats] = useState({ rating: reviewStats.rating, count: reviewStats.count })
-  const [demoPage, setDemoPage] = useState(DEMO_PAGE_FALLBACK)
-  const [demoLabel, setDemoLabel] = useState('Maison Brume')
+  const location = useLocation();
+  const [faqOpen, setFaqOpen] = useState(0);
+  const [stats, setStats] = useState({ members: null, faces: [] });
+  const [avisStats, setAvisStats] = useState({
+    rating: reviewStats.rating,
+    count: reviewStats.count,
+  });
+  const [demoPage, setDemoPage] = useState(DEMO_PAGE_FALLBACK);
+  const [demoLabel, setDemoLabel] = useState("Maison Brume");
 
   useEffect(() => {
-    if (!location.hash) return
-    const el = document.querySelector(location.hash)
-    el?.scrollIntoView({ behavior: 'smooth' })
-  }, [location.hash])
+    if (!location.hash) return;
+    const el = document.querySelector(location.hash);
+    el?.scrollIntoView({ behavior: "smooth" });
+  }, [location.hash]);
 
   useEffect(() => {
-    api('/api/public/landing-demo')
+    api("/api/public/landing-demo")
       .then((data) => {
-        const slug = data.pageSlug || data.user?.page?.slug || 'maison-brume'
-        setDemoPage(`/p/${slug}`)
+        const slug = data.pageSlug || data.user?.page?.slug || "maison-brume";
+        setDemoPage(`/p/${slug}`);
         const company =
-          data.user?.subscription?.company || data.user?.onboarding?.company || data.user?.name
-        if (company) setDemoLabel(company)
+          data.user?.subscription?.company ||
+          data.user?.onboarding?.company ||
+          data.user?.name;
+        if (company) setDemoLabel(company);
       })
       .catch(() => {
-        setDemoPage(DEMO_PAGE_FALLBACK)
-        setDemoLabel('Maison Brume')
-      })
-  }, [])
+        setDemoPage(DEMO_PAGE_FALLBACK);
+        setDemoLabel("Maison Brume");
+      });
+  }, []);
   useEffect(() => {
-    api('/api/public/stats')
+    api("/api/public/stats")
       .then((data) =>
         setStats({
           members: Number(data.members) || 0,
           faces: Array.isArray(data.faces) ? data.faces : [],
         }),
       )
-      .catch(() => setStats({ members: 0, faces: [] }))
-  }, [])
+      .catch(() => setStats({ members: 0, faces: [] }));
+  }, []);
 
-  const members = stats.members
-  const faces = stats.faces
-  const ratingLabel = Number(avisStats.rating || 0).toLocaleString('fr-FR', {
+  const members = stats.members;
+  const faces = stats.faces;
+  const ratingLabel = Number(avisStats.rating || 0).toLocaleString("fr-FR", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
-  })
+  });
 
   return (
     <main className="bg-paper">
@@ -253,8 +270,8 @@ function Home() {
               <span className="italic text-copper">Rayonnez.</span>
             </h1>
             <p className="mt-6 max-w-md text-lg leading-relaxed text-cream/75">
-              Nolyo réunit vos clients, rendez-vous, devis, chiffre d’affaires et votre présence en ligne au même
-              endroit.
+              Nolyo réunit vos clients, rendez-vous, devis, chiffre d’affaires
+              et votre présence en ligne au même endroit.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <Link
@@ -271,7 +288,9 @@ function Home() {
               </Link>
             </div>
             <p className="mt-5 text-sm text-cream/80">🎁 Premier mois offert</p>
-            <p className="mt-1 text-sm text-cream/50">Testez Nolyo avant de vous engager.</p>
+            <p className="mt-1 text-sm text-cream/50">
+              Testez Nolyo avant de vous engager.
+            </p>
           </div>
           <div className="min-w-0">
             <LiveAppFrame
@@ -311,10 +330,12 @@ function Home() {
               ) : null}
               <div>
                 <p className="font-display text-3xl tracking-tight">
-                  {members === null ? '…' : formatMembers(members)}
+                  {members === null ? "…" : formatMembers(members)}
                 </p>
                 <p className="text-sm text-cream/65">
-                  {members === 1 ? 'indépendant sur Nolyo' : 'indépendants sur Nolyo'}
+                  {members === 1
+                    ? "indépendant sur Nolyo"
+                    : "indépendants sur Nolyo"}
                 </p>
               </div>
             </div>
@@ -323,15 +344,21 @@ function Home() {
               className="flex items-center justify-between gap-4 rounded-[1.35rem] bg-cream px-5 py-4 text-ink shadow-lg shadow-ink/10 ring-1 ring-cream/80 transition hover:-translate-y-0.5"
             >
               <div>
-                <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Avis</p>
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">
+                  Avis
+                </p>
                 <p className="mt-1 font-display text-3xl tracking-tight">
                   {ratingLabel}
-                  <span className="ml-1 text-base font-sans font-medium text-ink-soft">/ 5</span>
+                  <span className="ml-1 text-base font-sans font-medium text-ink-soft">
+                    / 5
+                  </span>
                 </p>
               </div>
               <div className="text-right">
                 <Stars rating={avisStats.rating} />
-                <p className="mt-1 text-sm text-ink-soft">{avisStats.count} avis</p>
+                <p className="mt-1 text-sm text-ink-soft">
+                  {avisStats.count} avis
+                </p>
               </div>
             </Link>
           </div>
@@ -342,24 +369,33 @@ function Home() {
       <section id="video" className="border-b border-ink/6 bg-cream/50">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Présentation</p>
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+              Présentation
+            </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Découvrez Nolyo en quelques minutes
             </h2>
             <p className="mt-4 text-base leading-relaxed text-ink-soft">
-              Découvrez comment Nolyo vous aide à gérer votre activité simplement, sans multiplier les outils.
+              Découvrez comment Nolyo vous aide à gérer votre activité
+              simplement, sans multiplier les outils.
             </p>
           </div>
           <div className="mx-auto mt-10 max-w-4xl">
             <HomeVideo />
           </div>
           <div className="mt-8 flex flex-col items-center gap-3">
-            <p className="text-sm font-medium text-ink">Testez Nolyo gratuitement</p>
+            <p className="text-sm font-medium text-ink">
+              Testez Nolyo gratuitement
+            </p>
             <div className="flex flex-wrap justify-center gap-3">
               <TryPreviewButton plan="pro" variant="header">
                 Essayer Pro · 5 min
               </TryPreviewButton>
-              <TryPreviewButton plan="essentiel" variant="header" className="!bg-moss-mid">
+              <TryPreviewButton
+                plan="essentiel"
+                variant="header"
+                className="!bg-moss-mid"
+              >
                 Essayer Essentiel · 5 min
               </TryPreviewButton>
             </div>
@@ -371,13 +407,16 @@ function Home() {
       <section id="constat" className="border-b border-ink/6">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Le constat</p>
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+              Le constat
+            </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Votre activité ne devrait pas être éparpillée partout.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-ink-soft">
-              Instagram pour les demandes. WhatsApp pour les clients. Google Agenda pour les rendez-vous. Excel pour
-              suivre votre chiffre d’affaires. Et encore un autre outil pour votre présence en ligne.
+              Instagram pour les demandes. WhatsApp pour les clients. Google
+              Agenda pour les rendez-vous. Excel pour suivre votre chiffre
+              d’affaires. Et encore un autre outil pour votre présence en ligne.
             </p>
             <p className="mt-5 font-display text-2xl tracking-tight text-moss sm:text-3xl">
               Nolyo rassemble l’essentiel au même endroit.
@@ -390,7 +429,9 @@ function Home() {
                 className="rounded-[1.35rem] bg-cream p-5 ring-1 ring-ink/6 transition hover:-translate-y-0.5 hover:ring-ink/12"
               >
                 <h3 className="font-medium text-ink">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-soft">{item.text}</p>
+                <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                  {item.text}
+                </p>
               </article>
             ))}
           </div>
@@ -398,16 +439,21 @@ function Home() {
       </section>
 
       {/* 4. Pourquoi Nolyo */}
-      <section id="pourquoi" className="border-b border-ink/6 bg-moss text-cream">
+      <section
+        id="pourquoi"
+        className="border-b border-ink/6 bg-moss text-cream"
+      >
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Pourquoi Nolyo</p>
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+              Pourquoi Nolyo
+            </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Un seul espace pour votre activité.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-cream/75">
-              Nolyo est pensé pour éviter de multiplier les outils et vous permettre de retrouver l’essentiel au même
-              endroit.
+              Nolyo est pensé pour éviter de multiplier les outils et vous
+              permettre de retrouver l’essentiel au même endroit.
             </p>
           </div>
 
@@ -440,20 +486,30 @@ function Home() {
       </section>
 
       {/* 5. Comment ça marche */}
-      <section id="fonctionnement" className="border-b border-ink/6 bg-paper-2/70">
+      <section
+        id="fonctionnement"
+        className="border-b border-ink/6 bg-paper-2/70"
+      >
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Comment ça marche</p>
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+              Comment ça marche
+            </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Simple à prendre en main. Pensé pour votre quotidien.
             </h2>
           </div>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {steps.map((step) => (
-              <article key={step.n} className="rounded-[1.5rem] bg-cream p-6 ring-1 ring-ink/6">
+              <article
+                key={step.n}
+                className="rounded-[1.5rem] bg-cream p-6 ring-1 ring-ink/6"
+              >
                 <p className="font-display text-sm text-copper">{step.n}</p>
                 <h3 className="mt-3 font-display text-2xl">{step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-soft">{step.text}</p>
+                <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                  {step.text}
+                </p>
               </article>
             ))}
           </div>
@@ -464,12 +520,15 @@ function Home() {
       <section id="offres" className="border-b border-ink/6">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Tarifs</p>
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+              Tarifs
+            </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Deux formules. Une seule idée : vous simplifier la vie.
             </h2>
             <p className="mt-4 text-base text-ink-soft">
-              Premier mois offert. Ensuite, engagement de 6 mois — 7 mois au total.
+              Premier mois offert. Ensuite, engagement de 6 mois — 7 mois au
+              total.
             </p>
           </div>
 
@@ -478,18 +537,31 @@ function Home() {
               <span className="w-fit rounded-full bg-ink px-3 py-1 text-[11px] font-semibold text-cream">
                 Gestion privée
               </span>
-              <p className="mt-4 text-sm font-semibold tracking-[0.18em] text-moss-mid uppercase">Essentiel</p>
-              <p className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-                {new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-                  essentiel?.price || 9.99,
-                )}
-                <span className="ml-1.5 text-lg font-sans font-medium text-ink-soft">€ / mois</span>
+              <p className="mt-4 text-sm font-semibold tracking-[0.18em] text-moss-mid uppercase">
+                Essentiel
               </p>
-              <p className="mt-2 text-sm text-ink-soft">1er mois offert · Engagement 6 mois · 0 % de commission</p>
+              <p className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+                {new Intl.NumberFormat("fr-FR", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }).format(essentiel?.price || 9.99)}
+                <span className="ml-1.5 text-lg font-sans font-medium text-ink-soft">
+                  € / mois
+                </span>
+              </p>
+              <p className="mt-2 text-sm text-ink-soft">
+                1er mois offert · Engagement 6 mois · 0 % de commission
+              </p>
               <ul className="mt-7 flex-1 divide-y divide-ink/8">
                 {essentielFeatures.map((f) => (
-                  <li key={f} className="flex items-start gap-3 py-3 text-sm text-ink">
-                    <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-moss/10 text-moss" aria-hidden>
+                  <li
+                    key={f}
+                    className="flex items-start gap-3 py-3 text-sm text-ink"
+                  >
+                    <span
+                      className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-moss/10 text-moss"
+                      aria-hidden
+                    >
                       ✓
                     </span>
                     <span>{f}</span>
@@ -500,7 +572,11 @@ function Home() {
                 Essai 5 min gratuit · Sans carte bancaire
               </p>
               <div className="mt-3 flex flex-col gap-2">
-                <TryPreviewButton plan="essentiel" variant="header" className="w-full justify-center !rounded-2xl !py-3.5">
+                <TryPreviewButton
+                  plan="essentiel"
+                  variant="header"
+                  className="w-full justify-center !rounded-2xl !py-3.5"
+                >
                   Tester gratuitement →
                 </TryPreviewButton>
                 <Link
@@ -516,18 +592,31 @@ function Home() {
               <span className="w-fit rounded-full bg-cream px-3 py-1 text-[11px] font-semibold text-ink">
                 Tout inclus
               </span>
-              <p className="mt-4 text-sm font-semibold tracking-[0.18em] text-copper uppercase">Pro</p>
-              <p className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-                {new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-                  pro?.price || 19.99,
-                )}
-                <span className="ml-1.5 text-lg font-sans font-medium text-cream/65">€ / mois</span>
+              <p className="mt-4 text-sm font-semibold tracking-[0.18em] text-copper uppercase">
+                Pro
               </p>
-              <p className="mt-2 text-sm text-cream/70">1er mois offert · Engagement 6 mois · 0 % de commission</p>
+              <p className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+                {new Intl.NumberFormat("fr-FR", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }).format(pro?.price || 19.99)}
+                <span className="ml-1.5 text-lg font-sans font-medium text-cream/65">
+                  € / mois
+                </span>
+              </p>
+              <p className="mt-2 text-sm text-cream/70">
+                1er mois offert · Engagement 6 mois · 0 % de commission
+              </p>
               <ul className="mt-7 flex-1 divide-y divide-cream/12">
                 {proFeatures.map((f) => (
-                  <li key={f} className="flex items-start gap-3 py-3 text-sm text-cream/92">
-                    <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cream/12 text-cream" aria-hidden>
+                  <li
+                    key={f}
+                    className="flex items-start gap-3 py-3 text-sm text-cream/92"
+                  >
+                    <span
+                      className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cream/12 text-cream"
+                      aria-hidden
+                    >
                       ✓
                     </span>
                     <span>{f}</span>
@@ -557,8 +646,8 @@ function Home() {
           <div className="mt-8 rounded-[1.35rem] bg-paper-2/80 px-6 py-5 ring-1 ring-ink/6">
             <p className="text-sm font-medium text-ink">Premier mois offert</p>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft sm:text-base">
-              Après le mois offert, l’abonnement est souscrit pour 6 mois. Soit 7 mois au total, dont le premier mois
-              offert. {trialNote}
+              Après le mois offert, l’abonnement est souscrit pour 6 mois. Soit
+              7 mois au total.
             </p>
           </div>
         </div>
@@ -568,13 +657,16 @@ function Home() {
       <section id="pro" className="border-b border-ink/6 bg-cream/40">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Nolyo Pro</p>
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+              Nolyo Pro
+            </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Votre activité mérite plus qu’un simple profil Instagram.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-ink-soft">
-              Avec Nolyo Pro, créez votre page professionnelle pour présenter votre activité, vos prestations et
-              permettre à vos clients de vous contacter ou de réserver en ligne.
+              Avec Nolyo Pro, créez votre page professionnelle pour présenter
+              votre activité, vos prestations et permettre à vos clients de vous
+              contacter ou de réserver en ligne.
             </p>
           </div>
 
@@ -588,12 +680,17 @@ function Home() {
             <div className="space-y-6">
               {proFocus.map((item) => (
                 <article key={item.title}>
-                  <h3 className="font-display text-2xl tracking-tight">{item.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{item.text}</p>
+                  <h3 className="font-display text-2xl tracking-tight">
+                    {item.title}
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
+                    {item.text}
+                  </p>
                 </article>
               ))}
               <p className="text-sm text-ink-soft">
-                Exemple réel : la page publique du compte démo <span className="font-medium text-ink">{demoLabel}</span>.
+                Exemple réel : la page publique du compte démo{" "}
+                <span className="font-medium text-ink">{demoLabel}</span>.
               </p>
               <div className="flex flex-wrap gap-3">
                 <TryPreviewButton plan="pro" variant="header">
@@ -617,7 +714,9 @@ function Home() {
       <section id="pour-qui" className="border-b border-ink/6">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
           <div className="max-w-2xl">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Pour qui</p>
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+              Pour qui
+            </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
               Nolyo s’adapte à votre activité.
             </h2>
@@ -629,7 +728,9 @@ function Home() {
                 className="rounded-[1.35rem] bg-cream p-5 ring-1 ring-ink/6 transition hover:-translate-y-0.5"
               >
                 <h3 className="font-medium">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-soft">{item.text}</p>
+                <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                  {item.text}
+                </p>
               </article>
             ))}
           </div>
@@ -642,17 +743,19 @@ function Home() {
       {/* 9. Philosophie */}
       <section id="philosophie" className="border-b border-ink/6 bg-paper-2">
         <div className="mx-auto max-w-3xl px-5 py-20 text-center sm:px-8 lg:py-24">
-          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">Philosophie</p>
+          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+            Philosophie
+          </p>
           <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
             Moins d’outils. Plus de clarté.
           </h2>
           <p className="mt-6 text-base leading-relaxed text-ink-soft sm:text-lg">
-            Nolyo est né d’une idée simple : un indépendant ne devrait pas avoir besoin de cinq outils différents pour
-            gérer son activité.
+            Nolyo est né d’une idée simple : un indépendant ne devrait pas avoir
+            besoin de cinq outils différents pour gérer son activité.
           </p>
           <p className="mt-4 text-base leading-relaxed text-ink-soft sm:text-lg">
-            Nous voulons créer un outil simple, accessible et réellement pensé pour les personnes qui travaillent
-            seules.
+            Nous voulons créer un outil simple, accessible et réellement pensé
+            pour les personnes qui travaillent seules.
           </p>
         </div>
       </section>
@@ -663,15 +766,21 @@ function Home() {
       {/* 11. FAQ */}
       <section id="faq" className="border-b border-ink/6">
         <div className="mx-auto max-w-3xl px-5 py-20 sm:px-8 lg:py-24">
-          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">FAQ</p>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">Questions fréquentes</h2>
+          <p className="text-[11px] font-semibold tracking-[0.2em] text-copper uppercase">
+            FAQ
+          </p>
+          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
+            Questions fréquentes
+          </h2>
           <div className="mt-10 rounded-[1.5rem] bg-cream px-5 ring-1 ring-ink/6 sm:px-7">
             {faqItems.map((item, index) => (
               <FaqItem
                 key={item.q}
                 item={item}
                 open={faqOpen === index}
-                onToggle={() => setFaqOpen((current) => (current === index ? -1 : index))}
+                onToggle={() =>
+                  setFaqOpen((current) => (current === index ? -1 : index))
+                }
               />
             ))}
           </div>
@@ -686,7 +795,8 @@ function Home() {
               Votre activité. Un seul espace.
             </h2>
             <p className="mt-3 max-w-lg text-cream/80">
-              Clients, rendez-vous, chiffre d’affaires, relances et présence en ligne : gérez l’essentiel avec Nolyo.
+              Clients, rendez-vous, chiffre d’affaires, relances et présence en
+              ligne : gérez l’essentiel avec Nolyo.
             </p>
             <p className="mt-4 text-sm text-cream/70">🎁 Premier mois offert</p>
           </div>
@@ -697,14 +807,18 @@ function Home() {
             >
               Découvrir Nolyo
             </Link>
-            <TryPreviewButton plan="pro" variant="ghost" className="justify-center">
+            <TryPreviewButton
+              plan="pro"
+              variant="ghost"
+              className="justify-center"
+            >
               Tester gratuitement
             </TryPreviewButton>
           </div>
         </div>
       </section>
     </main>
-  )
+  );
 }
 
-export default Home
+export default Home;
