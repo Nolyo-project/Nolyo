@@ -49,7 +49,7 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
   return (
     <div className={`public-page min-h-svh overflow-x-clip ${embedded ? 'public-page-embed' : ''}`} style={themeStyle}>
       <header className="absolute inset-x-0 top-0 z-20">
-        <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-2 px-4 py-4 sm:gap-3 sm:px-8 lg:px-12">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-4 py-4 sm:gap-3 sm:px-8 lg:px-10">
           <p className="min-w-0 truncate text-[10px] font-semibold tracking-[0.22em] text-cream/80 uppercase sm:text-[11px] sm:tracking-[0.28em]">
             {page.name}
           </p>
@@ -81,7 +81,7 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
         <div className="absolute inset-0 bg-linear-to-t from-[color:var(--page-bg)] via-transparent to-ink/50" />
       </div>
 
-      <div className="relative mx-auto min-w-0 max-w-[92rem] px-4 sm:px-8 lg:px-12">
+      <div className="relative mx-auto min-w-0 w-full max-w-6xl px-4 sm:px-8 lg:px-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
           <div className={`relative z-10 ${embedded ? '-mt-10' : '-mt-14 sm:-mt-20 lg:-mt-24'}`}>
             {portrait && !portraitFailed ? (

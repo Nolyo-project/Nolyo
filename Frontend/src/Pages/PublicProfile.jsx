@@ -353,7 +353,7 @@ function PublicProfile() {
         <>
           <main className={publicPageMainClass(hasAside)}>
             <div className="min-w-0">
-              <h1 className="max-w-3xl font-display text-[2rem] leading-[1.12] tracking-tight wrap-break-word sm:text-5xl lg:text-[3.4rem]">
+              <h1 className="max-w-3xl font-display text-[1.75rem] leading-[1.15] tracking-tight wrap-break-word sm:text-4xl lg:text-5xl">
                 {page.title}
               </h1>
               {page.tradeLabel || copy.label !== 'Autre métier' ? (

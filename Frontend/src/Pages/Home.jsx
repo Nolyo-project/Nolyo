@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { api, mediaUrl } from "../api/client";
-import LiveAppFrame from "../components/LiveAppFrame";
+import {
+  LandingDashPreview,
+  LandingPagePreview,
+} from "../components/LandingPreview";
 import TestimonialsCarousel, {
   reviewStats,
 } from "../components/TestimonialsCarousel";
 import TryPreviewButton from "../components/TryPreviewButton";
 import { plans } from "../data/plans";
 
-const DEMO_DASHBOARD = "/apercu/dashboard";
 const DEMO_PAGE_FALLBACK = "/p/maison-brume";
 
 const essentiel = plans.find((p) => p.id === "essentiel");
@@ -239,6 +241,7 @@ function Home() {
     count: reviewStats.count,
   });
   const [demoPage, setDemoPage] = useState(DEMO_PAGE_FALLBACK);
+  const [demoSlug, setDemoSlug] = useState("maison-brume");
   const [demoLabel, setDemoLabel] = useState("Maison Brume");
 
   useEffect(() => {
@@ -251,6 +254,7 @@ function Home() {
     api("/api/public/landing-demo")
       .then((data) => {
         const slug = data.pageSlug || data.user?.page?.slug || "maison-brume";
+        setDemoSlug(slug);
         setDemoPage(`/p/${slug}`);
         const company =
           data.user?.subscription?.company ||
@@ -259,6 +263,7 @@ function Home() {
         if (company) setDemoLabel(company);
       })
       .catch(() => {
+        setDemoSlug("maison-brume");
         setDemoPage(DEMO_PAGE_FALLBACK);
         setDemoLabel("Maison Brume");
       });
@@ -490,10 +495,7 @@ function Home() {
           </Reveal>
 
           <Reveal className="home-preview-wrap mt-10 min-w-0 sm:mt-12">
-            <LiveAppFrame
-              src={DEMO_DASHBOARD}
-              title={`Tableau de bord Nolyo — ${demoLabel}`}
-            />
+            <LandingDashPreview label={demoLabel} />
           </Reveal>
 
           <Reveal className="home-chip-stagger mt-10">
@@ -700,10 +702,7 @@ function Home() {
           </Reveal>
 
           <Reveal className="home-preview-wrap mt-10 min-w-0 sm:mt-12">
-            <LiveAppFrame
-              src={demoPage}
-              title={`nolyo.fr${demoPage}`}
-            />
+            <LandingPagePreview slug={demoSlug} />
           </Reveal>
 
           <Reveal stagger className="mt-12 grid gap-6 sm:grid-cols-3">
