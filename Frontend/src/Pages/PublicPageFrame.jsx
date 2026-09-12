@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom'
 import { mediaUrl } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { homeForUser } from '../auth/homeForUser'
-import { publicPageStyle } from '../data/pageTheme'
+import { pagePortrait, publicPageStyle } from '../data/pageTheme'
 import Logo from '../components/Logo'
 import { publicPageChrome } from './PublicPageAside'
 
@@ -26,7 +25,8 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
     return <p className="px-5 py-24 text-center text-ink-soft">Chargement…</p>
   }
 
-  const cover = mediaUrl(page.banner || (page.photos || [])[0] || '')
+  const cover = mediaUrl(page.banner || page.works?.[0]?.image || (page.photos || [])[0] || '')
+  const portrait = mediaUrl(pagePortrait(page))
   const initial = (page.title || page.name || 'N').slice(0, 1).toUpperCase()
   const isOwner = Boolean(user?.page?.slug) && user.page.slug === String(slug || '').toLowerCase()
   const themeStyle = publicPageStyle(page.theme)
@@ -46,11 +46,11 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {isOwner ? (
               <Link
-                to={homeForUser(user)}
+                to="/dashboard/page"
                 className="rounded-full bg-cream px-3 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-paper sm:px-4"
               >
-                <span className="sm:hidden">Espace</span>
-                <span className="hidden sm:inline">Tableau de bord</span>
+                <span className="sm:hidden">Page</span>
+                <span className="hidden sm:inline">Modifier la page</span>
               </Link>
             ) : null}
             <Logo size="sm" className="rounded-full bg-cream/55 px-2 py-1 hover:bg-cream/80" />
@@ -70,9 +70,9 @@ export function PublicPageFrame({ slug, page, error, current = 'home', children 
       <div className="relative mx-auto min-w-0 max-w-[92rem] px-4 sm:px-8 lg:px-12">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
           <div className="relative z-10 -mt-14 sm:-mt-20 lg:-mt-24">
-            {page.avatar ? (
+            {portrait ? (
               <img
-                src={mediaUrl(page.avatar)}
+                src={portrait}
                 alt=""
                 className="h-24 w-24 rounded-full object-cover shadow-[0_24px_60px_-18px_rgba(36,48,38,0.55)] ring-[5px] ring-[color:var(--page-bg)] sm:h-40 sm:w-40 sm:ring-[6px] lg:h-44 lg:w-44"
               />

@@ -17,7 +17,7 @@ function Page() {
         icon="page"
         highlights={[
           'Page d’accueil et à propos',
-          'Photos, couleurs, contact',
+          'Réalisations, couleurs, contact',
           'Réservation en ligne',
         ]}
       />
@@ -29,7 +29,7 @@ function Page() {
       <PageHeader
         kicker="Vitrine"
         title="Page"
-        description="Infos, horaires, prestations, avis, e-mail client — tout pour votre vitrine."
+        description="Portrait, réalisations, horaires, prestations — enregistrés ici, visibles par vos visiteurs."
       />
       <PageStudio isPro={isPro} showQr={hasModule(user, 'qr')} />
     </PageShell>

@@ -333,6 +333,21 @@ function wellnessSeed() {
         rating: 4,
         body: 'Très belle expérience. Cabine soignée, horaires respectés.',
       },
+      {
+        authorName: 'Léa Moreau',
+        rating: 5,
+        body: 'Je sors vraiment reposée. La cabine, les huiles, le rythme : tout est juste.',
+      },
+      {
+        authorName: 'Nicolas Petit',
+        rating: 5,
+        body: 'Accueil simple et chaleureux. On se sent attendu, pas enchaîné.',
+      },
+      {
+        authorName: 'Sarah Klein',
+        rating: 4,
+        body: 'Très bon soin du visage. Je recommande pour un premier rendez-vous.',
+      },
     ],
   }
 }
@@ -1106,7 +1121,7 @@ async function ensureDemoAccount(profile, { force = false } = {}) {
   const photos = user.page?.photos || []
   const imagesIncomplete =
     !user.avatar ||
-    (plan === 'pro' && (!user.page?.banner || photos.filter(Boolean).length < 3))
+    (plan === 'pro' && (!user.page?.banner || photos.filter(Boolean).length < 2))
   const planMismatch = user.subscription?.plan !== plan
   const slugMismatch = plan === 'pro' && user.page?.slug !== profile.slug
   const pageNotPublished = plan === 'pro' && !user.page?.published

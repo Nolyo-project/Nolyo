@@ -63,6 +63,20 @@ textarea {
     radial-gradient(28rem 18rem at -12% -8%, color-mix(in srgb, var(--color-copper) 28%, transparent), transparent 62%),
     radial-gradient(18rem 14rem at 120% 110%, color-mix(in srgb, var(--color-cream) 12%, transparent), transparent 55%),
     var(--color-moss);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dash-sidebar::-webkit-scrollbar,
+.dash-sidebar *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.dash-sidebar * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .dash-canvas {

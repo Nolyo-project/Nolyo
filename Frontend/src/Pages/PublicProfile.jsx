@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, mediaUrl } from '../api/client'
+import { api, mediaUrl, siteHostname, sitePreviewUrl, websiteHref } from '../api/client'
+import { loadPublicPage } from '../data/demoPublicPage'
 import { copyForTrade } from '../data/trades'
-import { hasAboutContent, groupServicesByHeading, servicePriceLabel } from '../data/pageTheme'
+import { groupServicesByHeading, hasAboutContent, pagePortrait, servicePriceLabel } from '../data/pageTheme'
 import { formatMoney } from './dashboard/format'
 import { Modal } from './dashboard/ui'
 import { PublicPageAside, publicPageChrome, publicPageMainClass } from './PublicPageAside'
@@ -38,26 +39,91 @@ function StarRating({ value = 0, onChange, size = 'md', readOnly = false }) {
   )
 }
 
+function pageWorks(page) {
+  if (Array.isArray(page?.works)) {
+    return page.works
+      .slice(0, 2)
+      .map((item) => ({
+        image: mediaUrl(item?.image || ''),
+        url: websiteHref(item?.url || ''),
+      }))
+      .filter((item) => item.image || item.url)
+  }
+  return (page?.photos || [])
+    .slice(0, 2)
+    .map((src) => ({ image: mediaUrl(src), url: '' }))
+    .filter((item) => item.image)
+}
+
+function workPreview(work) {
+  return work.image || sitePreviewUrl(work.url)
+}
+
 function chunkReviews(list, size = 3) {
   const pages = []
   for (let i = 0; i < list.length; i += size) pages.push(list.slice(i, i + size))
   return pages
 }
 
+function useReviewsPerPage() {
+  const [perPage, setPerPage] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches ? 3 : 1,
+  )
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 768px)')
+    const sync = () => setPerPage(query.matches ? 3 : 1)
+    sync()
+    query.addEventListener('change', sync)
+    return () => query.removeEventListener('change', sync)
+  }, [])
+
+  return perPage
+}
+
+function ReviewCard({ item }) {
+  return (
+    <article className="page-card flex h-full min-h-44 flex-col rounded-[1.4rem] px-6 py-5 ring-1 ring-ink/8">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium">{item.authorName}</p>
+        <StarRating value={item.rating} readOnly />
+      </div>
+      <p className="page-muted mt-3 flex-1 text-sm leading-relaxed whitespace-pre-line">{item.body}</p>
+    </article>
+  )
+}
+
 function ReviewsCarousel({ reviews, onLeaveReview }) {
-  const pages = chunkReviews(reviews, 3)
+  const perPage = useReviewsPerPage()
+  const pages = chunkReviews(reviews, perPage)
+  const scrollerRef = useRef(null)
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const pageCount = pages.length
 
   useEffect(() => {
     setIndex(0)
-  }, [reviews.length])
+    const el = scrollerRef.current
+    if (el) el.scrollTo({ left: 0 })
+  }, [reviews.length, perPage])
+
+  function goTo(next) {
+    if (!pageCount) return
+    const i = ((next % pageCount) + pageCount) % pageCount
+    setIndex(i)
+    const el = scrollerRef.current
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+  }
 
   useEffect(() => {
     if (pageCount <= 1 || paused) return undefined
     const id = window.setInterval(() => {
-      setIndex((current) => (current + 1) % pageCount)
+      setIndex((current) => {
+        const next = (current + 1) % pageCount
+        const el = scrollerRef.current
+        if (el) el.scrollTo({ left: next * el.clientWidth, behavior: 'smooth' })
+        return next
+      })
     }, 5500)
     return () => window.clearInterval(id)
   }, [pageCount, paused])
@@ -73,8 +139,6 @@ function ReviewsCarousel({ reviews, onLeaveReview }) {
     )
   }
 
-  const page = pages[Math.min(index, pageCount - 1)] || []
-
   return (
     <div
       className="mt-8"
@@ -85,21 +149,28 @@ function ReviewsCarousel({ reviews, onLeaveReview }) {
         if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false)
       }}
     >
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {page.map((item) => (
-          <article key={item.id} className="page-card flex h-full flex-col rounded-[1.4rem] px-6 py-5 ring-1 ring-ink/8">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium">{item.authorName}</p>
-              <StarRating value={item.rating} readOnly />
-            </div>
-            <p className="page-muted mt-3 flex-1 text-sm leading-relaxed whitespace-pre-line">{item.body}</p>
-          </article>
+      <div
+        ref={scrollerRef}
+        onScroll={(event) => {
+          const el = event.currentTarget
+          if (!el.clientWidth) return
+          const next = Math.round(el.scrollLeft / el.clientWidth)
+          if (next !== index && next >= 0 && next < pageCount) setIndex(next)
+        }}
+        onPointerDown={() => setPaused(true)}
+        onPointerUp={() => setPaused(false)}
+        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {pages.map((group, pageIndex) => (
+          <div
+            key={pageIndex}
+            className={`grid w-full shrink-0 snap-start gap-4 ${perPage === 3 ? 'md:grid-cols-3' : ''}`}
+          >
+            {group.map((item) => (
+              <ReviewCard key={item.id} item={item} />
+            ))}
+          </div>
         ))}
-        {page.length < 3
-          ? Array.from({ length: 3 - page.length }).map((_, i) => (
-              <div key={`empty-${i}`} className="hidden lg:block" aria-hidden />
-            ))
-          : null}
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
@@ -110,7 +181,7 @@ function ReviewsCarousel({ reviews, onLeaveReview }) {
                 type="button"
                 aria-label="Avis précédents"
                 className="grid h-10 w-10 place-items-center rounded-full ring-1 ring-ink/12 transition hover:ring-[var(--page-accent)]"
-                onClick={() => setIndex((current) => (current - 1 + pageCount) % pageCount)}
+                onClick={() => goTo(index - 1)}
               >
                 ‹
               </button>
@@ -120,7 +191,7 @@ function ReviewsCarousel({ reviews, onLeaveReview }) {
                     key={i}
                     type="button"
                     aria-label={`Page ${i + 1}`}
-                    onClick={() => setIndex(i)}
+                    onClick={() => goTo(i)}
                     className={`h-2.5 w-2.5 rounded-full transition ${
                       i === index ? 'bg-[var(--page-accent)]' : 'bg-ink/15 hover:bg-ink/30'
                     }`}
@@ -131,7 +202,7 @@ function ReviewsCarousel({ reviews, onLeaveReview }) {
                 type="button"
                 aria-label="Avis suivants"
                 className="grid h-10 w-10 place-items-center rounded-full ring-1 ring-ink/12 transition hover:ring-[var(--page-accent)]"
-                onClick={() => setIndex((current) => (current + 1) % pageCount)}
+                onClick={() => goTo(index + 1)}
               >
                 ›
               </button>
@@ -162,13 +233,16 @@ function PublicProfile() {
   useEffect(() => {
     setPage(null)
     setError('')
-    api(`/api/public/pages/${slug}`)
-      .then((data) => setPage(data.page))
+    loadPublicPage(slug)
+      .then(setPage)
       .catch((err) => setError(err.message))
   }, [slug])
 
+  const works = pageWorks(page)
+  const photos = works.filter((item) => item.image && !item.url).map((item) => item.image)
+
   useEffect(() => {
-    const count = (page?.photos || []).length
+    const count = photos.length
     if (lightbox < 0 || !count) return undefined
     function onKey(event) {
       if (event.key === 'Escape') setLightbox(-1)
@@ -182,9 +256,8 @@ function PublicProfile() {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = previous
     }
-  }, [lightbox, page])
+  }, [lightbox, photos.length])
 
-  const photos = (page?.photos || []).map((src) => mediaUrl(src)).filter(Boolean)
   const copy = copyForTrade(page?.trade)
   const { hasAside } = publicPageChrome(page, slug)
   const lightboxSrc = lightbox >= 0 ? photos[lightbox] : ''
@@ -192,7 +265,7 @@ function PublicProfile() {
   const seoDescription =
     page?.description?.replace(/\s+/g, ' ').trim().slice(0, 160) ||
     `${page?.title || 'Professionnel'} sur Nolyo — réservation et prestations.`
-  const seoImage = mediaUrl(page?.banner || page?.avatar || page?.photos?.[0] || '')
+  const seoImage = mediaUrl(page?.banner || pagePortrait(page) || page?.photos?.[0] || page?.works?.[0]?.image || '')
   const reviewAvg =
     page?.reviews?.length > 0
       ? Math.round(
@@ -342,30 +415,62 @@ function PublicProfile() {
                   />
                 </section>
 
-              {photos.length ? (
+              {works.length ? (
                 <section className="mt-16">
-                  <h2 className="page-accent text-[11px] font-semibold tracking-[0.22em] uppercase">Photos</h2>
+                  <h2 className="page-accent text-[11px] font-semibold tracking-[0.22em] uppercase">
+                    {works.some((item) => item.url) ? 'Réalisations' : 'Photos'}
+                  </h2>
                   <span className="page-accent-bar mt-3 block h-px w-12 opacity-70" />
                   <ul
-                    className={`mt-8 grid gap-3 sm:gap-5 ${
-                      photos.length === 1 ? 'max-w-3xl' : photos.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'
-                    }`}
+                    className={`mt-8 grid gap-3 sm:gap-5 ${works.length === 1 ? 'max-w-3xl' : 'sm:grid-cols-2'}`}
                   >
-                    {photos.map((src, index) => (
-                      <li key={src}>
-                        <button
-                          type="button"
-                          onClick={() => setLightbox(index)}
-                          className="group block w-full overflow-hidden rounded-[1.4rem]"
-                        >
-                          <img
-                            src={src}
-                            alt=""
-                            className="aspect-[4/5] w-full object-cover transition duration-700 group-hover:scale-[1.04]"
-                          />
-                        </button>
-                      </li>
-                    ))}
+                    {works.map((work, index) => {
+                      const preview = workPreview(work)
+                      const host = work.url ? siteHostname(work.url) : ''
+                      const className =
+                        'group relative block w-full overflow-hidden rounded-[1.4rem] text-left'
+                      const media = preview ? (
+                        <img
+                          src={preview}
+                          alt={host || ''}
+                          className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-[1.04]"
+                        />
+                      ) : (
+                        <div className="grid aspect-[4/3] place-items-center page-muted text-sm">{host}</div>
+                      )
+                      const caption = host ? (
+                        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent px-4 pb-3 pt-8 text-sm font-medium text-cream">
+                          {host}
+                        </span>
+                      ) : null
+                      if (work.url) {
+                        return (
+                          <li key={`${work.url}-${index}`}>
+                            <a
+                              href={work.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={className}
+                            >
+                              {media}
+                              {caption}
+                            </a>
+                          </li>
+                        )
+                      }
+                      const photoIndex = photos.indexOf(work.image)
+                      return (
+                        <li key={`${work.image}-${index}`}>
+                          <button
+                            type="button"
+                            onClick={() => setLightbox(photoIndex >= 0 ? photoIndex : 0)}
+                            className={className}
+                          >
+                            {media}
+                          </button>
+                        </li>
+                      )
+                    })}
                   </ul>
                 </section>
               ) : null}

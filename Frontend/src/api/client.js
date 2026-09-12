@@ -15,6 +15,26 @@ export function mediaUrl(url = '') {
   return apiUrl(url)
 }
 
+export function websiteHref(url = '') {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+}
+
+export function siteHostname(url = '') {
+  try {
+    return new URL(websiteHref(url)).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+export function sitePreviewUrl(url = '') {
+  const href = websiteHref(url)
+  if (!href) return ''
+  return `https://s.wordpress.com/mshots/v1/${encodeURIComponent(href)}?w=1200`
+}
+
 function fail(data, res) {
   const error = new Error(data.error || 'Une erreur est survenue.')
   error.status = res.status

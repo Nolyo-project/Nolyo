@@ -1,25 +1,37 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, mediaUrl } from '../api/client'
+import { mediaUrl } from '../api/client'
+import { loadPublicPage } from '../data/demoPublicPage'
 import { copyForTrade } from '../data/trades'
+import { aboutPeople, pagePortrait } from '../data/pageTheme'
 import SeoHead from '../components/SeoHead'
 import { PublicPageAside, publicPageChrome, publicPageMainClass } from './PublicPageAside'
 import { PublicPageFrame } from './PublicPageFrame'
 
 function PersonCard({ person }) {
   const [flipped, setFlipped] = useState(false)
+  const [photo, setPhoto] = useState(() => mediaUrl(person.photo || ''))
   const canFlip = Boolean(person.bio)
 
+  useEffect(() => {
+    setPhoto(mediaUrl(person.photo || ''))
+  }, [person.photo])
+
   return (
-    <li className="aspect-3/4 [perspective:56rem]">
+    <li className="relative aspect-[3/4] w-full min-h-[20rem] [perspective:56rem]">
       <div
         className={`relative h-full w-full transition duration-500 [transform-style:preserve-3d] ${
           flipped ? '[transform:rotateY(180deg)]' : ''
         }`}
       >
         <div className="absolute inset-0 overflow-hidden rounded-[1.35rem] bg-moss shadow-[0_18px_36px_-24px_rgba(36,48,38,0.5)] [backface-visibility:hidden]">
-          {person.photo ? (
-            <img src={mediaUrl(person.photo)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          {photo ? (
+            <img
+              src={photo}
+              alt={person.name || ''}
+              className="absolute inset-0 h-full w-full object-cover"
+              onError={() => setPhoto('')}
+            />
           ) : (
             <div className="absolute inset-0 grid place-items-center font-display text-3xl text-cream/70">
               {(person.name || '?').slice(0, 1).toUpperCase()}
@@ -79,13 +91,13 @@ function PublicAbout() {
   useEffect(() => {
     setPage(null)
     setError('')
-    api(`/api/public/pages/${slug}`)
-      .then((data) => setPage(data.page))
+    loadPublicPage(slug)
+      .then(setPage)
       .catch((err) => setError(err.message))
   }, [slug])
 
   const about = page?.about || { body: '', people: [] }
-  const people = (about.people || []).filter((person) => person.name || person.photo || person.role || person.bio)
+  const people = aboutPeople(page)
   const copy = copyForTrade(page?.trade)
   const { hasAside } = publicPageChrome(page, slug)
   const teamLabel = people.length > 1 ? 'L’équipe' : 'Portrait'
@@ -93,7 +105,7 @@ function PublicAbout() {
   const seoDescription =
     about.body?.replace(/\s+/g, ' ').trim().slice(0, 160) ||
     `À propos de ${page?.title || 'ce professionnel'} — ${page?.tradeLabel || copy.label} sur Nolyo.`
-  const seoImage = mediaUrl(page?.banner || page?.avatar || '')
+  const seoImage = mediaUrl(page?.banner || pagePortrait(page) || '')
 
   return (
     <PublicPageFrame slug={slug} page={page} error={error} current="about">
@@ -133,10 +145,10 @@ function PublicAbout() {
                 <ul
                   className={`mt-8 grid justify-start gap-3 sm:gap-4 ${
                     people.length === 1
-                      ? 'max-w-[13.5rem]'
+                      ? 'w-[16rem] sm:w-[18rem] grid-cols-1'
                       : people.length === 2
-                        ? 'max-w-[28rem] grid-cols-2'
-                        : 'max-w-[42rem] grid-cols-2 sm:grid-cols-3'
+                        ? 'max-w-[34rem] grid-cols-2'
+                        : 'max-w-[46rem] grid-cols-2 sm:grid-cols-3'
                   }`}
                 >
                   {people.map((person, index) => (

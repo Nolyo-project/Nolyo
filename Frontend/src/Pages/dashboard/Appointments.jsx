@@ -7,13 +7,15 @@ import { hasModule } from '../../data/workspace'
 import {
   WEEKDAY_LABELS,
   addDays,
+  agendaEventRect,
+  agendaRangeMinutes,
+  appointmentDurationMinutes,
   appointmentOverlaps,
-  appointmentSlotSpan,
   buildDaySlots,
   defaultSchedule,
   fieldClass,
+  formatHourRange,
   formatMoney,
-  formatTime,
   isSlotInFuture,
   slotDateTime,
   startOfWeek,
@@ -33,12 +35,6 @@ function weekLabel(weekStart) {
   return `${start} – ${end}`
 }
 
-function isSlotOrigin(appointment, slotStart, durationMinutes) {
-  const start = new Date(appointment.startAt).getTime()
-  const slotEnd = slotStart.getTime() + durationMinutes * 60000
-  return start >= slotStart.getTime() && start < slotEnd
-}
-
 function personName(contact, fallback = '') {
   const full = [contact?.firstName, contact?.lastName].filter(Boolean).join(' ')
   return full || contact?.name || fallback
@@ -54,6 +50,12 @@ function dayIsAbsent(day, absences) {
   if (!absences?.length) return false
   const ymd = toDateInput(day)
   return absences.some((item) => item.startDate <= ymd && item.endDate >= ymd)
+}
+
+function clockLabel(startMinutes) {
+  const hours = Math.floor(startMinutes / 60)
+  const minutes = startMinutes % 60
+  return minutes === 0 ? `${hours}h` : `${hours}h${String(minutes).padStart(2, '0')}`
 }
 
 function canPlaceAppointment(start, durationMinutes, appointments, excludeId, workDays, now, absences) {
@@ -123,7 +125,20 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
     () => buildDaySlots(schedule.workStart, schedule.workEnd, schedule.durationMinutes),
     [schedule],
   )
+  const agendaRange = useMemo(
+    () => agendaRangeMinutes(slots, schedule.durationMinutes),
+    [schedule.durationMinutes, slots],
+  )
+  const nowPct = useMemo(() => {
+    const date = new Date(now)
+    const minutes = date.getHours() * 60 + date.getMinutes()
+    const span = agendaRange.end - agendaRange.start
+    if (span <= 0 || minutes < agendaRange.start || minutes > agendaRange.end) return null
+    return ((minutes - agendaRange.start) / span) * 100
+  }, [agendaRange, now])
   const workDays = schedule.workDays || [1, 2, 3, 4, 5]
+  const slotRem = fill ? 2.4 : 3.25
+  const agendaHeight = `${slots.length * slotRem}rem`
 
   const occupancy = useMemo(() => {
     const map = new Map()
@@ -615,7 +630,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
                       month: 'short',
                       year: 'numeric',
                     })}{' '}
-                    · {formatTime(item.startAt)}
+                    · {formatHourRange(item.startAt, item.durationMinutes)}
                   </p>
                   {item.contact?.email ? <p className="mt-1 truncate text-xs text-ink-soft">{item.contact.email}</p> : null}
                   <p className={`mt-3 text-sm font-medium ${item.isConverted ? 'text-moss' : 'text-ink-soft'}`}>
@@ -771,142 +786,173 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
             </p>
           ) : (
             <div
-              className="mt-1 grid gap-1.5 sm:mt-3 sm:gap-2"
+              className="mt-1 grid gap-x-1.5 sm:mt-3 sm:gap-x-2"
               style={{
                 minWidth: isWeek ? '48rem' : undefined,
-                gridTemplateColumns: `${isWeek ? '4.25rem' : '3.25rem'} repeat(${visibleDays.length}, minmax(0, 1fr))`,
-                gridTemplateRows: `auto repeat(${slots.length}, minmax(${fill ? '2.4rem' : '3.25rem'}, auto))`,
+                gridTemplateColumns: `${isWeek ? '3.5rem' : '2.75rem'} repeat(${visibleDays.length}, minmax(0, 1fr))`,
+                gridTemplateRows: `auto ${agendaHeight}`,
               }}
             >
-              <div className="grid place-items-center text-xs text-ink-soft">Horaire</div>
+              <div className="grid place-items-end pb-2 pr-1 text-[11px] text-ink-soft"> </div>
               {visibleDays.map((day) => {
                 const open = workDays.includes(day.getDay())
                 const away = dayIsAbsent(day, absences)
+                const shut = !open || away
                 const isToday = new Date().toDateString() === day.toDateString()
                 return (
-                  <div key={`head-${day.toISOString()}`} className="text-center">
-                    <p className={`text-xs uppercase ${isToday ? 'font-semibold text-copper' : 'text-ink-soft'}`}>
+                  <div
+                    key={`head-${day.toISOString()}`}
+                    className={`rounded-t-xl px-1 py-2 text-center ${
+                      shut ? 'bg-ink/8' : isToday ? 'bg-copper/5' : 'bg-paper/70'
+                    }`}
+                  >
+                    <p
+                      className={`text-[11px] uppercase ${
+                        shut ? 'text-ink-soft/70' : isToday ? 'font-semibold text-copper' : 'text-ink-soft'
+                      }`}
+                    >
                       {day.toLocaleDateString('fr-FR', { weekday: 'short' })}
                     </p>
-                    <p className={`text-sm ${isToday ? 'font-semibold' : ''} ${away ? 'text-ink-soft' : ''}`}>
+                    <p className={`text-sm ${isToday && !shut ? 'font-semibold' : ''} ${shut ? 'text-ink-soft' : ''}`}>
                       {day.toLocaleDateString('fr-FR', { day: 'numeric' })}
                     </p>
-                    {!open ? (
-                      <p className="text-[11px] text-ink-soft">Fermé</p>
-                    ) : away ? (
-                      <p className="text-[11px] font-medium text-ink-soft">Congés</p>
-                    ) : null}
                   </div>
                 )
               })}
 
-              {slots.map((slot, slotIndex) => (
-                <p
-                  key={slot.label}
-                  className="grid place-items-center text-xs text-ink-soft"
-                  style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
-                >
-                  {slot.label}
-                </p>
-              ))}
+              <div className="relative" style={{ gridColumn: 1, gridRow: 2 }}>
+                {slots.map((slot, slotIndex) => (
+                  <p
+                    key={slot.label}
+                    className="absolute right-1 text-[11px] leading-none text-ink-soft"
+                    style={{
+                      top: `${(slotIndex / slots.length) * 100}%`,
+                      transform: 'translateY(-0.35em)',
+                    }}
+                  >
+                    {clockLabel(slot.startMinutes)}
+                  </p>
+                ))}
+              </div>
 
-              {visibleDays.flatMap((day, dayIndex) =>
-                slots.flatMap((slot, slotIndex) => {
-                  const start = slotDateTime(day, slot.startMinutes)
-                  const iso = start.toISOString()
-                  const cell = occupancy.map.get(iso)
-                  const style = {
-                    gridColumn: dayIndex + 2,
-                    gridRow: slotIndex + 2,
-                  }
+              {visibleDays.map((day, dayIndex) => {
+                const open = workDays.includes(day.getDay())
+                const away = dayIsAbsent(day, absences)
+                const shut = !open || away
+                const isToday = new Date().toDateString() === day.toDateString()
+                const dayKey = toDateInput(day)
+                const events = appointments.filter((item) => {
+                  if (item.status !== 'planned') return false
+                  if (drag?.id && String(item._id) === String(drag.id)) return false
+                  return toDateInput(new Date(item.startAt)) === dayKey
+                })
+                return (
+                  <div
+                    key={`col-${dayKey}`}
+                    className={`relative min-w-0 overflow-hidden rounded-b-xl ${
+                      shut ? 'bg-ink/8' : isToday ? 'bg-copper/5' : 'bg-paper/70'
+                    }`}
+                    style={{ gridColumn: dayIndex + 2, gridRow: 2 }}
+                  >
+                    {shut ? (
+                      <div className="absolute inset-0 grid place-items-center">
+                        <span className="rounded-full bg-ink/10 px-3 py-1 text-[11px] font-semibold tracking-[0.14em] text-ink-soft uppercase">
+                          {away && open ? 'Congés' : 'Fermé'}
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        {slots.map((slot, slotIndex) => {
+                          const start = slotDateTime(day, slot.startMinutes)
+                          const iso = start.toISOString()
+                          const cell = occupancy.map.get(iso)
+                          const slotStyle = {
+                            top: `${(slotIndex / slots.length) * 100}%`,
+                            height: `${100 / slots.length}%`,
+                          }
+                          if (cell?.status === 'busy' || cell?.status === 'past') {
+                            return (
+                              <div
+                                key={iso}
+                                data-agenda-slot={iso}
+                                style={slotStyle}
+                                className={`absolute inset-x-0 border-t border-ink/6 ${
+                                  cell.status === 'past' ? 'bg-ink/3' : ''
+                                } ${dropClass(iso)}`.trim()}
+                              />
+                            )
+                          }
+                          return (
+                            <button
+                              key={iso}
+                              type="button"
+                              data-agenda-slot={iso}
+                              style={slotStyle}
+                              onClick={() => {
+                                if (dragRef.current?.activated) return
+                                setSelected(null)
+                                setBooking(start)
+                                setContactId('')
+                                setError('')
+                              }}
+                              className={`group absolute inset-x-0 border-t border-ink/6 px-1.5 text-left transition hover:bg-moss/10 ${dropClass(iso)}`}
+                            >
+                              <span className="text-[11px] font-medium text-moss opacity-0 transition group-hover:opacity-100">
+                                Disponible
+                              </span>
+                            </button>
+                          )
+                        })}
 
-                  if (!cell || cell.status === 'closed') {
-                    return [
-                      <div key={iso} style={style} className="min-h-14 rounded-xl bg-ink/5" />,
-                    ]
-                  }
+                        {events.map((item) => {
+                          const duration = appointmentDurationMinutes(item, schedule.durationMinutes)
+                          const rect = agendaEventRect(item.startAt, duration, agendaRange.start, agendaRange.end)
+                          if (!rect.visible) return null
+                          const past = !isSlotInFuture(item.startAt, now)
+                          const rangeLabel = formatHourRange(item.startAt, duration)
+                          const tall = rect.height >= 9
+                          return (
+                            <button
+                              key={item._id}
+                              type="button"
+                              draggable={false}
+                              onClick={() => openAppointment(item)}
+                              onPointerDown={(event) => onCardPointerDown(event, item)}
+                              className={`absolute inset-x-1 z-10 flex touch-none flex-col overflow-hidden rounded-lg text-left shadow-sm select-none ${
+                                fill ? 'px-1.5 py-1' : 'px-2 py-1.5'
+                              } ${drag ? 'pointer-events-none' : 'pointer-events-auto'} ${
+                                item.status === 'planned' ? 'cursor-grab active:cursor-grabbing' : ''
+                              } ${past ? 'bg-moss/55 text-cream' : 'bg-moss text-cream'}`}
+                              style={{
+                                top: `${rect.top}%`,
+                                height: `${rect.height}%`,
+                              }}
+                            >
+                              <p className="truncate text-xs font-semibold">{agendaCardTitle(item)}</p>
+                              <p className="truncate text-[11px] text-cream/85">{rangeLabel}</p>
+                              {tall ? (
+                                <p className="mt-auto truncate text-[11px] text-cream/75">
+                                  {item.contact?.phone || 'Pas de numéro'}
+                                </p>
+                              ) : null}
+                            </button>
+                          )
+                        })}
 
-                  if (cell.status === 'absence') {
-                    return [
-                      <div
-                        key={iso}
-                        style={style}
-                        className="grid min-h-14 place-items-center rounded-xl bg-ink/[0.07] text-[11px] text-ink-soft/80"
-                        title="Jour de congés — réservation fermée"
-                      >
-                        Congés
-                      </div>,
-                    ]
-                  }
-
-                  if (cell.status === 'busy') {
-                    const item = cell.appointment
-                    if (!isSlotOrigin(item, start, schedule.durationMinutes)) return []
-                    const span = appointmentSlotSpan(item, schedule.durationMinutes, slots.length - slotIndex)
-                    const past = !isSlotInFuture(start, now)
-                    return [
-                      <div
-                        key={iso}
-                        data-agenda-slot={iso}
-                        style={{ ...style, gridRow: `${slotIndex + 2} / span ${span}` }}
-                        className={`${fill ? 'min-h-11' : 'min-h-16'} ${dropClass(iso)}`.trim()}
-                      >
-                        <button
-                          type="button"
-                          draggable={false}
-                          onClick={() => openAppointment(item)}
-                          onPointerDown={(event) => onCardPointerDown(event, item)}
-                          className={`flex h-full ${fill ? 'min-h-11 px-1.5 py-1' : 'min-h-16 px-2 py-2'} w-full touch-none flex-col justify-center rounded-xl text-left select-none ${
-                            item.status === 'planned' ? 'cursor-grab active:cursor-grabbing' : ''
-                          } ${past ? 'bg-moss/50 text-cream' : 'bg-moss text-cream'}`}
-                        >
-                          <p className="truncate text-xs font-semibold">{agendaCardTitle(item)}</p>
-                          <p className="truncate text-[11px] text-cream/85">
-                            {item.contact?.phone || 'Pas de numéro'}
-                          </p>
-                          {(item.durationMinutes || schedule.durationMinutes) > schedule.durationMinutes ? (
-                            <p className="mt-0.5 truncate text-[11px] text-cream/75">
-                              {item.durationMinutes || schedule.durationMinutes} min
-                            </p>
-                          ) : null}
-                        </button>
-                      </div>,
-                    ]
-                  }
-
-                  if (cell.status === 'past') {
-                    return [
-                      <div
-                        key={iso}
-                        data-agenda-slot={iso}
-                        style={style}
-                        className={`grid min-h-14 place-items-center rounded-xl bg-ink/5 text-[11px] text-ink-soft ${dropClass(iso)}`}
-                      >
-                        Passé
-                      </div>,
-                    ]
-                  }
-
-                  return [
-                    <button
-                      key={iso}
-                      type="button"
-                      data-agenda-slot={iso}
-                      style={style}
-                      onClick={() => {
-                        if (dragRef.current?.activated) return
-                        setSelected(null)
-                        setBooking(start)
-                        setContactId('')
-                        setError('')
-                      }}
-                      className={`${fill ? 'min-h-11 py-1 text-xs' : 'min-h-16 py-2 text-sm'} rounded-xl border border-dashed border-moss/25 bg-paper px-2 text-left text-moss transition hover:border-moss hover:bg-moss/10 ${dropClass(iso)}`}
-                    >
-                      Disponible
-                    </button>,
-                  ]
-                }),
-              )}
+                        {isToday && nowPct != null ? (
+                          <div
+                            className="pointer-events-none absolute right-0 left-0 z-20"
+                            style={{ top: `${nowPct}%` }}
+                          >
+                            <span className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-copper" />
+                            <div className="h-px bg-copper" />
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -948,7 +994,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
                 day: 'numeric',
                 month: 'long',
               })}{' '}
-              · {formatTime(booking)} · {schedule.durationMinutes} min
+              · {formatHourRange(booking, schedule.durationMinutes)}
             </p>
             <label className="mt-5 block text-sm font-medium">
               {variant === 'founder'
@@ -1051,7 +1097,7 @@ function Appointments({ variant = 'member', apiBase, compact = false }) {
                 day: 'numeric',
                 month: 'long',
               })}{' '}
-              · {formatTime(selected.startAt)} · {selected.durationMinutes || schedule.durationMinutes} min
+              · {formatHourRange(selected.startAt, selected.durationMinutes, schedule.durationMinutes)}
             </p>
             {selected.contact?.phone ? (
               <a

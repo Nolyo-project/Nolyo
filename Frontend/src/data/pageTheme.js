@@ -52,10 +52,43 @@ export function publicPageStyle(theme) {
   }
 }
 
+export function pagePortrait(page) {
+  if (page?.avatar) return page.avatar
+  const person = (page?.about?.people || []).find((item) => item?.photo)
+  return person?.photo || ''
+}
+
+export function aboutPeople(page) {
+  const people = (page?.about?.people || []).filter(
+    (person) => person?.name || person?.photo || person?.role || person?.bio,
+  )
+  const avatar = page?.avatar || ''
+  if (people.length) {
+    return people.map((person, index) => ({
+      ...person,
+      name: person.name || (index === 0 ? page.name || page.title || '' : ''),
+      role: person.role || (index === 0 && people.length === 1 ? page.tradeLabel || 'Fondateur' : ''),
+      photo: person.photo || (index === 0 ? avatar : ''),
+    }))
+  }
+  if (avatar || page?.name) {
+    return [
+      {
+        name: page.name || page.title || '',
+        role: page.tradeLabel || 'Fondateur',
+        bio: '',
+        photo: avatar,
+      },
+    ]
+  }
+  return []
+}
+
 export function hasAboutContent(page) {
+  if (aboutPeople(page).length) return true
   const about = page?.about || {}
   if (String(about.body || '').trim()) return true
-  return (about.people || []).some((person) => person?.name || person?.role || person?.bio || person?.photo)
+  return Boolean(page?.avatar)
 }
 
 export function isQuoteService(item) {

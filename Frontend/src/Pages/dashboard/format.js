@@ -174,6 +174,50 @@ export function appointmentSlotSpan(appointment, slotDurationMinutes, remainingS
   return Math.min(span, Math.max(1, remainingSlots))
 }
 
+export function appointmentDurationMinutes(appointment, fallback = 60) {
+  return Math.max(15, Number(appointment?.durationMinutes) || Number(fallback) || 60)
+}
+
+export function formatHourLabel(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const minutes = date.getMinutes()
+  return minutes === 0 ? `${date.getHours()}h` : `${date.getHours()}h${String(minutes).padStart(2, '0')}`
+}
+
+export function formatHourRange(startAt, durationMinutes, fallback = 60) {
+  const start = startAt instanceof Date ? startAt : new Date(startAt)
+  if (Number.isNaN(start.getTime())) return ''
+  const end = new Date(start.getTime() + appointmentDurationMinutes({ durationMinutes }, fallback) * 60000)
+  return `${formatHourLabel(start)} à ${formatHourLabel(end)}`
+}
+
+export function agendaRangeMinutes(slots, slotDurationMinutes) {
+  if (!slots?.length) return { start: 0, end: 0 }
+  const duration = Number(slotDurationMinutes) || 60
+  return {
+    start: slots[0].startMinutes,
+    end: slots[slots.length - 1].startMinutes + duration,
+  }
+}
+
+export function agendaEventRect(startAt, durationMinutes, rangeStart, rangeEnd) {
+  const start = startAt instanceof Date ? startAt : new Date(startAt)
+  if (Number.isNaN(start.getTime())) return { top: 0, height: 0, visible: false }
+  const startMin = start.getHours() * 60 + start.getMinutes()
+  const duration = appointmentDurationMinutes({ durationMinutes })
+  const span = rangeEnd - rangeStart
+  if (span <= 0) return { top: 0, height: 0, visible: false }
+  const from = Math.max(rangeStart, startMin)
+  const to = Math.min(rangeEnd, startMin + duration)
+  if (to <= from) return { top: 0, height: 0, visible: false }
+  return {
+    top: ((from - rangeStart) / span) * 100,
+    height: ((to - from) / span) * 100,
+    visible: true,
+  }
+}
+
 export function localDateTimeIso(dateValue, timeValue) {
   const day = parseLocalDate(dateValue)
   if (!day || !timeValue) return null

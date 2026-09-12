@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, apiUpload, mediaUrl } from '../../api/client'
+import { api, apiUpload, mediaUrl, sitePreviewUrl, websiteHref } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { ghostBtn, primaryBtn, quietBtn } from './ui'
 import { ACCENT_PRESETS, BACKGROUND_PRESETS, SURFACE_PRESETS, parseHex, pickTheme } from '../../data/pageTheme'
@@ -49,8 +49,10 @@ const emptyPage = {
   published: false,
   title: '',
   description: '',
-  photos: ['', '', ''],
+  photos: ['', ''],
+  workUrls: ['', ''],
   banner: '',
+  avatar: '',
   instagram: '',
   facebook: '',
   linkedin: '',
@@ -73,8 +75,10 @@ function pageFromUser(user) {
   return {
     ...emptyPage,
     ...source,
-    photos: [0, 1, 2].map((i) => source.photos?.[i] || ''),
+    photos: [0, 1].map((i) => source.photos?.[i] || ''),
+    workUrls: [0, 1].map((i) => source.workUrls?.[i] || ''),
     banner: source.banner || '',
+    avatar: user?.avatar || '',
     city: source.city || '',
     postalCode: source.postalCode || '',
     lat: source.lat != null && source.lat !== '' ? String(source.lat) : '',
@@ -88,14 +92,31 @@ function pageFromUser(user) {
     theme: pickTheme(source.theme),
     about: {
       body: source.about?.body || '',
-      people: Array.isArray(source.about?.people)
-        ? source.about.people.map((person) => ({
-            name: person.name || '',
-            role: person.role || '',
-            bio: person.bio || '',
-            photo: person.photo || '',
-          }))
-        : [],
+      people: (() => {
+        const list = Array.isArray(source.about?.people)
+          ? source.about.people.map((person) => ({
+              name: person.name || '',
+              role: person.role || '',
+              bio: person.bio || '',
+              photo: person.photo || '',
+            }))
+          : []
+        const filled = list.filter((person) => person.name || person.photo || person.role || person.bio)
+        if (!filled.length && (user?.avatar || user?.name)) {
+          return [
+            {
+              name: user.name || '',
+              role: 'Fondateur',
+              bio: '',
+              photo: user.avatar || '',
+            },
+          ]
+        }
+        if (filled[0] && !filled[0].photo && user?.avatar) {
+          filled[0] = { ...filled[0], photo: user.avatar }
+        }
+        return filled.length ? filled : list
+      })(),
     },
   }
 }
@@ -227,7 +248,22 @@ export function PageStudio({ showQr, isPro }) {
     setPage((current) => {
       const people = [...(current.about.people || [])]
       if (people.length >= 6) return current
-      return { ...current, about: { ...current.about, people: [...people, { ...emptyPerson }] } }
+      const isFirst = people.length === 0
+      return {
+        ...current,
+        about: {
+          ...current.about,
+          people: [
+            ...people,
+            {
+              ...emptyPerson,
+              name: isFirst ? user?.name || '' : '',
+              role: isFirst ? 'Fondateur' : '',
+              photo: isFirst ? current.avatar || user?.avatar || '' : '',
+            },
+          ],
+        },
+      }
     })
   }
 
@@ -309,8 +345,12 @@ export function PageStudio({ showQr, isPro }) {
           lng = geo.lng
         }
       }
+      const pageFields = { ...page }
+      delete pageFields.avatar
       const payload = {
-        ...page,
+        ...pageFields,
+        workUrls: [0, 1].map((i) => page.workUrls?.[i] || ''),
+        photos: [0, 1].map((i) => page.photos?.[i] || ''),
         theme: pickTheme(page.theme),
         lat: Number.isFinite(lat) ? lat : null,
         lng: Number.isFinite(lng) ? lng : null,
@@ -347,8 +387,37 @@ export function PageStudio({ showQr, isPro }) {
       updateUser(data.user)
       setPage((current) => ({
         ...current,
-        photos: [0, 1, 2].map((i) => data.user.page?.photos?.[i] || ''),
+        photos: [0, 1].map((i) => data.user.page?.photos?.[i] || ''),
+        workUrls: [0, 1].map((i) => data.user.page?.workUrls?.[i] || current.workUrls?.[i] || ''),
       }))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setPendingPhoto('')
+    }
+  }
+
+  function updateWorkUrl(index, value) {
+    setPage((current) => ({
+      ...current,
+      workUrls: [0, 1].map((i) => (i === index ? value : current.workUrls?.[i] || '')),
+    }))
+  }
+
+  async function persistWorkUrls(urls) {
+    setError('')
+    setPendingPhoto('work-urls')
+    try {
+      const data = await api('/api/auth/me', {
+        method: 'PATCH',
+        body: { page: { workUrls: urls } },
+      })
+      updateUser(data.user)
+      setPage((current) => ({
+        ...current,
+        workUrls: [0, 1].map((i) => data.user.page?.workUrls?.[i] || ''),
+      }))
+      setOk('Lien enregistré. Vos visiteurs le voient sur la page.')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -363,8 +432,39 @@ export function PageStudio({ showQr, isPro }) {
       updateUser(data.user)
       setPage((current) => ({
         ...current,
-        photos: [0, 1, 2].map((i) => data.user.page?.photos?.[i] || ''),
+        photos: [0, 1].map((i) => data.user.page?.photos?.[i] || ''),
+        workUrls: [0, 1].map((i) => data.user.page?.workUrls?.[i] || current.workUrls?.[i] || ''),
       }))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setPendingPhoto('')
+    }
+  }
+
+  async function uploadAvatar(file) {
+    if (!file) return
+    setError('')
+    setPendingPhoto('avatar')
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const data = await apiUpload('/api/auth/me/avatar', body)
+      updateUser(data.user)
+      setPage(pageFromUser(data.user))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setPendingPhoto('')
+    }
+  }
+
+  async function removeAvatar() {
+    setPendingPhoto('avatar')
+    try {
+      const data = await api('/api/auth/me/avatar', { method: 'DELETE' })
+      updateUser(data.user)
+      setPage((current) => ({ ...current, avatar: '' }))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -646,8 +746,45 @@ export function PageStudio({ showQr, isPro }) {
                 </div>
               </StudioPanel>
 
-              <StudioPanel title="Photos" hint="Une bannière en haut, trois photos plus bas.">
+              <StudioPanel
+                title="Photos et réalisations"
+                hint="Tout est enregistré ici. Les visiteurs voient le portrait, la bannière et les deux réalisations."
+              >
                 <div className="space-y-5">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">Portrait</p>
+                    <p className="mt-0.5 text-xs text-ink-soft">
+                      Photo ronde en haut de page, et présentation du fondateur sur À propos.
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-4">
+                      <div className="h-24 w-24 overflow-hidden rounded-full bg-[#faf8f5] ring-1 ring-ink/10">
+                        {page.avatar ? (
+                          <img src={mediaUrl(page.avatar)} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="grid h-full place-items-center text-[11px] text-ink-soft">Photo</div>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <label className={`${quietBtn} cursor-pointer`}>
+                          {pendingPhoto === 'avatar' ? 'Envoi…' : page.avatar ? 'Changer' : 'Ajouter'}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="sr-only"
+                            onChange={(event) => {
+                              uploadAvatar(event.target.files?.[0])
+                              event.target.value = ''
+                            }}
+                          />
+                        </label>
+                        {page.avatar ? (
+                          <button type="button" className={quietBtn} onClick={removeAvatar}>
+                            Retirer
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
                   <div>
                     <p className="text-sm font-semibold text-ink">Bannière</p>
                     <div className="mt-1.5 overflow-hidden rounded-2xl bg-[#faf8f5] ring-1 ring-ink/10">
@@ -678,36 +815,57 @@ export function PageStudio({ showQr, isPro }) {
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-ink">Photos</p>
-                    <ul className="mt-1.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      {[0, 1, 2].map((index) => (
-                        <li key={index} className="overflow-hidden rounded-2xl bg-[#faf8f5] ring-1 ring-ink/10">
-                          {page.photos[index] ? (
-                            <img src={mediaUrl(page.photos[index])} alt="" className="aspect-4/5 w-full object-cover" />
-                          ) : (
-                            <div className="grid aspect-4/5 place-items-center text-xs text-ink-soft">{index + 1}</div>
-                          )}
-                          <div className="flex flex-wrap gap-2 p-2">
-                            <label className={`${quietBtn} cursor-pointer`}>
-                              {pendingPhoto === `page-${index}` ? 'Envoi…' : page.photos[index] ? 'Changer' : 'Ajouter'}
+                    <p className="text-sm font-semibold text-ink">Réalisations</p>
+                    <p className="mt-0.5 text-xs text-ink-soft">
+                      Deux emplacements, stockés sur votre compte. Collez une URL ou ajoutez une photo.
+                    </p>
+                    <ul className="mt-1.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {[0, 1].map((index) => {
+                        const photo = page.photos[index]
+                        const link = page.workUrls[index]
+                        const preview = photo ? mediaUrl(photo) : sitePreviewUrl(websiteHref(link))
+                        return (
+                          <li key={index} className="overflow-hidden rounded-2xl bg-[#faf8f5] ring-1 ring-ink/10">
+                            {preview ? (
+                              <img src={preview} alt="" className="aspect-[4/3] w-full object-cover" />
+                            ) : (
+                              <div className="grid aspect-[4/3] place-items-center px-4 text-center text-xs text-ink-soft">
+                                Photo ou aperçu du site
+                              </div>
+                            )}
+                            <div className="space-y-2 p-2">
                               <input
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp"
-                                className="sr-only"
-                                onChange={(event) => {
-                                  uploadPagePhoto(index, event.target.files?.[0])
-                                  event.target.value = ''
-                                }}
+                                className={`${studioField} mt-0`}
+                                value={link}
+                                onChange={(event) => updateWorkUrl(index, event.target.value)}
+                                onBlur={() => persistWorkUrls([0, 1].map((i) => page.workUrls?.[i] || ''))}
+                                placeholder="https://site-realise.fr"
+                                inputMode="url"
+                                autoComplete="url"
                               />
-                            </label>
-                            {page.photos[index] ? (
-                              <button type="button" className={quietBtn} onClick={() => removePagePhoto(index)}>
-                                Retirer
-                              </button>
-                            ) : null}
-                          </div>
-                        </li>
-                      ))}
+                              <div className="flex flex-wrap gap-2">
+                                <label className={`${quietBtn} cursor-pointer`}>
+                                  {pendingPhoto === `page-${index}` ? 'Envoi…' : photo ? 'Changer la photo' : 'Ajouter une photo'}
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    className="sr-only"
+                                    onChange={(event) => {
+                                      uploadPagePhoto(index, event.target.files?.[0])
+                                      event.target.value = ''
+                                    }}
+                                  />
+                                </label>
+                                {photo ? (
+                                  <button type="button" className={quietBtn} onClick={() => removePagePhoto(index)}>
+                                    Retirer la photo
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                          </li>
+                        )
+                      })}
                     </ul>
                   </div>
                 </div>
@@ -832,7 +990,10 @@ export function PageStudio({ showQr, isPro }) {
           ) : null}
 
           {section === 'about' ? (
-            <StudioPanel title="À propos" hint="Un texte, puis vous — ou l’équipe. Jusqu’à 6 personnes.">
+            <StudioPanel
+              title="À propos"
+              hint="Un texte, puis le fondateur ou l’équipe. Un portrait seul s’affiche déjà sur la page À propos."
+            >
               <label className="block text-sm font-semibold text-ink">
                 Texte
                 <textarea
@@ -851,10 +1012,10 @@ export function PageStudio({ showQr, isPro }) {
                 ) : null}
               </div>
               {people.length ? (
-                <ul className="mt-4 grid gap-4 lg:grid-cols-2">
+                <ul className={`mt-4 grid gap-4 ${people.length > 1 ? 'lg:grid-cols-2' : ''}`}>
                   {people.map((person, index) => (
-                    <li key={index} className="flex gap-4 rounded-[1.4rem] border border-ink/12 bg-[#faf8f5] p-4">
-                      <div className="w-28 shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-ink/10">
+                    <li key={index} className="flex items-start gap-4 rounded-[1.4rem] border border-ink/12 bg-[#faf8f5] p-4">
+                      <div className="w-28 shrink-0 self-start overflow-hidden rounded-2xl bg-white ring-1 ring-ink/10">
                         {person.photo ? (
                           <img src={mediaUrl(person.photo)} alt="" className="aspect-square w-full object-cover" />
                         ) : (

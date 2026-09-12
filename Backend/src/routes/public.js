@@ -79,14 +79,51 @@ function publicReview(item) {
   }
 }
 
+function publicAbout(page, user) {
+  const about = page.about || { body: '', people: [] }
+  const avatar = user.avatar || ''
+  const people = (Array.isArray(about.people) ? about.people : [])
+    .map((person, index) => ({
+      name: person.name || '',
+      role: person.role || '',
+      bio: person.bio || '',
+      photo: person.photo || (index === 0 ? avatar : ''),
+    }))
+    .filter((person) => person.name || person.photo || person.role || person.bio)
+
+  if (!people.length && (avatar || user.name)) {
+    people.push({
+      name: user.name || page.title || '',
+      role: user.onboarding?.tradeLabel || 'Fondateur',
+      bio: '',
+      photo: avatar,
+    })
+  } else if (people[0]) {
+    if (!people[0].photo && avatar) people[0].photo = avatar
+    if (!people[0].name) people[0].name = user.name || page.title || ''
+    if (!people[0].role) people[0].role = people.length === 1 ? user.onboarding?.tradeLabel || 'Fondateur' : people[0].role
+  }
+
+  return { body: about.body || '', people }
+}
+
 function publicPage(user, extras = {}) {
   const page = User.pickPage(user.page?.toObject?.() || user.page || {})
-  const photos = (page.photos || []).filter(Boolean).slice(0, 3)
+  const works = [0, 1]
+    .map((i) => {
+      const image = String(page.photos?.[i] || '').trim()
+      const url = websiteUrl(page.workUrls?.[i] || '')
+      if (!image && !url) return null
+      return { image, url }
+    })
+    .filter(Boolean)
+  const photos = works.map((item) => item.image).filter(Boolean)
   const hasGeo = page.lat != null && page.lng != null
   return {
     title: page.title || user.subscription?.company || user.name,
     description: page.description,
     photos,
+    works,
     banner: page.banner || '',
     instagram: socialUrl('instagram', page.instagram),
     facebook: socialUrl('facebook', page.facebook),
@@ -101,9 +138,9 @@ function publicPage(user, extras = {}) {
     phone: page.phone,
     email: page.email,
     theme: page.theme,
-    about: page.about,
+    about: publicAbout(page, user),
     name: user.name,
-    avatar: user.avatar || '',
+    avatar: user.avatar || (page.about?.people || []).find((person) => person?.photo)?.photo || '',
     trade: user.onboarding?.trade || '',
     tradeLabel: user.onboarding?.tradeLabel || '',
     ...extras,

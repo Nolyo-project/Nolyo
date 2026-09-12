@@ -19,6 +19,31 @@ async function sendUser(res, user, status = 200, extras = {}) {
   return res.status(status).json({ user: withPreviewPlan({ ...json, ...preview, ...extras }) })
 }
 
+function founderRole(user) {
+  return user.onboarding?.tradeLabel || 'Fondateur'
+}
+
+function ensureFounderPerson(page, user, photo = '') {
+  const people = [...(page.about?.people || [])]
+  const nextPhoto = photo || user.avatar || ''
+  if (!people.length) {
+    people.push({
+      name: user.name || '',
+      role: founderRole(user),
+      bio: '',
+      photo: nextPhoto,
+    })
+  } else {
+    const first = { ...people[0] }
+    if (!first.photo && nextPhoto) first.photo = nextPhoto
+    if (!first.name) first.name = user.name || ''
+    if (!first.role) first.role = founderRole(user)
+    people[0] = first
+  }
+  page.about = { ...(page.about || { body: '' }), people }
+  return page
+}
+
 function previewExtras(req) {
   if (!req.auth?.preview || !req.auth.exp) return {}
   const previewPlan = req.auth.previewPlan === 'essentiel' ? 'essentiel' : 'pro'
@@ -386,6 +411,7 @@ router.patch('/me', requireAuth, async (req, res) => {
       ...current,
       ...incoming,
       photos: incoming.photos || current.photos,
+      workUrls: incoming.workUrls || current.workUrls,
       theme: incoming.theme || current.theme,
       hours: incoming.hours || current.hours,
       about: incoming.about
@@ -432,20 +458,30 @@ router.post('/me/avatar', requireAuth, handleMulter, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
   removeFile(req.user.avatar)
   req.user.avatar = saveImage(req.file, 'avatars', String(req.user._id))
+  const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
+  req.user.page = ensureFounderPerson(page, req.user, req.user.avatar)
   await req.user.save()
   await sendUser(res, req.user)
 })
 
 router.delete('/me/avatar', requireAuth, async (req, res) => {
+  const previous = req.user.avatar
   removeFile(req.user.avatar)
   req.user.avatar = ''
+  const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
+  const people = [...(page.about?.people || [])]
+  if (people[0]?.photo && people[0].photo === previous) {
+    people[0] = { ...people[0], photo: '' }
+    page.about = { ...page.about, people }
+    req.user.page = page
+  }
   await req.user.save()
   await sendUser(res, req.user)
 })
 
 router.post('/me/page/photos', requireAuth, handleMulter, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Choisissez une photo.' })
-  const index = Math.min(2, Math.max(0, Number(req.body?.index) || 0))
+  const index = Math.min(1, Math.max(0, Number(req.body?.index) || 0))
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
   removeFile(page.photos[index])
   page.photos[index] = saveImage(req.file, 'pages', `${req.user._id}-${index}`)
@@ -480,7 +516,12 @@ router.post('/me/page/people/:index/photo', requireAuth, handleMulter, async (re
   const people = [...(page.about.people || [])]
   while (people.length <= index) people.push({ name: '', role: '', bio: '', photo: '' })
   removeFile(people[index].photo)
-  people[index] = { ...people[index], photo: saveImage(req.file, 'pages', `${req.user._id}-person-${index}`) }
+  people[index] = {
+    ...people[index],
+    photo: saveImage(req.file, 'pages', `${req.user._id}-person-${index}`),
+    name: people[index].name || req.user.name || '',
+    role: people[index].role || (index === 0 ? founderRole(req.user) : ''),
+  }
   page.about = { ...page.about, people }
   req.user.page = page
   await req.user.save()
@@ -501,7 +542,7 @@ router.delete('/me/page/people/:index/photo', requireAuth, async (req, res) => {
 })
 
 router.delete('/me/page/photos/:index', requireAuth, async (req, res) => {
-  const index = Math.min(2, Math.max(0, Number(req.params.index) || 0))
+  const index = Math.min(1, Math.max(0, Number(req.params.index) || 0))
   const page = User.pickPage(req.user.page?.toObject?.() || req.user.page || {})
   removeFile(page.photos[index])
   page.photos[index] = ''

@@ -189,12 +189,26 @@ const DEFAULT_PAGE_HOURS = {
   note: '',
 }
 
+function pageWebsite(value) {
+  const raw = String(value || '').trim().slice(0, 240)
+  if (!raw) return ''
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+  try {
+    const parsed = new URL(withProtocol)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
+    return parsed.href.slice(0, 240)
+  } catch {
+    return ''
+  }
+}
+
 const PAGE_DEFAULTS = {
   slug: '',
   published: false,
   title: '',
   description: '',
-  photos: ['', '', ''],
+  photos: ['', ''],
+  workUrls: ['', ''],
   banner: '',
   instagram: '',
   facebook: '',
@@ -283,6 +297,7 @@ function pickPage(source = {}) {
   const next = {
     ...PAGE_DEFAULTS,
     photos: [...PAGE_DEFAULTS.photos],
+    workUrls: [...PAGE_DEFAULTS.workUrls],
     theme: { ...DEFAULT_THEME },
     about: { body: '', people: [] },
     hours: { ...DEFAULT_PAGE_HOURS, workDays: [...DEFAULT_PAGE_HOURS.workDays] },
@@ -292,9 +307,10 @@ function pickPage(source = {}) {
   if (source.title !== undefined) next.title = String(source.title).trim().slice(0, 80)
   if (source.description !== undefined) next.description = String(source.description).trim().slice(0, 800)
   if (Array.isArray(source.photos)) {
-    next.photos = [0, 1, 2].map((i) => String(source.photos[i] || '').trim().slice(0, 240))
-  } else if (Array.isArray(PAGE_DEFAULTS.photos)) {
-    next.photos = [0, 1, 2].map((i) => String(source.photos?.[i] || '').trim())
+    next.photos = [0, 1].map((i) => String(source.photos[i] || '').trim().slice(0, 240))
+  }
+  if (Array.isArray(source.workUrls)) {
+    next.workUrls = [0, 1].map((i) => pageWebsite(source.workUrls[i]))
   }
   if (source.banner !== undefined) next.banner = String(source.banner).trim().slice(0, 240)
   for (const key of ['instagram', 'facebook', 'linkedin', 'website', 'address', 'city', 'postalCode', 'phone', 'email']) {
@@ -320,7 +336,8 @@ const pageSchema = new mongoose.Schema(
     published: { type: Boolean, default: false },
     title: { type: String, trim: true, default: '', maxlength: 80 },
     description: { type: String, trim: true, default: '', maxlength: 800 },
-    photos: { type: [String], default: () => ['', '', ''] },
+    photos: { type: [String], default: () => ['', ''] },
+    workUrls: { type: [String], default: () => ['', ''] },
     banner: { type: String, trim: true, default: '', maxlength: 240 },
     instagram: { type: String, trim: true, default: '', maxlength: 200 },
     facebook: { type: String, trim: true, default: '', maxlength: 200 },

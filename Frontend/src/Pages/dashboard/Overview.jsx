@@ -4,7 +4,7 @@ import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { copyForUser, pluralLabel } from '../../data/trades'
 import { hasModule } from '../../data/workspace'
-import { formatDateTime, formatLongDate, formatMoney, formatTime } from './format'
+import { formatDateTime, formatHourRange, formatLongDate, formatMoney } from './format'
 import { EmptyState, PageShell, Surface, icons, primaryBtn } from './ui'
 
 /** Contenu de la vue d’ensemble — réutilisé par le dashboard réel et l’aperçu landing. */
@@ -17,7 +17,7 @@ export function OverviewView({ user, data, interactive = true }) {
       ? (data.todayAppointments || []).slice(0, 3).map((item) => ({
           id: item._id,
           title: item.title,
-          meta: `${formatTime(item.startAt)}${item.contact?.name ? ` · ${item.contact.name}` : ''}`,
+          meta: `${formatHourRange(item.startAt, item.durationMinutes)}${item.contact?.name ? ` · ${item.contact.name}` : ''}`,
           kind: copy.appointments,
           to: '/dashboard/rdv',
         }))
