@@ -12,7 +12,8 @@ function mailEnabled() {
   return Boolean(
     process.env.EMAILJS_SERVICE_ID &&
       process.env.EMAILJS_TEMPLATE_ID &&
-      process.env.EMAILJS_PUBLIC_KEY,
+      process.env.EMAILJS_PUBLIC_KEY &&
+      process.env.EMAILJS_PRIVATE_KEY,
   )
 }
 
@@ -123,13 +124,18 @@ async function sendMail({ to, subject, text, html, replyTo }) {
       },
       {
         publicKey: process.env.EMAILJS_PUBLIC_KEY,
-        privateKey: process.env.EMAILJS_PRIVATE_KEY || undefined,
+        privateKey: process.env.EMAILJS_PRIVATE_KEY,
       },
     )
     return { ok: true }
   } catch (err) {
     const detail = err?.text || err?.message || String(err)
     console.error(`[mail] échec EmailJS → ${recipient} · ${subject} · ${detail}`)
+    if (/non-browser|private key|API calls are disabled/i.test(detail)) {
+      console.error(
+        '[mail] Active Account → Security : « Allow EmailJS API for non-browser applications » + private key sur Railway.',
+      )
+    }
     throw err
   }
 }
