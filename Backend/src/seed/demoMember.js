@@ -1164,9 +1164,17 @@ async function ensureDemoAccount(profile, { force = false } = {}) {
   return User.findById(user._id)
 }
 
-/** Crée/aligne les 2 comptes visiteurs et supprime tout autre membre (le président est conservé). */
+function canPurgeNonDemoMembers() {
+  return process.env.PURGE_NON_DEMO_MEMBERS === '1'
+}
+
+/** Crée/aligne les comptes démo. Ne supprime jamais un vrai client, sauf PURGE_NON_DEMO_MEMBERS=1. */
 async function ensureDemoAccounts({ force = false } = {}) {
-  await purgeOtherMembers()
+  if (canPurgeNonDemoMembers()) {
+    await purgeOtherMembers()
+  } else {
+    console.log('Comptes membres conservés : la purge démo est désactivée.')
+  }
   for (const profile of PROFILES) {
     await ensureDemoAccount(profile, { force })
   }

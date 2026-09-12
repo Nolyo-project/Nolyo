@@ -152,7 +152,6 @@ async function start() {
   await ensurePresident()
   const SiteSettings = require('./models/SiteSettings')
   await SiteSettings.getSiteSettings()
-  // Toujours : fondateur conservé, 2 comptes visiteurs (Essentiel + Pro page publique), reste purgé
   await ensureDemoAccounts()
   await ensureSeedSiteReviews()
   await User.updateMany(
