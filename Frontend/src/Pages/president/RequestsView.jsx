@@ -6,7 +6,7 @@ import { openQuoteInGmail } from './quoteMail'
 
 const PAGE_SIZE = 9
 
-function RequestDetail({ item, quoteNote, setQuoteNote, issueNote, setIssueNote, pending, copied, onCopy, onRun, onFlag, onClear, onClose }) {
+function RequestDetail({ item, quoteNote, setQuoteNote, issueNote, setIssueNote, pending, copied, onCopy, onRun, onFlag, onClear, onDelete, onClose }) {
   if (!item) {
     return <Empty>Choisissez une personne pour voir sa fiche.</Empty>
   }
@@ -190,6 +190,19 @@ function RequestDetail({ item, quoteNote, setQuoteNote, issueNote, setIssueNote,
             {item.inviteCode ? 'Renvoyer le code' : 'Générer le code'}
           </button>
         ) : null}
+        {item.status !== 'registered' ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              if (!window.confirm(`Supprimer la demande de ${item.name || item.company} ?`)) return
+              onDelete?.(item.id)
+            }}
+            className="rounded-full border border-red-200 px-5 py-2.5 text-sm font-semibold text-red-800 disabled:opacity-60"
+          >
+            Supprimer
+          </button>
+        ) : null}
       </div>
     </article>
   )
@@ -207,6 +220,7 @@ function RequestsView({
   onCopy,
   onRun,
   onUpdate,
+  onDeleted,
   q,
 }) {
   const [tab, setTab] = useState('received')
@@ -260,6 +274,17 @@ function RequestsView({
     try {
       const data = await api(`/api/president/requests/${id}/clear-issue`, { method: 'POST' })
       onUpdate?.(data.request)
+    } catch (err) {
+      setLocalError(err.message)
+    }
+  }
+
+  async function deleteRequest(id) {
+    setLocalError('')
+    try {
+      await api(`/api/president/requests/${id}`, { method: 'DELETE' })
+      onDeleted?.(id)
+      setSelectedId(null)
     } catch (err) {
       setLocalError(err.message)
     }
@@ -334,6 +359,7 @@ function RequestsView({
               onRun={onRun}
               onFlag={flagIssue}
               onClear={clearIssue}
+              onDelete={deleteRequest}
               onClose={() => setSelectedId(null)}
             />
           </div>

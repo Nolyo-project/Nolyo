@@ -205,6 +205,16 @@ function PresidentDashboard() {
     )
   }
 
+  function removeRequest(id) {
+    setRequests((current) => current.filter((item) => item.id !== id))
+    setCounts((current) => {
+      const item = requests.find((entry) => entry.id === id)
+      if (!item || current[item.status] === undefined) return current
+      return { ...current, [item.status]: Math.max(0, (current[item.status] || 0) - 1) }
+    })
+    setSelectedId((current) => (current === id ? null : current))
+  }
+
   async function resolveDeletion(action) {
     if (!selectedDeletion) return
     setError('')
@@ -605,6 +615,7 @@ function PresidentDashboard() {
               onCopy={copyCode}
               onRun={run}
               onUpdate={updateRequest}
+              onDeleted={removeRequest}
               q={q}
             />
           ) : null}

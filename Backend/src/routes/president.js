@@ -279,6 +279,18 @@ router.post('/requests/:id/clear-issue', async (req, res) => {
   res.json({ request: await requestWithAvatar(request) })
 })
 
+router.delete('/requests/:id', async (req, res) => {
+  const request = await SubscriptionRequest.findById(req.params.id)
+  if (!request) return res.status(404).json({ error: 'Demande introuvable.' })
+  if (request.status === 'registered' && request.user) {
+    return res.status(400).json({
+      error: 'Cette demande est liée à un compte. Supprimez le membre plutôt que la demande.',
+    })
+  }
+  await request.deleteOne()
+  res.json({ ok: true, id: String(req.params.id) })
+})
+
 router.get('/members', async (_req, res) => {
   const { DEMO_EMAILS } = require('../seed/demoMember')
   const users = await User.find({
