@@ -8,6 +8,7 @@ import {
   peekPreviewPlan,
 } from '../auth/previewSession'
 import { hasWorkspaceAccess } from '../data/billing'
+import { acquisitionPayload, EVENTS, getAnalyticsSessionId, track } from '../utils/analytics'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'nolio_token'
@@ -97,22 +98,24 @@ export function AuthProvider({ children }) {
     async ({ name, email, password, code }) => {
       const data = await api('/api/auth/register', {
         method: 'POST',
-        body: { name, email, password, code },
+        body: { name, email, password, code, acquisition: acquisitionPayload() },
       })
       persist(data.token, data.user)
+      const plan = data.user?.subscription?.plan
+      track(EVENTS.SIGN_UP, { method: 'invite_code', plan })
+      track(EVENTS.TRIAL_START, { plan })
       return data.user
     },
     [persist],
   )
 
   const startPreview = useCallback(async (plan = 'pro') => {
-    const { getAnalyticsSessionId, gaEvent } = await import('../utils/analytics')
     const previewPlan = plan === 'essentiel' ? 'essentiel' : 'pro'
     const data = await api('/api/auth/preview', {
       method: 'POST',
       body: { plan: previewPlan, sessionId: getAnalyticsSessionId() },
     })
-    gaEvent('preview_start', { plan: previewPlan })
+    track(EVENTS.PREVIEW_START, { plan: previewPlan })
     persist(data.token, data.user)
     return data.user
   }, [persist])
@@ -123,6 +126,7 @@ export function AuthProvider({ children }) {
       body,
     })
     setUser(data.user)
+    track(EVENTS.ONBOARDING_COMPLETE, { plan: data.user?.subscription?.plan })
     return data.user
   }, [])
 

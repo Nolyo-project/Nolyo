@@ -10,6 +10,7 @@ import TestimonialsCarousel, {
 } from "../components/TestimonialsCarousel";
 import TryPreviewButton from "../components/TryPreviewButton";
 import { plans } from "../data/plans";
+import { EVENTS, track } from "../utils/analytics";
 
 const DEMO_PAGE_FALLBACK = "/p/maison-brume";
 
@@ -248,6 +249,25 @@ function Home() {
     if (!location.hash) return;
     const el = document.querySelector(location.hash);
     el?.scrollIntoView({ behavior: "smooth" });
+  }, [location.hash]);
+
+  useEffect(() => {
+    const el = document.getElementById("offres");
+    if (!el) return undefined;
+    const fire = () => {
+      track(EVENTS.VIEW_PRICING, { surface: "home" });
+    };
+    if (location.hash === "#offres") fire();
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        fire();
+        io.disconnect();
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, [location.hash]);
 
   useEffect(() => {

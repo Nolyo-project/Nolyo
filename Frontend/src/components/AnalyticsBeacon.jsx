@@ -1,23 +1,22 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { initGoogleAnalytics, shouldTrackPath, trackPageView } from '../utils/analytics'
+import { getConsent } from '../utils/consent'
+import { captureAcquisition, initGoogleAnalytics, shouldTrackPath, trackPageView } from '../utils/analytics'
 import { isAdminHost } from '../config/site'
-
-let gaReady = false
 
 function AnalyticsBeacon() {
   const location = useLocation()
 
   useEffect(() => {
     if (isAdminHost()) return
-    if (!gaReady) {
-      initGoogleAnalytics()
-      gaReady = true
-    }
+    captureAcquisition()
+    const consent = getConsent()
+    if (consent?.analytics || consent?.ads) initGoogleAnalytics()
   }, [])
 
   useEffect(() => {
     if (isAdminHost()) return
+    captureAcquisition()
     if (!shouldTrackPath(location.pathname)) return
     trackPageView(location.pathname)
   }, [location.pathname, location.search])

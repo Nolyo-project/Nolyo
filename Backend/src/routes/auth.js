@@ -10,6 +10,7 @@ const { RESERVED } = require('./public')
 const { TRADE_IDS, WORK_MODES, publicTrades } = require('../data/trades')
 const { pickWorkspace } = require('../data/workspace')
 const { startMemberSubscription } = require('../utils/stripe')
+const { hasAcquisition, pickAcquisition, trackEvent } = require('../utils/analytics')
 const { sendWelcome } = require('../utils/emails')
 const { applyOnboarding } = require('../utils/applyOnboarding')
 const { passwordStrengthError } = require('../utils/password')
@@ -141,12 +142,16 @@ router.post('/register', async (req, res) => {
 
   try {
     const now = new Date()
+    const fromRequest = pickAcquisition(request.acquisition || {})
+    const fromBody = pickAcquisition(req.body?.acquisition || {})
+    const acquisition = hasAcquisition(fromRequest) ? fromRequest : fromBody
     const user = await User.create({
       name,
       email,
       passwordHash: await User.hashPassword(password),
       role: 'member',
       request: request._id,
+      ...(hasAcquisition(acquisition) ? { acquisition } : {}),
       subscription: {
         plan: request.plan,
         status: 'trialing',
@@ -170,6 +175,21 @@ router.post('/register', async (req, res) => {
     await request.save()
 
     sendWelcome(user).catch((e) => console.error('Mail bienvenue', e.message))
+
+    const funnel = {
+      path: '/inscription',
+      plan: request.plan,
+      source: acquisition.source,
+      medium: acquisition.medium,
+      campaign: acquisition.campaign,
+      sessionId: acquisition.sessionId,
+    }
+    trackEvent({ type: 'sign_up', ...funnel, meta: { userId: String(user._id) } }).catch((err) =>
+      console.error('analytics sign_up', err.message),
+    )
+    trackEvent({ type: 'trial_start', ...funnel, meta: { userId: String(user._id) } }).catch((err) =>
+      console.error('analytics trial_start', err.message),
+    )
 
     return res.status(201).json({
       token: signToken(user),
@@ -302,6 +322,16 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     displayAs,
     services,
   })
+  trackEvent({
+    type: 'onboarding_complete',
+    path: '/onboarding',
+    plan: user.subscription?.plan || '',
+    source: user.acquisition?.source,
+    medium: user.acquisition?.medium,
+    campaign: user.acquisition?.campaign,
+    sessionId: user.acquisition?.sessionId,
+    meta: { userId: String(user._id) },
+  }).catch((err) => console.error('analytics onboarding', err.message))
   await sendUser(res, user)
 })
 

@@ -1,6 +1,16 @@
 const mongoose = require('mongoose')
 
-const TYPES = ['page_view', 'preview_start']
+const TYPES = [
+  'page_view',
+  'preview_start',
+  'view_pricing',
+  'generate_lead',
+  'sign_up',
+  'trial_start',
+  'onboarding_complete',
+  'purchase',
+  'subscription_cancel',
+]
 
 const analyticsEventSchema = new mongoose.Schema(
   {

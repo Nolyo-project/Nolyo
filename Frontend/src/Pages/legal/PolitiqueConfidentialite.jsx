@@ -6,7 +6,7 @@ function PolitiqueConfidentialite() {
       <p className="text-xs font-semibold tracking-[0.2em] text-copper uppercase">Légal</p>
       <h1 className="mt-2 font-display text-3xl tracking-tight sm:text-5xl">Politique de confidentialité</h1>
       <p className="mt-4 rounded-2xl bg-cream px-4 py-3 text-sm text-ink-soft ring-1 ring-ink/8">
-        Dernière mise à jour : 9 septembre 2026.
+        Dernière mise à jour : 13 septembre 2026.
       </p>
 
       <section className="mt-8 space-y-6 rounded-3xl bg-cream p-6 ring-1 ring-ink/8 sm:p-8">
@@ -65,8 +65,19 @@ function PolitiqueConfidentialite() {
         <article>
           <h2 className="font-display text-2xl">7. Cookies et mesure d’audience</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-            Nolyo utilise des cookies techniques nécessaires au fonctionnement du site, et peut utiliser des outils de
-            mesure d’audience (ex. Google Analytics) pour analyser le trafic de façon agrégée.
+            Nolyo utilise des cookies et un stockage local techniques nécessaires au fonctionnement du site (connexion,
+            sécurité, préférences). Un bandeau vous permet d’accepter ou de refuser les cookies optionnels. Vous pouvez
+            modifier ce choix à tout moment via le lien « Cookies » en bas de page.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+            Si vous acceptez, Nolyo peut charger Google Analytics 4 (mesure d’audience agrégée) et Google Ads (mesure
+            des campagnes). Ces outils ne reçoivent pas votre e-mail. Les pages vues marketing et les étapes du tunnel
+            (demande d’abonnement, inscription) sont aussi enregistrées de façon interne, sans publicité, pour le
+            tableau de bord fondateur.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+            Un paiement n’est jamais considéré comme une conversion tant que Stripe n’a pas confirmé un encaissement
+            réel.
           </p>
         </article>
       </section>

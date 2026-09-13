@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { consumePreviewExit, peekPreviewPlan } from '../auth/previewSession'
 import { formatPrice, paymentNote, plans as catalog } from '../data/plans'
+import { acquisitionPayload, EVENTS, track } from '../utils/analytics'
 
 const fieldClass =
   'mt-1.5 w-full rounded-2xl border border-ink/10 bg-cream px-4 py-3 text-sm outline-none transition focus:border-copper'
@@ -27,6 +28,10 @@ function Subscribe() {
   useEffect(() => {
     consumePreviewExit()
   }, [])
+
+  useEffect(() => {
+    track(EVENTS.VIEW_PRICING, { plan, surface: 'abonnement' })
+  }, [plan])
 
   useEffect(() => {
     if (planFromUrl === 'pro' || planFromUrl === 'essentiel') return
@@ -81,8 +86,10 @@ function Subscribe() {
           ...form,
           plan: selected.id,
           teamSize: '2',
+          acquisition: acquisitionPayload(),
         },
       })
+      track(EVENTS.GENERATE_LEAD, { plan: selected.id, method: 'form' })
       setSent(true)
     } catch (err) {
       setError(err.message)

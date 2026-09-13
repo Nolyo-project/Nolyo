@@ -106,7 +106,8 @@ async function handleStripeWebhook(req, res) {
 
     if (event.type === 'invoice.paid') {
       const invoice = event.data.object
-      if ((invoice.amount_paid || 0) > 0 || invoice.paid) {
+      const amountPaid = Number(invoice.amount_paid || 0)
+      if (amountPaid > 0 || invoice.paid) {
         const user = await findUserForStripe({
           customerId: String(invoice.customer),
           userId: invoice.metadata?.noly_user,
@@ -120,6 +121,33 @@ async function handleStripeWebhook(req, res) {
         // Ne force pas le prélèvement auto si le membre a choisi le paiement manuel
         if (user?.subscription?.billingChoice !== 'invoice') {
           await attachDefaultPaymentMethod(invoice).catch((err) => console.error('PM attach', err.message))
+        }
+        if (amountPaid > 0) {
+          const { recordPaidPurchase } = require('../utils/analytics')
+          const { sendGa4Purchase } = require('../utils/gaMeasurement')
+          const plan = user?.subscription?.plan || ''
+          const value = amountPaid / 100
+          const currency = String(invoice.currency || 'eur').toUpperCase()
+          const recorded = await recordPaidPurchase({
+            transactionId: invoice.id,
+            value,
+            currency,
+            plan,
+            acquisition: user?.acquisition || {},
+          }).catch((err) => {
+            console.error('analytics purchase', err.message)
+            return null
+          })
+          // GA4 Measurement Protocol : no-op tant que GA_MEASUREMENT_ID + GA_API_SECRET absents
+          if (recorded) {
+            sendGa4Purchase({
+              transactionId: invoice.id,
+              value,
+              currency,
+              plan,
+              sessionId: user?.acquisition?.sessionId,
+            }).catch((err) => console.error('GA4 purchase', err.message))
+          }
         }
       }
     }

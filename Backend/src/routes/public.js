@@ -337,16 +337,17 @@ router.post('/track', async (req, res) => {
 
   const { trackEvent } = require('../utils/analytics')
   const type = String(payload?.type || '').trim()
-  if (type !== 'page_view') return res.status(204).end()
+  if (type !== 'page_view' && type !== 'view_pricing') return res.status(204).end()
 
   await trackEvent({
-    type: 'page_view',
+    type,
     path: payload?.path,
     referrer: payload?.referrer,
     source: payload?.source || payload?.utm_source,
     medium: payload?.medium || payload?.utm_medium,
     campaign: payload?.campaign || payload?.utm_campaign,
     sessionId: payload?.sessionId,
+    plan: payload?.plan,
   })
   res.status(204).end()
 })

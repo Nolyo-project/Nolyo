@@ -4,6 +4,7 @@ const SubscriptionRequest = require('../models/SubscriptionRequest')
 const User = require('../models/User')
 const { sendRequestReceived, sendFounderNewRequest } = require('../utils/emails')
 const { createCustomerForRequest } = require('../utils/stripe')
+const { hasAcquisition, pickAcquisition, trackEvent } = require('../utils/analytics')
 
 const router = express.Router()
 
@@ -54,6 +55,7 @@ router.post('/', async (req, res) => {
     })
   }
 
+  const acquisition = pickAcquisition(req.body?.acquisition || req.body)
   const request = await SubscriptionRequest.create({
     name,
     email,
@@ -62,7 +64,19 @@ router.post('/', async (req, res) => {
     plan: plan.id,
     message,
     status: 'received',
+    ...(hasAcquisition(acquisition) ? { acquisition } : {}),
   })
+
+  trackEvent({
+    type: 'generate_lead',
+    path: '/abonnement',
+    plan: plan.id,
+    source: acquisition.source,
+    medium: acquisition.medium,
+    campaign: acquisition.campaign,
+    sessionId: acquisition.sessionId,
+    meta: { requestId: String(request._id) },
+  }).catch((err) => console.error('analytics lead', err.message))
 
   try {
     await createCustomerForRequest(request)

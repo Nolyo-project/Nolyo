@@ -309,6 +309,15 @@ router.post('/choice', async (req, res) => {
         req.user.subscription.billingPromptSeenAt = new Date()
       }
       await req.user.save()
+      const { trackEvent } = require('../utils/analytics')
+      trackEvent({
+        type: 'subscription_cancel',
+        path: '/dashboard',
+        plan: req.user.subscription?.plan || '',
+        source: req.user.acquisition?.source,
+        sessionId: req.user.acquisition?.sessionId,
+        meta: { phase, userId: String(req.user._id), alreadyPending: true },
+      }).catch((err) => console.error('analytics cancel', err.message))
       const user = await AccountDeletionRequest.decorateUser(req.user)
       return res.json({
         user,
@@ -340,6 +349,15 @@ router.post('/choice', async (req, res) => {
       req.user.subscription.billingPromptSeenAt = new Date()
     }
     await req.user.save()
+    const { trackEvent } = require('../utils/analytics')
+    trackEvent({
+      type: 'subscription_cancel',
+      path: '/dashboard',
+      plan: req.user.subscription?.plan || '',
+      source: req.user.acquisition?.source,
+      sessionId: req.user.acquisition?.sessionId,
+      meta: { phase, userId: String(req.user._id) },
+    }).catch((err) => console.error('analytics cancel', err.message))
     const user = await AccountDeletionRequest.decorateUser(req.user)
     return res.status(201).json({
       user,

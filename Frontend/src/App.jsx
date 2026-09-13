@@ -38,6 +38,7 @@ import PolitiqueConfidentialite from './Pages/legal/PolitiqueConfidentialite'
 import PreviewExpiryWatcher from './components/PreviewExpiryWatcher'
 import IdleSessionWatcher from './components/IdleSessionWatcher'
 import AnalyticsBeacon from './components/AnalyticsBeacon'
+import ConsentBanner from './components/ConsentBanner'
 import { canVisitModule } from './data/workspace'
 import { isAdminHost, siteOrigin } from './config/site'
 import SiteStatusGate from './components/SiteStatusGate'
@@ -257,6 +258,7 @@ function App() {
           <PreviewExpiryWatcher />
           <IdleSessionWatcher />
           <AnalyticsBeacon />
+          <ConsentBanner />
           {isAdminHost() ? (
             <AdminGate>
               <AdminApp />

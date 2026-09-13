@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import Logo from './Logo'
+import { openConsentPreferences } from '../utils/consent'
 
 const columns = [
   {
@@ -77,6 +78,17 @@ function Footer() {
                   )}
                 </li>
               ))}
+              {column.title === 'Légal' ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={openConsentPreferences}
+                    className="text-sm text-cream/80 transition hover:text-cream"
+                  >
+                    Cookies
+                  </button>
+                </li>
+              ) : null}
             </ul>
           </div>
         ))}

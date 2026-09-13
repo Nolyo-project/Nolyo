@@ -457,6 +457,16 @@ const userSchema = new mongoose.Schema(
       },
       default: () => ({}),
     },
+    acquisition: {
+      source: { type: String, trim: true, default: '', maxlength: 80 },
+      medium: { type: String, trim: true, default: '', maxlength: 80 },
+      campaign: { type: String, trim: true, default: '', maxlength: 120 },
+      gclid: { type: String, trim: true, default: '', maxlength: 200 },
+      gbraid: { type: String, trim: true, default: '', maxlength: 200 },
+      wbraid: { type: String, trim: true, default: '', maxlength: 200 },
+      sessionId: { type: String, trim: true, default: '', maxlength: 64 },
+      landingPath: { type: String, trim: true, default: '', maxlength: 300 },
+    },
     workspace: {
       type: workspaceSchema,
       default: () => ({}),

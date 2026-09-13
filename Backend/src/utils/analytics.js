@@ -29,9 +29,28 @@ function resolveSource({ source, referrer, path }) {
   return host
 }
 
+const ALLOWED_TYPES = AnalyticsEvent.TYPES
+
+function pickAcquisition(input = {}) {
+  return {
+    source: truncate(input.source || input.utm_source, 80),
+    medium: truncate(input.medium || input.utm_medium, 80),
+    campaign: truncate(input.campaign || input.utm_campaign, 120),
+    gclid: truncate(input.gclid, 200),
+    gbraid: truncate(input.gbraid, 200),
+    wbraid: truncate(input.wbraid, 200),
+    sessionId: truncate(input.sessionId, 64),
+    landingPath: truncate(input.landingPath || input.path, 300),
+  }
+}
+
+function hasAcquisition(acq = {}) {
+  return Boolean(acq.source || acq.medium || acq.campaign || acq.gclid || acq.gbraid || acq.wbraid || acq.sessionId)
+}
+
 async function trackEvent(payload = {}) {
   const type = payload.type
-  if (type !== 'page_view' && type !== 'preview_start') return null
+  if (!ALLOWED_TYPES.includes(type)) return null
 
   const path = truncate(payload.path, 300)
   const referrer = truncate(payload.referrer, 500)
@@ -51,11 +70,36 @@ async function trackEvent(payload = {}) {
       medium: truncate(payload.medium || payload.utm_medium, 80),
       campaign: truncate(payload.campaign || payload.utm_campaign, 120),
       sessionId: truncate(payload.sessionId, 64),
+      meta: payload.meta && typeof payload.meta === 'object' ? payload.meta : undefined,
     })
   } catch (err) {
     console.error('analytics track', err.message)
     return null
   }
+}
+
+async function recordPaidPurchase({ transactionId, value, currency = 'EUR', plan, acquisition = {} }) {
+  const amount = Number(value)
+  const id = String(transactionId || '').trim()
+  if (!(amount > 0) || !id) return null
+
+  const existing = await AnalyticsEvent.findOne({ type: 'purchase', 'meta.transactionId': id })
+  if (existing) return existing
+
+  return trackEvent({
+    type: 'purchase',
+    path: '/facture',
+    plan,
+    source: acquisition.source,
+    medium: acquisition.medium,
+    campaign: acquisition.campaign,
+    sessionId: acquisition.sessionId,
+    meta: {
+      transactionId: id,
+      value: Math.round(amount * 100) / 100,
+      currency: String(currency || 'EUR').toUpperCase(),
+    },
+  })
 }
 
 function startOfDaysAgo(days) {
@@ -65,4 +109,12 @@ function startOfDaysAgo(days) {
   return d
 }
 
-module.exports = { trackEvent, resolveSource, startOfDaysAgo, hostFromReferrer }
+module.exports = {
+  trackEvent,
+  resolveSource,
+  startOfDaysAgo,
+  hostFromReferrer,
+  pickAcquisition,
+  hasAcquisition,
+  recordPaidPurchase,
+}
