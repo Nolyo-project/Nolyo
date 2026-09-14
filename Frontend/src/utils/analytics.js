@@ -163,6 +163,18 @@ function adsId() {
   return String(import.meta.env.VITE_GOOGLE_ADS_ID || '').trim()
 }
 
+function metaPixelId() {
+  return String(import.meta.env.VITE_META_PIXEL_ID || '1102955475629451').trim()
+}
+
+const META_EVENTS = {
+  [EVENTS.PAGE_VIEW]: 'PageView',
+  [EVENTS.VIEW_PRICING]: 'ViewContent',
+  [EVENTS.GENERATE_LEAD]: 'Lead',
+  [EVENTS.SIGN_UP]: 'CompleteRegistration',
+  [EVENTS.TRIAL_START]: 'StartTrial',
+}
+
 function ensureGtag() {
   if (typeof window === 'undefined') return false
   if (window.gtag) return true
@@ -231,6 +243,72 @@ export function disableGoogleScripts() {
   }
 }
 
+function ensureFbq() {
+  if (typeof window === 'undefined') return false
+  if (window.fbq) return true
+  const n = (window.fbq = function fbq() {
+    n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+  })
+  if (!window._fbq) window._fbq = n
+  n.push = n
+  n.loaded = true
+  n.version = '2.0'
+  n.queue = []
+  return true
+}
+
+function loadMetaPixelScript() {
+  if (document.querySelector('script[data-nolio-fbq]')) return
+  const script = document.createElement('script')
+  script.async = true
+  script.dataset.nolioFbq = '1'
+  script.src = 'https://connect.facebook.net/en_US/fbevents.js'
+  document.head.appendChild(script)
+}
+
+function sendMetaPageView() {
+  if (typeof window === 'undefined' || !window.fbq) return
+  const key = `${window.location.pathname}${window.location.search}`
+  if (window.__nolioMetaLastPageView === key) return
+  window.__nolioMetaLastPageView = key
+  window.fbq('track', 'PageView')
+}
+
+/** Charge le Pixel Meta uniquement après consentement pubs. */
+export function initMetaPixel() {
+  if (typeof window === 'undefined' || !hasAdsConsent()) return null
+  const pixelId = metaPixelId()
+  if (!pixelId) return null
+
+  ensureFbq()
+  loadMetaPixelScript()
+
+  if (!window.__nolioMetaConfigured) {
+    window.fbq('consent', 'grant')
+    window.fbq('init', pixelId)
+    window.__nolioMetaConfigured = true
+    if (shouldTrackPath(window.location.pathname)) sendMetaPageView()
+  }
+
+  return pixelId
+}
+
+export function disableMetaPixel() {
+  window.__nolioMetaConfigured = false
+  window.__nolioMetaLastPageView = ''
+  if (typeof window.fbq === 'function') window.fbq('consent', 'revoke')
+}
+
+export function initMarketingPixels() {
+  initGoogleAnalytics()
+  initMetaPixel()
+}
+
+export function disableMarketingPixels() {
+  disableGoogleScripts()
+  disableMetaPixel()
+}
+
 function sendGoogle(name, params = {}) {
   if (!hasAnalyticsConsent() && !hasAdsConsent()) return
   initGoogleAnalytics()
@@ -241,6 +319,25 @@ function sendGoogle(name, params = {}) {
     BLOCKED_GA_KEYS.forEach((key) => delete safe[key])
     window.gtag('event', name, safe)
   }
+}
+
+function sendMeta(name, params = {}) {
+  if (!hasAdsConsent()) return
+  initMetaPixel()
+  if (typeof window === 'undefined' || !window.fbq) return
+
+  if (name === EVENTS.PAGE_VIEW) {
+    sendMetaPageView()
+    return
+  }
+
+  const event = META_EVENTS[name]
+  if (!event) return
+  const payload = {}
+  if (params.plan) payload.content_name = params.plan
+  if (params.currency) payload.currency = params.currency
+  if (params.value != null && params.value !== '') payload.value = params.value
+  window.fbq('track', event, payload)
 }
 
 export function gaEvent(name, params = {}) {
@@ -285,6 +382,7 @@ export async function track(name, props = {}) {
     if (gaParams[key] === undefined || gaParams[key] === '') delete gaParams[key]
   })
   sendGoogle(name, gaParams)
+  sendMeta(name, gaParams)
 }
 
 export function getAnalyticsSessionId() {

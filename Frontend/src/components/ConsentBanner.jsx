@@ -7,12 +7,12 @@ import {
   onConsentOpen,
   refuseOptionalConsent,
 } from '../utils/consent'
-import { disableGoogleScripts, initGoogleAnalytics } from '../utils/analytics'
+import { disableMarketingPixels, initMarketingPixels } from '../utils/analytics'
 import { isAdminHost } from '../config/site'
 
 function applyConsent(consent) {
-  if (consent?.analytics || consent?.ads) initGoogleAnalytics()
-  else disableGoogleScripts()
+  if (consent?.analytics || consent?.ads) initMarketingPixels()
+  else disableMarketingPixels()
 }
 
 function ConsentBanner() {
@@ -44,7 +44,7 @@ function ConsentBanner() {
           <p className="text-[11px] font-semibold tracking-[0.18em] text-copper uppercase">Cookies</p>
           <p className="mt-1 text-sm leading-relaxed text-ink">
             Nolyo utilise des cookies techniques pour fonctionner. Avec votre accord, nous mesurons aussi le trafic
-            (Google Analytics) et les campagnes (Google Ads), sans jamais envoyer d’e-mail à Google.{' '}
+            (Google Analytics) et les campagnes (Google Ads, Meta), sans jamais envoyer d’e-mail à ces régies.{' '}
             <Link to="/politique-confidentialite" className="font-semibold underline decoration-copper/40">
               Politique de confidentialité
             </Link>
